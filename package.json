@@ -1,0 +1,35 @@
+{
+  "name": "statblock-forge",
+  "version": "0.4.0",
+  "description": "Statblock Forge for Atlas VTT — an independent Obsidian companion plugin.",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "build": "node scripts/compile-styles.mjs && node esbuild.config.mjs",
+    "dev": "node scripts/compile-styles.mjs && node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "build:styles": "node scripts/compile-styles.mjs",
+    "test:compendium": "node --experimental-strip-types --test tests/fieldCompendium.test.mjs",
+    "test:layout": "node --experimental-strip-types --test tests/gridLayout.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.5",
+    "obsidian": "^1.8.7",
+    "sass": "^1.86.0",
+    "typescript": "^5.8.3"
+  },
+  "type": "module",
+  "author": "Guilherme Berger Lopes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt"
+  },
+  "bugs": {
+    "url": "https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues"
+  },
+  "homepage": "https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt"
+}

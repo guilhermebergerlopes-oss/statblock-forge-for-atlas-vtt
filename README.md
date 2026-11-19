@@ -49,4 +49,3 @@ Forge is an independent community plugin. It can integrate with Atlas VTT when A
 ## License
 
 This project is distributed under GNU AGPL-3.0-only. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
-# statblock-forge-for-atlas-vtt
