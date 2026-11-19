@@ -30,7 +30,7 @@ import {
 } from '../atlas/atlasRestResources.ts';
 import { RestResultModal, type ForgeRestResultAction, type ForgeRestResultSpend } from './RestResultModal.ts';
 import { FORGE_STATBLOCK_IMAGE_FRAMES_KEY, readStatblockImageFrames, withStatblockImageFrame, type StatblockImageFrame, type StatblockImageFrames } from '../statblocks/statblockImageFraming.ts';
-import { DEFAULT_FORGE_SHEET_WIDTH, MAX_FORGE_SHEET_WIDTH, MIN_FORGE_SHEET_WIDTH, STEP_FORGE_SHEET_WIDTH, resolveForgeSheetWidth, normalizeForgeSheetWidth } from '../templates/sheetWidth.ts';
+import { DEFAULT_FORGE_SHEET_WIDTH, FORGE_STATBLOCK_SHEET_WIDTH_KEY, MAX_FORGE_SHEET_WIDTH, MIN_FORGE_SHEET_WIDTH, STEP_FORGE_SHEET_WIDTH, resolveForgeSheetWidth, normalizeForgeSheetWidth } from '../templates/sheetWidth.ts';
 import { routeStatblockWheel } from './statblockWheelNavigation.ts';
 import { preserveUnchangedFieldCompendiumEntrySources } from '../statblocks/fieldCompendiumUsageModel.ts';
 import { SourceMetadataRefreshGate } from './sourceMetadataRefreshGate.ts';
@@ -54,7 +54,6 @@ function sameStoredValue(left: unknown, right: unknown): boolean {
 
 /** Rest failures are transient UI feedback, never a permanent statblock status. */
 const REST_ERROR_NOTICE_DURATION_MS = 6_000;
-const FORGE_STATBLOCK_SHEET_WIDTH_KEY = '__forgeSheetWidth';
 
 /** Shared editable statblock surface, usable in a standalone view or beside its Markdown note. */
 export class StatblockRenderSurface {

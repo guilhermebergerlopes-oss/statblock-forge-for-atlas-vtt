@@ -10,6 +10,7 @@ import { renderStatblock } from '../render/statblockPreviewRenderer.ts';
 import { resolveVaultImageResource } from '../render/vaultImageResolver.ts';
 import { attachForgeStatblockDiceRolling } from '../render/statblockDiceLinks.ts';
 import { normalizeForgeLanguage } from '../i18n/localization.ts';
+import { FORGE_STATBLOCK_SHEET_WIDTH_KEY, resolveForgeSheetWidth } from '../templates/sheetWidth.ts';
 
 const FORGE_SHEET_PROVIDER_ID = 'statblock-forge';
 
@@ -66,6 +67,7 @@ interface ForgeResolvedSource {
   layout: ReturnType<typeof createForgeLayout>;
   data: JsonRecord;
   basename: string;
+  sheetWidth: number;
 }
 
 async function resolveForgeSource(app: App, plugin: StatblockForgePlugin, sourceId: string): Promise<ForgeResolvedSource | null> {
@@ -95,6 +97,7 @@ async function resolveForgeSource(app: App, plugin: StatblockForgePlugin, source
     layout,
     data: forgeRestDataWithResources(source.binding.data, source.raw),
     basename: source.basename,
+    sheetWidth: resolveForgeSheetWidth(source.raw[FORGE_STATBLOCK_SHEET_WIDTH_KEY], layout.sheetWidth),
   };
 }
 
@@ -116,7 +119,7 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
   const provider: AtlasSheetProvider = {
     id: FORGE_SHEET_PROVIDER_ID,
     name: 'Statblock Forge',
-    version: '0.4.3',
+    version: '0.4.4',
     async getSheet(sourceId) {
       const resolved = await resolveDefinition(sourceId);
       if (!resolved) return null;
@@ -143,7 +146,8 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
         markdownComponent = null;
         renderedCard?.remove();
         renderedCard = null;
-        context.container.replaceChildren();
+        activeContext.container.replaceChildren();
+        delete activeContext.container.dataset.forgeSheetWidth;
       };
 
       const draw = async (): Promise<void> => {
@@ -188,6 +192,10 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
         });
         renderedCard.classList.add('statblock-forge__final-card');
         renderedCard.dataset.forgeRenderTarget = 'atlas-provider-preview';
+        renderedCard.setCssProps({ ['--statblock-forge-sheet-width']: `${resolved.sheetWidth}px` });
+        if (activeContext.variant === 'preview') {
+          activeContext.container.dataset.forgeSheetWidth = String(resolved.sheetWidth);
+        }
         if (disposed || activeContext.signal.aborted) {
           clear();
           return;

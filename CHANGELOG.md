@@ -1,3 +1,10 @@
+## 0.4.4 — Largura da pré-visualização Ctrl
+
+### Fixed
+- Ctrl-hover provider previews now inherit the effective statblock width: the Template width by default, or the per-statblock override when present.
+- Exposes the effective width to the Atlas fork preview window while preserving the existing scrollable-body behavior.
+- Updates package, manifest, provider and bundled documentation versions to 0.4.4.
+
 ## 0.4.3 — Metadados de publicação
 
 ### Changed

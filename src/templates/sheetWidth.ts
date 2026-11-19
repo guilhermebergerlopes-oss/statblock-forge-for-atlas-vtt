@@ -1,3 +1,6 @@
+/** Frontmatter/JSON key for an optional per-statblock width override. */
+export const FORGE_STATBLOCK_SHEET_WIDTH_KEY = '__forgeSheetWidth';
+
 /** Shared editor/rendered statblock width bounds in CSS pixels. */
 export const DEFAULT_FORGE_SHEET_WIDTH = 560;
 export const MIN_FORGE_SHEET_WIDTH = 400;
