@@ -380,13 +380,13 @@ function appendFieldCompendiumPicker(
     const availableAbove = Math.max(0, rect.top - 12);
     const openAbove = availableBelow < 280 && availableAbove > availableBelow;
     const maxHeight = Math.max(160, Math.min(480, (openAbove ? availableAbove : availableBelow) || 480));
-    popover.style.position = 'fixed';
-    popover.style.left = `${left}px`;
-    popover.style.width = `${Math.min(width, viewportWidth - 24)}px`;
-    popover.style.maxHeight = `${maxHeight}px`;
-    popover.style.top = openAbove
+    popover.setCssStyles({ position: 'fixed' });
+    popover.setCssStyles({ left: `${left}px` });
+    popover.setCssStyles({ width: `${Math.min(width, viewportWidth - 24)}px` });
+    popover.setCssStyles({ maxHeight: `${maxHeight}px` });
+    popover.setCssStyles({ top: openAbove
       ? `${Math.max(12, rect.top - maxHeight - 6)}px`
-      : `${Math.min(viewportHeight - maxHeight - 12, rect.bottom + 6)}px`;
+      : `${Math.min(viewportHeight - maxHeight - 12, rect.bottom + 6)}px` });
   };
   const closePopover = (restoreFocus = false): void => {
     if (!isOpen) return;
@@ -692,7 +692,7 @@ function preserveInlineFieldFormatting(control: HTMLElement, display: HTMLElemen
   const rendered = view.getComputedStyle(display);
   for (const property of INLINE_FIELD_FORMAT_PROPERTIES) {
     const value = rendered.getPropertyValue(property);
-    if (value) control.style.setProperty(property, value);
+    if (value) control.setCssProps({ [property]: value });
   }
 
   // A native input's intrinsic width is usually much wider than the inline
@@ -705,30 +705,30 @@ function preserveInlineFieldFormatting(control: HTMLElement, display: HTMLElemen
   if (control instanceof HTMLInputElement) {
     const bounds = display.getBoundingClientRect();
     if (bounds.width > 0) {
-      control.style.setProperty('box-sizing', 'border-box');
-      control.style.setProperty('width', `${bounds.width}px`);
-      control.style.setProperty('min-width', '0');
-      control.style.setProperty('max-width', '100%');
+      control.setCssProps({ ['box-sizing']: 'border-box' });
+      control.setCssProps({ ['width']: `${bounds.width}px` });
+      control.setCssProps({ ['min-width']: '0' });
+      control.setCssProps({ ['max-width']: '100%' });
       // Keep border thickness for geometry but hide the editor's own chrome;
       // the editing outline belongs to the containing block.
-      control.style.setProperty('border-style', 'solid');
-      control.style.setProperty('border-color', 'transparent');
+      control.setCssProps({ ['border-style']: 'solid' });
+      control.setCssProps({ ['border-color']: 'transparent' });
     }
     // Single-line controls have a browser-defined intrinsic height. Match the
     // rendered value's line box so the typed glyphs start on the same baseline.
-    if (bounds.height > 0) control.style.setProperty('height', `${bounds.height}px`);
+    if (bounds.height > 0) control.setCssProps({ ['height']: `${bounds.height}px` });
   } else if (control instanceof HTMLTextAreaElement) {
     // Do not derive a multiline editor's width from the rendered text: for an
     // empty Markdown Field that measurement can be tiny and make the textarea
     // appear unusable. Keep a full-width editing surface instead.
-    control.style.setProperty('box-sizing', 'border-box');
-    control.style.setProperty('display', 'block');
-    control.style.setProperty('width', '100%');
-    control.style.setProperty('min-width', '0');
-    control.style.setProperty('max-width', '100%');
-    control.style.setProperty('white-space', 'pre-wrap');
-    control.style.setProperty('pointer-events', 'auto');
-    control.style.setProperty('user-select', 'text');
+    control.setCssProps({ ['box-sizing']: 'border-box' });
+    control.setCssProps({ ['display']: 'block' });
+    control.setCssProps({ ['width']: '100%' });
+    control.setCssProps({ ['min-width']: '0' });
+    control.setCssProps({ ['max-width']: '100%' });
+    control.setCssProps({ ['white-space']: 'pre-wrap' });
+    control.setCssProps({ ['pointer-events']: 'auto' });
+    control.setCssProps({ ['user-select']: 'text' });
   }
 }
 
@@ -1120,7 +1120,7 @@ function bindAtlasInlineBlockEditing(card: HTMLElement, template: ForgeTemplate,
     region.root.addEventListener('focusout', (event) => {
       const next = event.relatedTarget as Node | null;
       if (next && region.root.contains(next)) return;
-      Promise.resolve().then(() => {
+      void Promise.resolve().then(() => {
         if (active !== region || region.root.contains(document.activeElement)) return;
         void schedule(async () => { await closeActive(true); });
       });
@@ -1567,8 +1567,8 @@ function applyBlockAppearance(node: HTMLElement, block: ForgeBlock, layout: Forg
     }
   }
   const nestedBleed = nestedLayoutInlineBleed(appearance);
-  node.style.setProperty('--forge-nested-inline-bleed-start', `${nestedBleed}px`);
-  node.style.setProperty('--forge-nested-inline-bleed-end', `${nestedBleed}px`);
+  node.setCssProps({ ['--forge-nested-inline-bleed-start']: `${nestedBleed}px` });
+  node.setCssProps({ ['--forge-nested-inline-bleed-end']: `${nestedBleed}px` });
   // Theme-following blocks deliberately receive no surface appearance values.
   if (mode !== 'custom') return;
   const borderPreset = appearance.borderPreset ?? 'default';
@@ -1597,15 +1597,15 @@ function applyBlockAppearance(node: HTMLElement, block: ForgeBlock, layout: Forg
   }
   for (const [property, value] of Object.entries(css)) {
     const cssProperty = property.startsWith('--') ? property : property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
-    node.style.setProperty(cssProperty, value);
+    node.setCssProps({ [cssProperty]: value });
   }
 }
 
 function applyGridPlacement(node: HTMLElement, placement: { x: number; y: number; span: number; rows: number } | undefined): void {
   if (!placement) return;
-  node.style.gridColumn = `${placement.x + 1} / span ${placement.span}`;
-  node.style.gridRow = `${placement.y + 1} / span ${placement.rows}`;
-  node.style.minWidth = '0';
+  node.setCssStyles({ gridColumn: `${placement.x + 1} / span ${placement.span}` });
+  node.setCssStyles({ gridRow: `${placement.y + 1} / span ${placement.rows}` });
+  node.setCssStyles({ minWidth: '0' });
   node.dataset.contentRows = String(placement.rows);
 }
 
@@ -1674,9 +1674,9 @@ function applyTokenFrameAppearance(node: HTMLElement, layout: ForgeLayoutDocumen
   const preset = appearance.borderPreset ?? 'default';
   node.classList.add('has-forge-token-border');
   node.dataset.tokenBorderPreset = preset;
-  node.style.setProperty('--forge-token-border-color', appearance.borderColor ?? 'var(--forge-theme-accent, var(--interactive-accent))');
-  node.style.setProperty('--forge-token-border-width', `${appearance.borderWidth ?? (preset === 'double' ? 3 : 2)}px`);
-  node.style.setProperty('--forge-token-inner', 'var(--forge-theme-bg, var(--background-primary))');
+  node.setCssProps({ ['--forge-token-border-color']: appearance.borderColor ?? 'var(--forge-theme-accent, var(--interactive-accent))' });
+  node.setCssProps({ ['--forge-token-border-width']: `${appearance.borderWidth ?? (preset === 'double' ? 3 : 2)}px` });
+  node.setCssProps({ ['--forge-token-inner']: 'var(--forge-theme-bg, var(--background-primary))' });
   const layer = element('span', 'statblock-forge__token-border-frame');
   layer.setAttribute('aria-hidden', 'true');
   node.append(layer);
@@ -1973,7 +1973,7 @@ function renderMetric(
     const slotsPerRow = layout.blocks[block.id]?.metricSlotsPerRow ?? DEFAULT_METRIC_SLOTS_PER_ROW;
     for (const rowSize of metricPreviewRows(keys.length, slotsPerRow)) {
       const row = element('div', 'statblock-forge__preview-metric-grid');
-      row.style.gridTemplateColumns = `repeat(${rowSize}, minmax(0, 1fr))`;
+      row.setCssStyles({ gridTemplateColumns: `repeat(${rowSize}, minmax(0, 1fr))` });
       keys.slice(offset, offset + rowSize).forEach((key, rowIndex) => {
         const slotIndex = offset + rowIndex;
         const field = fieldOf(fields, key);
@@ -2178,11 +2178,11 @@ function renderEditableScores(
       const count = Math.max(1, Math.min(columns.length || 1, perLine));
       const groups = Array.from({ length: count }, (_item, groupIndex) =>
         columns.map((_column, index) => index).filter((index) => index % count === groupIndex));
-      lines.style.gridTemplateColumns = `repeat(${groups.length}, minmax(0, 1fr))`;
+      lines.setCssStyles({ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` });
       groups.forEach((indexes) => lines.append(renderLineRecord(0, indexes)));
     } else {
       const count = Math.max(1, Math.min(effectiveRows.length, perLine));
-      lines.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
+      lines.setCssStyles({ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` });
       effectiveRows.forEach((_row, rowIndex) => lines.append(renderLineRecord(rowIndex, columns.map((_column, index) => index))));
     }
     editor.append(lines);
@@ -2196,7 +2196,7 @@ function renderEditableScores(
   const columnTemplate = `repeat(${Math.max(1, columns.length)}, minmax(5.25rem, 7.5rem))`;
   const editorRowTemplate = `${columnTemplate} 4.45rem`;
   const header = element('div', 'statblock-forge__score-editor-row is-header');
-  header.style.gridTemplateColumns = editorRowTemplate;
+  header.setCssStyles({ gridTemplateColumns: editorRowTemplate });
   columns.forEach((column, index) => {
     const cell = element('div', 'statblock-forge__score-editor-header-cell');
     const input = element('input', 'statblock-forge__score-editor-input');
@@ -2228,7 +2228,7 @@ function renderEditableScores(
 
   rows.forEach((row, rowIndex) => {
     const rowNode = element('div', 'statblock-forge__score-editor-row');
-    rowNode.style.gridTemplateColumns = editorRowTemplate;
+    rowNode.setCssStyles({ gridTemplateColumns: editorRowTemplate });
     columns.forEach((_column, columnIndex) => {
       const input = element('input', 'statblock-forge__score-editor-input');
       input.type = 'text';
@@ -2311,7 +2311,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
     const lines = element('div', `statblock-forge__preview-score-lines${rows.length > 1 ? ' is-records' : ''}`);
     if (rows.length > 1) {
       const recordColumns = Math.max(1, Math.min(rows.length, perLine));
-      lines.style.gridTemplateColumns = `repeat(${recordColumns}, minmax(0, 1fr))`;
+      lines.setCssStyles({ gridTemplateColumns: `repeat(${recordColumns}, minmax(0, 1fr))` });
       rows.forEach((rawRow) => {
         const table = element('table', 'statblock-forge__preview-score-lines-table is-record');
         const body = element('tbody');
@@ -2321,7 +2321,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
           label.scope = 'row';
           const value = element('td');
           const alignment = grid.align[index];
-          if (alignment === 'center' || alignment === 'end') value.style.textAlign = alignment === 'end' ? 'right' : 'center';
+          if (alignment === 'center' || alignment === 'end') value.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
           appendRollableScoreValue(value, signedScoreValue(rawRow[index], signed), block.rollable === true, column);
           row.append(label, value);
           body.append(row);
@@ -2335,7 +2335,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
     const groupCount = Math.max(1, Math.min(grid.columns.length, perLine));
     const groups = Array.from({ length: groupCount }, (_, groupIndex) =>
       grid.columns.map((_column, index) => index).filter((index) => index % groupCount === groupIndex));
-    lines.style.gridTemplateColumns = `repeat(${groups.length}, minmax(0, 1fr))`;
+    lines.setCssStyles({ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` });
     groups.forEach((indices) => {
       const table = element('table', 'statblock-forge__preview-score-lines-table');
       if (derived.some((column) => column.label)) {
@@ -2354,7 +2354,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
         label.scope = 'row';
         const value = element('td');
         const alignment = grid.align[index];
-        if (alignment === 'center' || alignment === 'end') value.style.textAlign = alignment === 'end' ? 'right' : 'center';
+        if (alignment === 'center' || alignment === 'end') value.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
         appendRollableScoreValue(value, signedScoreValue(rows[0]?.[index], signed), block.rollable === true, grid.columns[index]);
         row.append(label, value);
         derived.forEach((column, columnIndex) => {
@@ -2404,7 +2404,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
     grid.columns.forEach((_column, index) => {
       const cell = element('td');
       const alignment = grid.align[index];
-      if (alignment === 'center' || alignment === 'end') cell.style.textAlign = alignment === 'end' ? 'right' : 'center';
+      if (alignment === 'center' || alignment === 'end') cell.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
       appendRollableScoreValue(cell, signedScoreValue(rawRow[index], signed), block.rollable === true, grid.columns[index]);
       row.append(cell);
     });
@@ -2416,7 +2416,7 @@ function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: 
     column.values.forEach((text, index) => {
       const cell = element('td', 'statblock-forge__preview-score-derived');
       const alignment = grid.align[index];
-      if (alignment === 'center' || alignment === 'end') cell.style.textAlign = alignment === 'end' ? 'right' : 'center';
+      if (alignment === 'center' || alignment === 'end') cell.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
       appendRollableScoreValue(cell, text || '—', derivedRollable, grid.columns[index]);
       row.append(cell);
     });
@@ -2655,12 +2655,12 @@ function renderEntryCounter(
   const count = element('span', 'statblock-forge__ability-counter-count statblock-forge__preview-counter-value', `${marks.filter(Boolean).length}/${maximum}`);
   line.append(count);
   const indicator = element('span', `statblock-forge__ability-counter${part.look === 'checkboxes' ? ' is-boxes' : ''}`);
-  indicator.style.setProperty('--forge-part-fill', useCustomPartAppearance && partAppearance.trackFillColor
-    ? partAppearance.trackFillColor : 'var(--forge-theme-track-fill, var(--interactive-accent))');
-  indicator.style.setProperty('--forge-part-empty', useCustomPartAppearance && partAppearance.trackEmptyColor
-    ? partAppearance.trackEmptyColor : 'var(--forge-theme-track-empty, var(--background-primary))');
-  indicator.style.setProperty('--forge-part-border', useCustomPartAppearance && partAppearance.trackBorderColor
-    ? partAppearance.trackBorderColor : 'var(--forge-theme-track-border, var(--background-modifier-border))');
+  indicator.setCssProps({ ['--forge-part-fill']: useCustomPartAppearance && partAppearance.trackFillColor
+    ? partAppearance.trackFillColor : 'var(--forge-theme-track-fill, var(--interactive-accent))' });
+  indicator.setCssProps({ ['--forge-part-empty']: useCustomPartAppearance && partAppearance.trackEmptyColor
+    ? partAppearance.trackEmptyColor : 'var(--forge-theme-track-empty, var(--background-primary))' });
+  indicator.setCssProps({ ['--forge-part-border']: useCustomPartAppearance && partAppearance.trackBorderColor
+    ? partAppearance.trackBorderColor : 'var(--forge-theme-track-border, var(--background-modifier-border))' });
   const renderMarks = (): void => {
     indicator.replaceChildren();
     marks = normalizeAbilityCounterMarks(record[part.key], maximum);
@@ -2944,13 +2944,13 @@ function openInlineEntryEditor(
       const openAbove = below < Math.min(preferred, 140) && above > below;
       const available = openAbove ? above : below;
       const height = Math.max(36, Math.min(preferred, available || preferred));
-      popup.style.position = 'fixed';
-      popup.style.left = `${left}px`;
-      popup.style.width = `${width}px`;
-      popup.style.maxHeight = `${height}px`;
-      popup.style.top = openAbove
+      popup.setCssStyles({ position: 'fixed' });
+      popup.setCssStyles({ left: `${left}px` });
+      popup.setCssStyles({ width: `${width}px` });
+      popup.setCssStyles({ maxHeight: `${height}px` });
+      popup.setCssStyles({ top: openAbove
         ? `${Math.max(8, rect.top - height - 4)}px`
-        : `${Math.min(viewportHeight - height - 8, rect.bottom + 4)}px`;
+        : `${Math.min(viewportHeight - height - 8, rect.bottom + 4)}px` });
     };
     const updateActive = (): void => {
       optionNodes.forEach((option, index) => {
@@ -3597,10 +3597,10 @@ function renderEntries(
         const lineY = crossDestination < rects.length
           ? (rects[crossDestination]?.top ?? bounds.bottom)
           : (rects[rects.length - 1]?.bottom ?? bounds.top + 4);
-        line.style.left = `${bounds.left}px`;
-        line.style.top = `${lineY - 1}px`;
-        line.style.width = `${bounds.width}px`;
-        line.style.height = '2px';
+        line.setCssStyles({ left: `${bounds.left}px` });
+        line.setCssStyles({ top: `${lineY - 1}px` });
+        line.setCssStyles({ width: `${bounds.width}px` });
+        line.setCssStyles({ height: '2px' });
       }
     };
     /**
@@ -3677,28 +3677,28 @@ function renderEntries(
       row.setAttribute('data-sb-dragging', '');
       document.body.classList.add('statblock-forge__entry-dragging');
       layer = element('div', 'atlas-list-drag-layer statblock-forge__entry-drag-layer');
-      layer.style.position = 'fixed';
-      layer.style.inset = '0';
-      layer.style.zIndex = '10000';
-      layer.style.pointerEvents = 'none';
+      layer.setCssStyles({ position: 'fixed' });
+      layer.setCssStyles({ inset: '0' });
+      layer.setCssStyles({ zIndex: '10000' });
+      layer.setCssStyles({ pointerEvents: 'none' });
       ghost = row.cloneNode(true) as HTMLElement;
       ghost.querySelector('.statblock-forge__entry-drag-handle')?.remove();
       ghost.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after');
       ghost.removeAttribute('data-sb-dragging');
       ghost.removeAttribute('data-entry-index');
-      ghost.style.position = 'fixed';
-      ghost.style.left = `${sourceRect.left}px`;
-      ghost.style.top = `${sourceRect.top}px`;
-      ghost.style.width = `${sourceRect.width}px`;
-      ghost.style.boxSizing = 'border-box';
-      ghost.style.margin = '0';
-      ghost.style.opacity = '1';
-      ghost.style.pointerEvents = 'none';
-      ghost.style.background = 'var(--background-primary)';
-      ghost.style.borderRadius = 'var(--radius-m)';
-      ghost.style.boxShadow = 'var(--shadow-l)';
-      ghost.style.padding = '0.3rem 0.45rem';
-      ghost.style.zIndex = '1';
+      ghost.setCssStyles({ position: 'fixed' });
+      ghost.setCssStyles({ left: `${sourceRect.left}px` });
+      ghost.setCssStyles({ top: `${sourceRect.top}px` });
+      ghost.setCssStyles({ width: `${sourceRect.width}px` });
+      ghost.setCssStyles({ boxSizing: 'border-box' });
+      ghost.setCssStyles({ margin: '0' });
+      ghost.setCssStyles({ opacity: '1' });
+      ghost.setCssStyles({ pointerEvents: 'none' });
+      ghost.setCssStyles({ background: 'var(--background-primary)' });
+      ghost.setCssStyles({ borderRadius: 'var(--radius-m)' });
+      ghost.setCssStyles({ boxShadow: 'var(--shadow-l)' });
+      ghost.setCssStyles({ padding: '0.3rem 0.45rem' });
+      ghost.setCssStyles({ zIndex: '1' });
       const sourceControls = row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
       const ghostControls = ghost.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
       sourceControls.forEach((control, index) => {
@@ -3713,9 +3713,9 @@ function renderEntries(
       const ghostEditable = ghost.querySelector<HTMLElement>('[contenteditable="true"]');
       if (sourceEditable && ghostEditable) ghostEditable.textContent = sourceEditable.textContent;
       line = element('div', 'atlas-list-drag-line statblock-forge__entry-drop-line');
-      line.style.position = 'absolute';
-      line.style.background = 'var(--interactive-accent)';
-      line.style.borderRadius = '999px';
+      line.setCssStyles({ position: 'absolute' });
+      line.setCssStyles({ background: 'var(--interactive-accent)' });
+      line.setCssStyles({ borderRadius: '999px' });
       layer.append(ghost, line);
       document.body.append(layer);
     };
@@ -3796,7 +3796,7 @@ function renderEntries(
         }
         const clampedY = Math.max(bounds.top, Math.min(bounds.bottom, event.clientY));
         const top = Math.max(bounds.top, Math.min(bounds.bottom - sourceRect.height, clampedY - (startY - sourceRect.top)));
-        if (ghost) ghost.style.top = `${top}px`;
+        if (ghost) ghost.setCssStyles({ top: `${top}px` });
         const remaining = allRows().filter((candidate) => candidate !== row);
         const rects = remaining.map((candidate) => candidate.getBoundingClientRect());
         destination = inlineEntryDropIndex(rects.map((rect) => ({ top: rect.top, bottom: rect.bottom, left: rect.left })), clampedY);
@@ -3813,10 +3813,10 @@ function renderEntries(
           const lineY = destination < rects.length
             ? (rects[destination]?.top ?? bounds.bottom)
             : (rects[rects.length - 1]?.bottom ?? bounds.top);
-          line.style.left = `${bounds.left}px`;
-          line.style.top = `${lineY - 1}px`;
-          line.style.width = `${bounds.width}px`;
-          line.style.height = '2px';
+          line.setCssStyles({ left: `${bounds.left}px` });
+          line.setCssStyles({ top: `${lineY - 1}px` });
+          line.setCssStyles({ width: `${bounds.width}px` });
+          line.setCssStyles({ height: '2px' });
         }
       }
     };
@@ -3998,7 +3998,7 @@ function renderEntries(
     begin();
   };
 
-  const createNewRow = (afterIndex: number, duplicate: unknown | null): HTMLElement | null => {
+  const createNewRow = (afterIndex: number, duplicate: unknown): HTMLElement | null => {
     if (!field || !numericRuntime?.canEdit) return null;
     const row = makeRow(duplicate ?? {}, -1);
     row.classList.add('is-new');
@@ -4358,9 +4358,9 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
   const appearance = blockMeta?.appearanceMode === 'custom' ? blockMeta.appearance ?? {} : {};
   const track = element('div', 'statblock-forge__track-preview');
   const trackContent = element('span', 'statblock-forge__track-content');
-  trackContent.style.display = 'inline-flex';
-  trackContent.style.minWidth = '0';
-  trackContent.style.maxWidth = '100%';
+  trackContent.setCssStyles({ display: 'inline-flex' });
+  trackContent.setCssStyles({ minWidth: '0' });
+  trackContent.setCssStyles({ maxWidth: '100%' });
   const accessibleLabel = label || field?.label?.trim() || fieldKey || 'Track';
   // In Boxes mode, show the trailing /maximum only when this Value owns its
   // maximum. When another Number Field supplies the cap, the extra number is
@@ -4388,7 +4388,7 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
       trailingMaximum.append(document.createTextNode(String(max)));
     }
     trailingMaximum.title = numericRuntime?.language === 'pt-BR' ? 'Clique para editar o máximo' : 'Click to edit the maximum';
-    trailingMaximum.style.alignSelf = 'flex-end';
+    trailingMaximum.setCssStyles({ alignSelf: 'flex-end' });
   }
   track.append(trackContent);
   if (trailingMaximum) track.append(trailingMaximum);
@@ -4406,15 +4406,15 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
       const gauge = element('span', 'atlas-sb-gauge statblock-forge__track-gauge');
       const gaugeTrack = element('span', 'atlas-sb-gauge-track statblock-forge__track-gauge-track');
       const gaugeFill = element('span', 'atlas-sb-gauge-fill statblock-forge__track-gauge-fill');
-      gaugeFill.style.setProperty('--atlas-sb-gauge-share', String(safeMax > 0 ? safeFilled / safeMax : 0));
-      gaugeFill.style.backgroundColor = appearance.trackFillColor ?? 'var(--text-accent)';
-      gaugeTrack.style.backgroundColor = appearance.trackEmptyColor ?? 'var(--background-modifier-border)';
+      gaugeFill.setCssProps({ ['--atlas-sb-gauge-share']: String(safeMax > 0 ? safeFilled / safeMax : 0) });
+      gaugeFill.setCssStyles({ backgroundColor: appearance.trackFillColor ?? 'var(--text-accent)' });
+      gaugeTrack.setCssStyles({ backgroundColor: appearance.trackEmptyColor ?? 'var(--background-modifier-border)' });
       gaugeTrack.setAttribute('role', 'meter');
       gaugeTrack.setAttribute('aria-label', `${accessibleLabel}: ${safeFilled} de ${safeMax}`);
       gaugeTrack.setAttribute('aria-valuemin', '0');
       gaugeTrack.setAttribute('aria-valuemax', String(safeMax));
       gaugeTrack.setAttribute('aria-valuenow', String(safeFilled));
-      if (appearance.trackBorderColor) gaugeTrack.style.border = `1px solid ${appearance.trackBorderColor}`;
+      if (appearance.trackBorderColor) gaugeTrack.setCssStyles({ border: `1px solid ${appearance.trackBorderColor}` });
       gaugeTrack.append(gaugeFill);
       const gaugeValue = element('span', 'atlas-sb-gauge-value statblock-forge__track-gauge-value', `${safeFilled} / ${safeMax}`);
       gauge.append(gaugeTrack, gaugeValue);
@@ -4461,9 +4461,9 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
           }
         });
       }
-      if (marked && appearance.trackFillColor) box.style.backgroundColor = appearance.trackFillColor;
-      else if (!marked && appearance.trackEmptyColor) box.style.backgroundColor = appearance.trackEmptyColor;
-      if (appearance.trackBorderColor) box.style.borderColor = appearance.trackBorderColor;
+      if (marked && appearance.trackFillColor) box.setCssStyles({ backgroundColor: appearance.trackFillColor });
+      else if (!marked && appearance.trackEmptyColor) box.setCssStyles({ backgroundColor: appearance.trackEmptyColor });
+      if (appearance.trackBorderColor) box.setCssStyles({ borderColor: appearance.trackBorderColor });
       boxes.append(box);
     }
     trackContent.append(boxes);
@@ -4546,7 +4546,7 @@ function renderCounters(
   if (heading) wrapper.append(element('strong', 'statblock-forge__preview-block-heading', heading));
   const body = element('span', 'atlas-sb-counters__body');
   const cells = element('span', 'atlas-sb-counters__cells');
-  cells.style.setProperty('--forge-counters-per-row', String(normalizeCountersPerRow(layout.blocks[block.id]?.countersPerRow ?? DEFAULT_COUNTERS_PER_ROW)));
+  cells.setCssProps({ ['--forge-counters-per-row']: String(normalizeCountersPerRow(layout.blocks[block.id]?.countersPerRow ?? DEFAULT_COUNTERS_PER_ROW)) });
   body.append(cells);
   wrapper.append(body);
   const blockMeta = layout.blocks[block.id];
@@ -4576,15 +4576,15 @@ function renderCounters(
       const main = element('span', 'statblock-forge__preview-counter-main');
       // Each Counter occupies one grid cell: its name is the first line and
       // its indicators are rendered beneath that name in a separate row.
-      main.style.display = 'flex';
-      main.style.flexDirection = 'column';
-      main.style.flexWrap = 'nowrap';
-      main.style.alignItems = 'center';
-      main.style.justifyContent = 'center';
-      main.style.gap = '0.28rem';
-      main.style.width = '100%';
-      main.style.minWidth = '0';
-      main.style.maxWidth = '100%';
+      main.setCssStyles({ display: 'flex' });
+      main.setCssStyles({ flexDirection: 'column' });
+      main.setCssStyles({ flexWrap: 'nowrap' });
+      main.setCssStyles({ alignItems: 'center' });
+      main.setCssStyles({ justifyContent: 'center' });
+      main.setCssStyles({ gap: '0.28rem' });
+      main.setCssStyles({ width: '100%' });
+      main.setCssStyles({ minWidth: '0' });
+      main.setCssStyles({ maxWidth: '100%' });
       // Keep the first row identifiable without reintroducing Atlas' numbered
       // placeholder. A blank first row or the legacy “Counter 1” name becomes
       // the neutral label “Counter”; user-defined names remain untouched.
@@ -4594,11 +4594,11 @@ function renderCounters(
         : rawCounterName;
       if (counterName) {
         const name = element('span', 'statblock-forge__preview-counter-name', counterName);
-        name.style.display = 'block';
-        name.style.width = '100%';
-        name.style.lineHeight = '1';
-        name.style.margin = '0';
-        name.style.flex = '0 0 auto';
+        name.setCssStyles({ display: 'block' });
+        name.setCssStyles({ width: '100%' });
+        name.setCssStyles({ lineHeight: '1' });
+        name.setCssStyles({ margin: '0' });
+        name.setCssStyles({ flex: '0 0 auto' });
         row.append(name);
       }
       const showNumericValue = shouldShowCounterNumericValue(field?.showCounterValue === true, rowData.max);
@@ -4633,25 +4633,25 @@ function renderCounters(
         main.append(stepper);
       } else {
         const pips = element('span', 'atlas-sb-counter__pips statblock-forge__preview-counter-pips');
-        pips.style.display = 'inline-flex';
-        pips.style.flexWrap = 'wrap';
-        pips.style.alignItems = 'center';
-        pips.style.justifyContent = 'center';
-        pips.style.gap = '0';
-        pips.style.width = 'max-content';
-        pips.style.maxWidth = '100%';
-        pips.style.boxSizing = 'border-box';
-        pips.style.margin = '0 auto';
-        pips.style.lineHeight = '0';
+        pips.setCssStyles({ display: 'inline-flex' });
+        pips.setCssStyles({ flexWrap: 'wrap' });
+        pips.setCssStyles({ alignItems: 'center' });
+        pips.setCssStyles({ justifyContent: 'center' });
+        pips.setCssStyles({ gap: '0' });
+        pips.setCssStyles({ width: 'max-content' });
+        pips.setCssStyles({ maxWidth: '100%' });
+        pips.setCssStyles({ boxSizing: 'border-box' });
+        pips.setCssStyles({ margin: '0 auto' });
+        pips.setCssStyles({ lineHeight: '0' });
         pips.setAttribute('role', isEditable ? 'group' : 'img');
         pips.setAttribute('aria-label', `${accessibleName}: ${rowData.remaining}/${rowData.max}`);
         for (let index = 0; index < rowData.max; index += 1) {
           const left = index < rowData.remaining;
           const pip = element('span', `atlas-sb-counter__pip${left ? ' is-left' : ''}`);
-          pip.style.borderColor = appearance.trackBorderColor ?? 'var(--forge-track-border, var(--forge-theme-track-border, var(--atlas-sb-track-box-color, var(--background-modifier-border))))';
-          pip.style.backgroundColor = left
+          pip.setCssStyles({ borderColor: appearance.trackBorderColor ?? 'var(--forge-track-border, var(--forge-theme-track-border, var(--atlas-sb-track-box-color, var(--background-modifier-border))))' });
+          pip.setCssStyles({ backgroundColor: left
             ? appearance.trackFillColor ?? 'var(--forge-track-fill, var(--forge-theme-track-fill, var(--atlas-sb-track-box-color, var(--interactive-accent))))'
-            : appearance.trackEmptyColor ?? 'var(--forge-track-empty, var(--forge-theme-track-empty, var(--background-primary)))';
+            : appearance.trackEmptyColor ?? 'var(--forge-track-empty, var(--forge-theme-track-empty, var(--background-primary)))' });
           if (isEditable) {
             const button = element('button', 'atlas-sb-counter__pip-button');
             button.type = 'button';
@@ -5659,7 +5659,7 @@ function renderBlockList(
   const safeColumns = Math.max(4, Math.min(MAX_GRID_COLUMN_COUNT, Math.round(layout.columns || DEFAULT_GRID_COLUMN_COUNT)));
   const grid = element('div', `statblock-forge__preview-grid atlas-sb-forge-grid${context === 'section' ? ' atlas-sb-stack' : ' is-root'} is-${context}${layout.dense ? ' is-dense' : ''}`);
   grid.dataset.columnCount = String(safeColumns);
-  grid.style.setProperty('--forge-grid-column-count', String(safeColumns));
+  grid.setCssProps({ ['--forge-grid-column-count']: String(safeColumns) });
   const nodeById = new Map<string, HTMLElement>();
   for (const block of blocks) {
     registerFoldableSection(uiState, block, sample, options);
@@ -5707,7 +5707,7 @@ function syncSquareGridTrackHeight(grid: HTMLElement): void {
       if (squareTrackSize <= 0) return;
       const nextTrackSize = `${squareTrackSize.toFixed(4).replace(/\.?0+$/, '')}px`;
       if (grid.style.getPropertyValue('--forge-preview-grid-row-height') !== nextTrackSize) {
-        grid.style.setProperty('--forge-preview-grid-row-height', nextTrackSize);
+        grid.setCssProps({ ['--forge-preview-grid-row-height']: nextTrackSize });
       }
     });
   };
@@ -5795,9 +5795,9 @@ function renderRow(
       const gapShare = line.length > 1 ? ((line.length - 1) * gapRem * span / lineTotalSpan) : 0;
       const width = `calc(${(span / 12 * 100).toFixed(4)}% - ${gapShare.toFixed(4)}rem)`;
       const node = renderBlockNode(child, template, layout, sample, options, undefined, false, options.language ?? 'en', uiState);
-      node.style.flex = `0 1 ${width}`;
-      node.style.width = width;
-      node.style.minWidth = '0';
+      node.setCssStyles({ flex: `0 1 ${width}` });
+      node.setCssStyles({ width: width });
+      node.setCssStyles({ minWidth: '0' });
       childNodes.set(child.id, node);
       lineWrapper.append(node);
     }
@@ -5817,9 +5817,9 @@ function renderRow(
       // Give every visual line a definite height matching its own Grid tracks.
       // Percentage-height children then resolve against this line instead of
       // stretching the first line to the full height of the entire Row.
-      line.node.style.height = lineRows > 0
+      line.node.setCssStyles({ height: lineRows > 0
         ? `calc(${lineRows} * var(--forge-preview-grid-row-height, 3.5rem) + ${lineRows - 1} * var(--forge-preview-grid-row-gap, ${gapRem}rem))`
-        : '0px';
+        : '0px' });
       totalRows += lineRows;
     });
     for (const child of children) {
@@ -5827,19 +5827,19 @@ function renderRow(
       if (!node) continue;
       const omitted = uiState?.omittedIds.has(child.id) === true;
       node.classList.toggle('is-layout-omitted', omitted);
-      node.style.visibility = omitted ? 'hidden' : '';
-      node.style.height = omitted ? '0' : '';
-      node.style.minHeight = omitted ? '0' : '';
-      node.style.maxHeight = omitted ? '0' : '';
-      node.style.overflow = omitted ? 'hidden' : '';
+      node.setCssStyles({ visibility: omitted ? 'hidden' : '' });
+      node.setCssStyles({ height: omitted ? '0' : '' });
+      node.setCssStyles({ minHeight: omitted ? '0' : '' });
+      node.setCssStyles({ maxHeight: omitted ? '0' : '' });
+      node.setCssStyles({ overflow: omitted ? 'hidden' : '' });
       const rows = omitted ? 0 : requiredRowsForBlock(child, layout, false, uiState?.omittedIds, sample);
       node.dataset.contentRows = String(rows);
       if (!omitted && rows > 1) {
         const rowHeight = 'var(--forge-preview-grid-row-height, 3.5rem)';
         const rowGap = `var(--forge-preview-grid-row-gap, ${gapRem}rem)`;
-        node.style.minHeight = `calc(${rows} * ${rowHeight} + ${rows - 1} * ${rowGap})`;
+        node.setCssStyles({ minHeight: `calc(${rows} * ${rowHeight} + ${rows - 1} * ${rowGap})` });
       } else if (!omitted) {
-        node.style.minHeight = '';
+        node.setCssStyles({ minHeight: '' });
       }
     }
     wrapper.dataset.contentRows = String(Math.max(1, totalRows));
@@ -5900,7 +5900,7 @@ function renderTabs(
       );
       const panelColumns = Math.max(4, Math.min(MAX_GRID_COLUMN_COUNT, Math.round(layout.columns || DEFAULT_GRID_COLUMN_COUNT)));
       panel.dataset.columnCount = String(panelColumns);
-      panel.style.setProperty('--forge-grid-column-count', String(panelColumns));
+      panel.setCssProps({ ['--forge-grid-column-count']: String(panelColumns) });
       panel.dataset.tabPanelId = section.id;
       panel.dataset.tabsBlockId = block.id;
       panel.setAttribute('role', 'tabpanel');
@@ -6022,8 +6022,8 @@ function syncNestedLayoutInlineBleedsAfterMount(card: HTMLElement): void {
         borderStart: readPx(computed.borderInlineStartWidth || computed.borderLeftWidth),
         borderEnd: readPx(computed.borderInlineEndWidth || computed.borderRightWidth),
       });
-      block.style.setProperty('--forge-nested-inline-bleed-start', `${bleed.start}px`);
-      block.style.setProperty('--forge-nested-inline-bleed-end', `${bleed.end}px`);
+      block.setCssProps({ ['--forge-nested-inline-bleed-start']: `${bleed.start}px` });
+      block.setCssProps({ ['--forge-nested-inline-bleed-end']: `${bleed.end}px` });
     }
   });
 }
@@ -6059,7 +6059,7 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
   const themeOverride = customTheme?.palette ?? layout.themeOverrides?.[normalizeStatblockThemeId(themeId)];
   if (customTheme || themeId !== 'default' || (themeOverride && Object.keys(themeOverride).length > 0)) {
     const paletteForControls = customTheme?.palette ?? { ...themePaletteFor(themeId), ...themeOverride };
-    card.style.colorScheme = colorSchemeForThemeBackground(paletteForControls.background);
+    card.setCssStyles({ colorScheme: colorSchemeForThemeBackground(paletteForControls.background) });
   }
   if (themeOverride && Object.keys(themeOverride).length > 0) {
     card.dataset.hasThemeOverrides = 'true';
@@ -6082,9 +6082,9 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
     for (const [key, variable] of Object.entries(cssVariables)) {
       const value = resolvedPalette[key as keyof typeof resolvedPalette];
       if (typeof value !== 'string') continue;
-      card.style.setProperty(variable, value);
+      card.setCssProps({ [variable]: value });
       if (themeId === 'default') {
-        for (const obsidianVariable of obsidianVariables[key] ?? []) card.style.setProperty(obsidianVariable, value);
+        for (const obsidianVariable of obsidianVariables[key] ?? []) card.setCssProps({ [obsidianVariable]: value });
       }
     }
   }
@@ -6092,13 +6092,13 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
   if (frame) {
     card.dataset.forgeFrame = 'custom';
     card.dataset.forgeFrameInner = String(frame.inner);
-    card.style.setProperty('--forge-frame-style', frame.style);
-    card.style.setProperty('--forge-frame-width', `${frame.width}px`);
-    card.style.setProperty('--forge-frame-color', frame.color);
-    card.style.setProperty('--forge-frame-radius', `${frame.radius}px`);
-    card.style.setProperty('--forge-frame-inner-color', frame.innerColor);
-    card.style.setProperty('--forge-frame-inner-width', `${frame.innerWidth}px`);
-    card.style.setProperty('--forge-frame-inner-gap', `${frame.innerGap}px`);
+    card.setCssProps({ ['--forge-frame-style']: frame.style });
+    card.setCssProps({ ['--forge-frame-width']: `${frame.width}px` });
+    card.setCssProps({ ['--forge-frame-color']: frame.color });
+    card.setCssProps({ ['--forge-frame-radius']: `${frame.radius}px` });
+    card.setCssProps({ ['--forge-frame-inner-color']: frame.innerColor });
+    card.setCssProps({ ['--forge-frame-inner-width']: `${frame.innerWidth}px` });
+    card.setCssProps({ ['--forge-frame-inner-gap']: `${frame.innerGap}px` });
   }
   const body = element('div', 'atlas-statblock-body statblock-forge__preview-body');
   body.append(sampleHeader(

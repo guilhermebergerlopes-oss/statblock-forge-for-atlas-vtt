@@ -20,6 +20,6 @@ export async function openForgeStatblockNoteForEditing(
   if (!leaf) throw new Error('Não foi possível abrir uma nova aba para a nota do statblock.');
   await leaf.openFile(file, { active: true });
   app.workspace.setActiveLeaf(leaf, { focus: true });
-  app.workspace.revealLeaf(leaf);
+  await app.workspace.revealLeaf(leaf);
   await opener.openForgeEditor();
 }

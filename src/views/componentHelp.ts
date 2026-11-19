@@ -156,12 +156,12 @@ function appendSectionContents(
   const section = make('section', `statblock-forge__preview-section${inTab ? ' is-tab-panel' : ''}`);
   if (!inTab) section.append(make('h4', 'statblock-forge__preview-section-heading', heading));
   const grid = make('div', 'statblock-forge__preview-grid is-section');
-  grid.style.gridTemplateColumns = 'repeat(12, minmax(0, 1fr))';
-  grid.style.gridAutoRows = '2rem';
+  grid.setCssStyles({ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' });
+  grid.setCssStyles({ gridAutoRows: '2rem' });
   const span = Math.floor(12 / Math.max(1, values.length));
   for (const [label, value] of values) {
     const child = appendStatBlock(grid, label, value);
-    child.style.gridColumn = `span ${span}`;
+    child.setCssStyles({ gridColumn: `span ${span}` });
   }
   section.append(grid);
   parent.append(section);
@@ -377,7 +377,7 @@ export function renderComponentHelpExample(kind: ExampleKind, themeId: string, l
         : [[['HP', '42'], ['AC', '16'], ['Level', '5']], [['STR', '+4'], ['DEX', '+2']], [['Strength', '18'], ['Dexterity', '14'], ['Wisdom', '12'], ['Charisma', '10']]];
       const values = samples[variant % samples.length] ?? samples[0]!;
       const grid = make('div', 'statblock-forge__preview-metric-grid');
-      grid.style.gridTemplateColumns = `repeat(${values.length}, minmax(0, 1fr))`;
+      grid.setCssStyles({ gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` });
       values.forEach(([label, value]) => {
         const cell = make('div', 'statblock-forge__preview-metric-cell');
         cell.append(make('span', 'statblock-forge__preview-field-label', label), make('strong', 'statblock-forge__preview-metric-value', value));
@@ -645,9 +645,9 @@ export function renderComponentHelpExample(kind: ExampleKind, themeId: string, l
       values.forEach(([label, value]) => {
         const child = make('article', 'statblock-forge__preview-block is-stat');
         appendStatExample(child, label, value);
-        child.style.flex = '0 1 calc(50% - 0.25rem)';
-        child.style.width = 'calc(50% - 0.25rem)';
-        child.style.minWidth = '0';
+        child.setCssStyles({ flex: '0 1 calc(50% - 0.25rem)' });
+        child.setCssStyles({ width: 'calc(50% - 0.25rem)' });
+        child.setCssStyles({ minWidth: '0' });
         row.append(child);
       });
       block.append(row);

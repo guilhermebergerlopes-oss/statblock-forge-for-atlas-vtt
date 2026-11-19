@@ -36,11 +36,21 @@ function appendIcon(slot: HTMLElement, name: string): void {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
+  // The icon fragments are trusted compile-time definitions, but build their
+  // SVG nodes through the DOM API instead of parsing markup with innerHTML.
   for (const markup of ICON_PATHS[name] ?? []) {
-    const template = document.createElement('template');
-    template.innerHTML = markup;
-    const path = template.content.firstElementChild;
-    if (path) svg.append(path);
+    const match = /^<(path|rect)\s+([^>]+)\/>$/.exec(markup);
+    if (!match) continue;
+    const tagName = match[1];
+    if (tagName !== 'path' && tagName !== 'rect') continue;
+    const shape = slot.ownerDocument.createElementNS('http://www.w3.org/2000/svg', tagName);
+    const attributes = /([a-z][a-z-]*)="([^"]*)"/g;
+    for (const attribute of match[2].matchAll(attributes)) {
+      const attributeName = attribute[1];
+      const attributeValue = attribute[2];
+      if (attributeName && attributeValue !== undefined) shape.setAttribute(attributeName, attributeValue);
+    }
+    svg.append(shape);
   }
   slot.append(svg);
 }
@@ -82,15 +92,15 @@ function setSubmenuOpen(trigger: HTMLButtonElement, wrap: HTMLElement, open: boo
   const actualWidth = panelRect.width || 208;
   const actualHeight = panelRect.height || 240;
   const top = Math.max(8, Math.min(triggerRect.top - 4, window.innerHeight - actualHeight - 8));
-  panel.style.top = `${top - wrap.getBoundingClientRect().top}px`;
+  panel.setCssStyles({ top: `${top - wrap.getBoundingClientRect().top}px` });
   if (panel.classList.contains('is-open-left')) {
-    panel.style.left = 'auto';
-    panel.style.right = `calc(100% - 4px)`;
+    panel.setCssStyles({ left: 'auto' });
+    panel.setCssStyles({ right: `calc(100% - 4px)` });
   } else {
-    panel.style.right = 'auto';
-    panel.style.left = 'calc(100% - 4px)';
+    panel.setCssStyles({ right: 'auto' });
+    panel.setCssStyles({ left: 'calc(100% - 4px)' });
   }
-  panel.style.minWidth = `${Math.max(180, Math.min(actualWidth, window.innerWidth - 16))}px`;
+  panel.setCssStyles({ minWidth: `${Math.max(180, Math.min(actualWidth, window.innerWidth - 16))}px` });
 }
 
 function createPanel(
@@ -199,8 +209,8 @@ export function openInlineScoresTableContextMenu(options: InlineScoresTableConte
   const rect = panel.getBoundingClientRect();
   const left = Math.max(8, Math.min(point.x, window.innerWidth - rect.width - 8));
   const top = Math.max(8, Math.min(point.y, window.innerHeight - rect.height - 8));
-  panel.style.left = `${left}px`;
-  panel.style.top = `${top}px`;
+  panel.setCssStyles({ left: `${left}px` });
+  panel.setCssStyles({ top: `${top}px` });
 
   let closed = false;
   const close = (restore: boolean): void => {

@@ -14,7 +14,7 @@ import { parseTemplateFileText } from './src/templates/forgeFileFormat.ts';
 import { createInitialStatblockData } from './src/templates/statblockCreationModel.ts';
 import { saveTemplateDocument, TemplateNameConflictError, type TemplateOverwriteConfirmation } from './src/templates/templateRepository.ts';
 import { createTemplateVaultStorage } from './src/templates/templateVaultStorage.ts';
-import { createForgeLayout } from './src/templates/forgeTemplate.ts';
+import { createForgeLayout, isRecord } from './src/templates/forgeTemplate.ts';
 import { createForgeStatblockNoteFromTemplate } from './src/statblocks/forgeStatblockNoteCreator.ts';
 import { openForgeStatblockNoteForEditing } from './src/statblocks/forgeStatblockEditorWorkflow.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './src/atlas/forgeTemplateLinkResolver';
@@ -141,7 +141,7 @@ export default class StatblockForgePlugin extends Plugin {
       id: 'toggle-statblock-mode',
       name: this.uiLabel('Toggle Statblock mode', 'Alternar Modo statblock'),
       checkCallback: (checking) => {
-        const activeView = this.app.workspace.activeLeaf?.view;
+        const activeView = this.app.workspace.getActiveViewOfType(TemplateEditorView);
         if (!(activeView instanceof TemplateEditorView)) return false;
         if (!checking) activeView.toggleStatblockMode();
         return true;
@@ -192,7 +192,7 @@ export default class StatblockForgePlugin extends Plugin {
       callback: () => this.renderCurrentNote(),
     });
     this.registerDomEvent(document, 'keydown', (event: KeyboardEvent) => {
-      const activeView = this.app.workspace.activeLeaf?.view;
+      const activeView = this.app.workspace.getActiveViewOfType(TemplateEditorView);
       if (!(activeView instanceof TemplateEditorView) || event.defaultPrevented || event.isComposing || event.repeat) return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || !!target.closest('input, textarea, select, [contenteditable="true"], .cm-editor'))) return;
@@ -274,7 +274,6 @@ export default class StatblockForgePlugin extends Plugin {
       window.setTimeout(() => this.promptForNextEditorRecoveryDraft(false), 250);
     });
 
-    console.info('Statblock Forge for Atlas VTT loaded. Atlas token creation is dispatched through its user-facing command when available.');
   }
 
   private showNotice(message: string, duration?: number): void {
@@ -509,7 +508,7 @@ export default class StatblockForgePlugin extends Plugin {
         }
         await leaf.view.loadTemplate(null);
         this.app.workspace.setActiveLeaf(leaf, { focus: true });
-        this.app.workspace.revealLeaf(leaf);
+        await this.app.workspace.revealLeaf(leaf);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.showNotice(`${this.uiLabel('Could not create a new template draft:', 'Não foi possível abrir um rascunho de template:')} ${message}`, 10000);
@@ -553,7 +552,7 @@ export default class StatblockForgePlugin extends Plugin {
     const existing = this.app.workspace.getLeavesOfType(STATBLOCK_FORGE_EDITOR_VIEW).find((candidate) =>
       candidate.view instanceof TemplateEditorView && candidate.view.getLoadedFilePath() === target?.path);
     if (existing) {
-      this.app.workspace.revealLeaf(existing);
+      await this.app.workspace.revealLeaf(existing);
       this.app.workspace.setActiveLeaf(existing, { focus: true });
       return;
     }
@@ -565,7 +564,7 @@ export default class StatblockForgePlugin extends Plugin {
     }
     await leaf.openFile(target, { active: true });
     this.app.workspace.setActiveLeaf(leaf, { focus: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   async openLinkedForgeStatblock(source: TFile): Promise<void> {
@@ -610,7 +609,10 @@ export default class StatblockForgePlugin extends Plugin {
 
   private async repairMovedForgeTemplatePath(note: TFile, template: TFile, previousPath: string): Promise<void> {
     try {
-      await this.app.fileManager.processFrontMatter(note, (frontmatter) => {
+      await this.app.fileManager.processFrontMatter(note, (frontmatter: unknown) => {
+        if (!isRecord(frontmatter)) {
+          throw new Error('O frontmatter YAML não contém um objeto válido.');
+        }
         refreshForgeStatblockTemplateLinkPath(frontmatter, template.path);
       });
       this.showNotice(`O template foi encontrado em ${template.path}; a referência YAML foi atualizada (antes: ${previousPath}).`);
@@ -632,7 +634,7 @@ export default class StatblockForgePlugin extends Plugin {
       return;
     }
     await leaf.openFile(note);
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
 
     // Opening the note makes it the active context required by Atlas' documented command.
     const openedAssessment = assessAtlasTokenCreation(this.app, note, fallbackValues, true);
@@ -687,7 +689,7 @@ export default class StatblockForgePlugin extends Plugin {
         this.showNotice('Statblock Forge: não foi possível anexar a ficha à aba Markdown.');
         return;
       }
-      this.app.workspace.revealLeaf(leaf);
+      await this.app.workspace.revealLeaf(leaf);
       return;
     }
 
@@ -704,7 +706,7 @@ export default class StatblockForgePlugin extends Plugin {
       active: true,
     });
     if (leaf.view instanceof StatblockRenderView) await leaf.view.loadStatblock(source, template, initialData, options);
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   /** Write the bundled documentation into the Vault only after an explicit settings action. */
@@ -961,7 +963,7 @@ export default class StatblockForgePlugin extends Plugin {
     if (!(leaf.view instanceof TemplateEditorView)) throw new Error('O editor de templates não ficou disponível.');
     await leaf.view.restorePersistedDraft(draft, openSaveDialog);
     this.app.workspace.setActiveLeaf(leaf, { focus: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
   async refreshStatblocksUsingTemplate(templatePath: string): Promise<void> {

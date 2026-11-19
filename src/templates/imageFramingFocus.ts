@@ -75,21 +75,21 @@ export function bindImageFocalLayout(
     const layout = calculateImageFocalRect(image.naturalWidth, image.naturalHeight, width, height, getOptions());
     if (!layout) return;
 
-    image.style.position = 'absolute';
-    image.style.inset = 'auto';
-    image.style.left = `${layout.left}px`;
-    image.style.top = `${layout.top}px`;
-    image.style.right = 'auto';
-    image.style.bottom = 'auto';
-    image.style.width = `${layout.width}px`;
-    image.style.height = `${layout.height}px`;
-    image.style.maxWidth = 'none';
-    image.style.maxHeight = 'none';
-    image.style.objectFit = 'fill';
-    image.style.objectPosition = '50% 50%';
-    image.style.transform = 'none';
-    image.style.transformOrigin = '0 0';
-    image.style.borderRadius = '0';
+    image.setCssStyles({ position: 'absolute' });
+    image.setCssStyles({ inset: 'auto' });
+    image.setCssStyles({ left: `${layout.left}px` });
+    image.setCssStyles({ top: `${layout.top}px` });
+    image.setCssStyles({ right: 'auto' });
+    image.setCssStyles({ bottom: 'auto' });
+    image.setCssStyles({ width: `${layout.width}px` });
+    image.setCssStyles({ height: `${layout.height}px` });
+    image.setCssStyles({ maxWidth: 'none' });
+    image.setCssStyles({ maxHeight: 'none' });
+    image.setCssStyles({ objectFit: 'fill' });
+    image.setCssStyles({ objectPosition: '50% 50%' });
+    image.setCssStyles({ transform: 'none' });
+    image.setCssStyles({ transformOrigin: '0 0' });
+    image.setCssStyles({ borderRadius: '0' });
   };
 
   image.addEventListener('load', update);

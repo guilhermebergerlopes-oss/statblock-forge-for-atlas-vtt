@@ -1,4 +1,4 @@
-import { FileView, Notice, TFile, type TFolder, type WorkspaceLeaf } from 'obsidian';
+import { FileView, Notice, TFile, TFolder, type WorkspaceLeaf } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
 import {
   blockLabel,
@@ -488,7 +488,7 @@ export class TemplateEditorView extends FileView {
     }
     editor.restoreClosedDraft(draft);
     this.app.workspace.setActiveLeaf(leaf, { focus: true });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
     if (openSaveDialog) window.setTimeout(() => editor.openSaveDialog(), 0);
   }
 
@@ -497,7 +497,7 @@ export class TemplateEditorView extends FileView {
     await this.loadTemplate(source instanceof TFile ? source : null);
     this.restoreClosedDraft(draft);
     this.app.workspace.setActiveLeaf(this.leaf, { focus: true });
-    this.app.workspace.revealLeaf(this.leaf);
+    await this.app.workspace.revealLeaf(this.leaf);
     if (openSaveDialog) window.setTimeout(() => this.openSaveDialog(), 0);
   }
 
@@ -2355,9 +2355,9 @@ export class TemplateEditorView extends FileView {
         // panes. Its fixed coordinates therefore match getBoundingClientRect().
         if (!tooltip.isConnected) return;
         // Measure the hidden popup, then anchor it beside the hovered choice.
-        tooltip.style.display = 'grid';
-        tooltip.style.visibility = 'hidden';
-        tooltip.style.maxHeight = '';
+        tooltip.setCssStyles({ display: 'grid' });
+        tooltip.setCssStyles({ visibility: 'hidden' });
+        tooltip.setCssStyles({ maxHeight: '' });
         // In the Canvas block/container menus, anchor the preview to the
         // whole choices panel instead of the hovered button. Anchoring to an
         // individual button can make the preview flip over the neighboring
@@ -2379,15 +2379,15 @@ export class TemplateEditorView extends FileView {
         const viewportSize = { width: viewportWidth, height: viewportHeight };
         let position = placeHelpTooltip(anchor, { width: popupRect.width, height: popupRect.height }, viewportSize);
         if (position.maxHeight !== undefined) {
-          tooltip.style.maxHeight = `${position.maxHeight}px`;
+          tooltip.setCssStyles({ maxHeight: `${position.maxHeight}px` });
           const constrainedRect = tooltip.getBoundingClientRect();
           position = placeHelpTooltip(anchor, { width: constrainedRect.width, height: constrainedRect.height }, viewportSize);
         }
         tooltip.dataset.placement = position.placement;
-        tooltip.style.left = `${position.left + viewportLeft}px`;
-        tooltip.style.top = `${position.top + viewportTop}px`;
-        tooltip.style.visibility = '';
-        tooltip.style.display = '';
+        tooltip.setCssStyles({ left: `${position.left + viewportLeft}px` });
+        tooltip.setCssStyles({ top: `${position.top + viewportTop}px` });
+        tooltip.setCssStyles({ visibility: '' });
+        tooltip.setCssStyles({ display: '' });
       };
       let currentExampleIndex = 0;
       let rotationTimer: number | null = null;
@@ -2408,7 +2408,7 @@ export class TemplateEditorView extends FileView {
         }));
         if (tooltip.isConnected) {
           positionTooltip();
-          requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
             if (activeComponentHelpTooltip === tooltip && wrapper.isConnected) positionTooltip();
           });
         }
@@ -2454,14 +2454,14 @@ export class TemplateEditorView extends FileView {
             renderExample(currentExampleIndex);
           }, 2600);
         }
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           if (activeComponentHelpTooltip === tooltip && wrapper.isConnected) positionTooltip();
         });
       };
       trigger.addEventListener('pointerenter', showTooltip);
       trigger.addEventListener('focus', showTooltip);
       trigger.addEventListener('blur', () => {
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           if (!wrapper.matches(':hover') && !wrapper.matches(':focus-within')) hideTooltip();
         });
       });
@@ -2970,7 +2970,7 @@ export class TemplateEditorView extends FileView {
       setSheetWidth: (width, commit) => {
         layout.sheetWidth = width;
         const sheet = this.contentEl.querySelector<HTMLElement>('.statblock-forge__canvas-sheet');
-        sheet?.style.setProperty('--statblock-forge-sheet-width', `${width}px`);
+        sheet?.setCssProps({ '--statblock-forge-sheet-width': `${width}px` });
         if (commit) this.render();
       },
     });
@@ -3022,7 +3022,7 @@ export class TemplateEditorView extends FileView {
         onImageFieldAction: (fieldKey, socket) => this.openImageSampleActions(template, fieldKey, socket),
       });
       card.classList.add('statblock-forge__canvas-sheet', 'statblock-forge__template-statblock-mode-card');
-      card.style.setProperty('--statblock-forge-sheet-width', `${normalizeForgeSheetWidth(layout.sheetWidth)}px`);
+      card.setCssProps({ ['--statblock-forge-sheet-width']: `${normalizeForgeSheetWidth(layout.sheetWidth)}px` });
       restoreTemplateCanvasTabs(card, this.activeTabsById);
       this.statblockPreviewDiceCleanup = attachForgeStatblockDiceRolling(card, {
         app: this.app,
@@ -3136,8 +3136,8 @@ export class TemplateEditorView extends FileView {
     };
     const positionContainerSelectionHandle = (handle: HTMLButtonElement, node: HTMLElement, blockId: string): void => {
       const position = canvasSelectionHandlePosition(selectionNestingDepth(blockId), node.getBoundingClientRect().width || node.clientWidth);
-      handle.style.top = `${position.topPx}px`;
-      handle.style.right = `${position.rightPx}px`;
+      handle.setCssStyles({ top: `${position.topPx}px` });
+      handle.setCssStyles({ right: `${position.rightPx}px` });
     };
     const annotateParents = (blocks: ForgeBlock[], parentId: string | null): void => {
       for (const block of blocks) {
@@ -3468,8 +3468,8 @@ export class TemplateEditorView extends FileView {
       const resizeIndicator = el('div', 'statblock-forge__resize-indicator');
       resizeIndicator.setAttribute('aria-hidden', 'true');
       resizeIndicator.textContent = `${startSpan}×${startRows}`;
-      resizeIndicator.style.left = `${startX}px`;
-      resizeIndicator.style.top = `${startY}px`;
+      resizeIndicator.setCssStyles({ left: `${startX}px` });
+      resizeIndicator.setCssStyles({ top: `${startY}px` });
       document.body.append(resizeIndicator);
       const wasDraggable = node.draggable;
       const pointerId = event.pointerId;
@@ -3484,17 +3484,17 @@ export class TemplateEditorView extends FileView {
       let lastAutoScrollFrameTime = 0;
       node.draggable = false;
       node.classList.add('is-resizing');
-      handle.style.opacity = '0';
+      handle.setCssStyles({ opacity: '0' });
       const restorePreview = (): void => {
         for (const original of originalGridStyles) {
-          original.node.style.gridColumn = original.gridColumn;
-          original.node.style.gridRow = original.gridRow;
+          original.node.setCssStyles({ gridColumn: original.gridColumn });
+          original.node.setCssStyles({ gridRow: original.gridRow });
         }
-        node.style.gridColumn = originalStyle.gridColumn;
-        node.style.gridRow = originalStyle.gridRow;
-        node.style.flex = originalStyle.flex;
-        node.style.width = originalStyle.width;
-        node.style.minHeight = originalStyle.minHeight;
+        node.setCssStyles({ gridColumn: originalStyle.gridColumn });
+        node.setCssStyles({ gridRow: originalStyle.gridRow });
+        node.setCssStyles({ flex: originalStyle.flex });
+        node.setCssStyles({ width: originalStyle.width });
+        node.setCssStyles({ minHeight: originalStyle.minHeight });
       };
       const finish = (commit: boolean): void => {
         if (finished) return;
@@ -3512,7 +3512,7 @@ export class TemplateEditorView extends FileView {
         }
         node.draggable = wasDraggable;
         node.classList.remove('is-resizing');
-        if (originalHandleOpacity) handle.style.opacity = originalHandleOpacity;
+        if (originalHandleOpacity) handle.setCssStyles({ opacity: originalHandleOpacity });
         else handle.style.removeProperty('opacity');
         resizeIndicator.remove();
         if (commit && (nextSpan !== startSpan || nextRows !== startRows)) {
@@ -3529,8 +3529,8 @@ export class TemplateEditorView extends FileView {
           );
           nextPhysicalSpan = nextSpan;
           const width = rowResizePreviewWidth(nextSpan, otherSpanTotal, rowChildren.length, columnGap);
-          node.style.flex = `0 1 ${width}`;
-          node.style.width = width;
+          node.setCssStyles({ flex: `0 1 ${width}` });
+          node.setCssStyles({ width: width });
         } else {
           nextPhysicalSpan = gridResizeSpanFromStep(
             startPhysicalSpan,
@@ -3545,9 +3545,9 @@ export class TemplateEditorView extends FileView {
         // the Canvas scrolls underneath it.
         const verticalDelta = latestPointerY - startY + autoScrollOffset;
         nextRows = Math.max(1, Math.min(MAX_BLOCK_ROWS, startRows + Math.round(verticalDelta / Math.max(1, rowStep))));
-        node.style.minHeight = isRow && nextRows > 1
+        node.setCssStyles({ minHeight: isRow && nextRows > 1
           ? resizeRowsMinHeight(nextRows, rowHeight, rowGap)
-          : originalStyle.minHeight;
+          : originalStyle.minHeight });
         if (!isRow && gridBlocks.length > 0) {
           // Preview the whole sibling grid through the same collision-aware
           // packer used by the renderer. This lets an expanded block move to
@@ -3574,16 +3574,16 @@ export class TemplateEditorView extends FileView {
           for (const placement of previewPlacements) {
             const siblingNode = gridNodesById.get(placement.id);
             if (!siblingNode) continue;
-            siblingNode.style.gridColumn = `${placement.x + 1} / span ${placement.span}`;
-            siblingNode.style.gridRow = `${placement.y + 1} / span ${placement.rows}`;
+            siblingNode.setCssStyles({ gridColumn: `${placement.x + 1} / span ${placement.span}` });
+            siblingNode.setCssStyles({ gridRow: `${placement.y + 1} / span ${placement.rows}` });
           }
         }
         // Use a viewport-fixed indicator rather than positioning the original
         // grip inside a block whose origin moves whenever Grid reflows. Client
         // coordinates now map directly to the indicator's fixed coordinates.
         resizeIndicator.textContent = `${nextPhysicalSpan}×${nextRows}`;
-        resizeIndicator.style.left = `${latestPointerX}px`;
-        resizeIndicator.style.top = `${latestPointerY}px`;
+        resizeIndicator.setCssStyles({ left: `${latestPointerX}px` });
+        resizeIndicator.setCssStyles({ top: `${latestPointerY}px` });
       };
       const runAutoScrollFrame = (time: number): void => {
         autoScrollFrame = 0;
@@ -3744,7 +3744,7 @@ export class TemplateEditorView extends FileView {
     const exactNote = this.app.vault.getAbstractFileByPath(notePath);
     if (exactNote) return true;
     const folder = folderPath ? this.app.vault.getAbstractFileByPath(folderPath) : this.app.vault.getRoot();
-    const children = folder && 'children' in folder ? (folder as TFolder).children : [];
+    const children = folder instanceof TFolder ? folder.children : [];
     return children.some((child) => child instanceof TFile
       && child.extension.toLocaleLowerCase() === 'md'
       && child.basename.toLocaleLowerCase() === normalized);

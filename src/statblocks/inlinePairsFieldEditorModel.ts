@@ -24,7 +24,7 @@ function scalarText(value: unknown): string {
 
 function numberFromText(value: string): number | null {
   const normalized = value.trim().replace(/[\u2212\u2013]/g, '-');
-  if (!/^[+\-]?(?:\d+(?:\.\d*)?|\.\d+)$/u.test(normalized)) return null;
+  if (!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/u.test(normalized)) return null;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }

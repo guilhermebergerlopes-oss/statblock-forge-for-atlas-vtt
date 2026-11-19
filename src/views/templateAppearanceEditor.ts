@@ -160,7 +160,7 @@ export function renderTemplateThemeAppearance(context: TemplateThemeAppearanceCo
   swatches.setAttribute('aria-label', `${selectedCustomTheme?.name ?? selectedPreset.name} palette`);
   (['background', 'surface', 'accent', 'accentStrong', 'text', 'muted'] as const).forEach((key) => {
     const chip = el('span', 'statblock-forge__theme-swatch');
-    chip.style.backgroundColor = palette[key];
+    chip.setCssStyles({ backgroundColor: palette[key] });
     chip.setAttribute('aria-label', `${key}: ${palette[key]}`);
     swatches.append(chip);
   });
@@ -360,9 +360,9 @@ export function renderTemplateThemeAppearance(context: TemplateThemeAppearanceCo
     }));
     borderSection.append(labeledControl('Custom border name', borderName), borderActions);
     const borderPreview = el('div', 'statblock-forge__frame-preview');
-    borderPreview.style.border = `${frame.width}px ${frame.style} ${frame.color}`;
-    borderPreview.style.borderRadius = `${frame.radius}px`;
-    if (frame.inner) borderPreview.style.boxShadow = `inset 0 0 0 ${frame.innerWidth}px ${frame.innerColor}, inset 0 0 0 ${frame.innerWidth + frame.innerGap}px transparent`;
+    borderPreview.setCssStyles({ border: `${frame.width}px ${frame.style} ${frame.color}` });
+    borderPreview.setCssStyles({ borderRadius: `${frame.radius}px` });
+    if (frame.inner) borderPreview.setCssStyles({ boxShadow: `inset 0 0 0 ${frame.innerWidth}px ${frame.innerColor}, inset 0 0 0 ${frame.innerWidth + frame.innerGap}px transparent` });
     borderPreview.setAttribute('aria-label', translateForgeText('Border preview', language));
     borderSection.append(borderPreview);
   }

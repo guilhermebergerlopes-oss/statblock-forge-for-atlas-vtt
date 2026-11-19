@@ -177,8 +177,8 @@ export function openImageSocketActionsMenu(
   const top = below + height <= viewportHeight - 8
     ? below
     : Math.max(8, rect.top - height - 6);
-  panel.style.left = `${left}px`;
-  panel.style.top = `${top}px`;
+  panel.setCssStyles({ left: `${left}px` });
+  panel.setCssStyles({ top: `${top}px` });
 
   document.addEventListener('pointerdown', onOutside, true);
   document.addEventListener('keydown', onKeyDown, true);

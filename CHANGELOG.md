@@ -1,5 +1,13 @@
 ## 0.4.0 — Busca no JSON, proteção de rascunhos e estabilidade de Sections
 
+### Obsidian API and source-safety cleanup
+- Replaces SVG icon fragment parsing through `innerHTML` with explicit SVG DOM-node construction.
+- Routes dynamic inline CSS changes through Obsidian's `setCssProps` and `setCssStyles` helpers.
+- Awaits workspace leaf reveals, removes the plugin startup console message, and uses `getActiveViewOfType` instead of the deprecated `activeLeaf` property.
+- Uses Obsidian's configured trash behavior when rolling back a newly created Atlas template file; tightens file guards and simplifies redundant `unknown | null` unions.
+- Makes intentionally unawaited microtask scheduling explicit and updates browser timers/animation frames to use the correct `window`.
+
+
 ### Fixed
 - Restaura a cadeia flex da prévia Forge aberta com Ctrl sobre Tokens do Atlas: o contêiner do provider e o cartão respeitam o limite de altura da janela, enquanto o corpo do statblock ganha rolagem vertical/horizontal real. Isso permite ao manipulador Ctrl+roda do Atlas mover fichas longas em vez de interceptar a rolagem sem um scrollport disponível.
 - Fixes Ctrl-hover scrolling for large Forge statblocks by constraining the provider mount and card to Atlas' preview height and making the statblock body the actual scroll viewport.

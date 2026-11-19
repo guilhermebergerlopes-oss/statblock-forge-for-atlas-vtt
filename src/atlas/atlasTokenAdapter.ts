@@ -23,7 +23,7 @@ export interface AtlasTokenAdapterContext {
   readonly atlasStore: unknown;
   readonly serviceManager: unknown;
   readonly rendererService: unknown;
-  readonly renderer: unknown | null;
+  readonly renderer: unknown;
   readonly rendererInitialized: boolean;
   readonly status: AtlasTokenAdapterStatus;
 }

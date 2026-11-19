@@ -277,11 +277,11 @@ export function openForgeRestChooser(
     const viewportMargin = 8;
     const anchorGap = 6;
     const width = Math.min(340, Math.max(180, viewportWidth - 16));
-    popover.style.width = `${width}px`;
+    popover.setCssStyles({ width: `${width}px` });
     // Measure the unconstrained panel first. An explicit panel height then gives the flex body
     // a finite scrollport even when the list is taller than the available viewport space.
-    panel.style.height = 'auto';
-    panel.style.maxHeight = 'none';
+    panel.setCssStyles({ height: 'auto' });
+    panel.setCssStyles({ maxHeight: 'none' });
     const naturalHeight = panel.getBoundingClientRect().height;
     const below = Math.max(0, viewportHeight - rect.bottom - anchorGap - viewportMargin);
     const above = Math.max(0, rect.top - anchorGap - viewportMargin);
@@ -289,15 +289,15 @@ export function openForgeRestChooser(
     const available = useAbove ? above : below;
     const viewportLimit = Math.max(96, viewportHeight - viewportMargin * 2);
     const maxPanelHeight = Math.max(96, Math.min(640, viewportLimit, available || viewportLimit));
-    panel.style.maxHeight = `${maxPanelHeight}px`;
-    panel.style.height = `${Math.min(naturalHeight, maxPanelHeight)}px`;
+    panel.setCssStyles({ maxHeight: `${maxPanelHeight}px` });
+    panel.setCssStyles({ height: `${Math.min(naturalHeight, maxPanelHeight)}px` });
     const panelHeight = panel.getBoundingClientRect().height;
     const left = Math.max(8, Math.min(rect.left, viewportWidth - width - 8));
     const top = useAbove
       ? rect.top - panelHeight - anchorGap
       : rect.bottom + anchorGap;
-    popover.style.left = `${left}px`;
-    popover.style.top = `${Math.max(viewportMargin, Math.min(viewportHeight - panelHeight - viewportMargin, top))}px`;
+    popover.setCssStyles({ left: `${left}px` });
+    popover.setCssStyles({ top: `${Math.max(viewportMargin, Math.min(viewportHeight - panelHeight - viewportMargin, top))}px` });
     popover.dataset.above = useAbove ? 'true' : 'false';
   };
 

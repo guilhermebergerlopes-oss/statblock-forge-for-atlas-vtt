@@ -268,7 +268,7 @@ export function renderInlineScoresTable(options: InlineScoresTableOptions): HTML
       cell.dataset.tableCol = String(at.column);
       cell.setAttribute('role', at.row < 0 ? 'columnheader' : 'gridcell');
       if (tag === 'th') cell.scope = 'col';
-      if (align === 'center' || align === 'end') cell.style.textAlign = align === 'end' ? 'right' : 'center';
+      if (align === 'center' || align === 'end') cell.setCssStyles({ textAlign: align === 'end' ? 'right' : 'center' });
       const typing = node('span', 'atlas-sb-sheet-table__typing');
       const editing = active;
       if (editing && sameCell(editing, at) && canType) {
@@ -287,8 +287,8 @@ export function renderInlineScoresTable(options: InlineScoresTableOptions): HTML
         editing.input = input;
         input.addEventListener('input', () => {
           sizer.textContent = `${input.value}\u200b`;
-          input.style.height = 'auto';
-          input.style.height = `${Math.max(input.scrollHeight, 20)}px`;
+          input.setCssStyles({ height: 'auto' });
+          input.setCssStyles({ height: `${Math.max(input.scrollHeight, 20)}px` });
         });
         input.addEventListener('keydown', (event) => {
           if (event.isComposing) return;
@@ -403,7 +403,7 @@ export function renderInlineScoresTable(options: InlineScoresTableOptions): HTML
       const lines = node('div', `statblock-forge__preview-score-lines atlas-sb-scores atlas-sb-scores--table${current.rows.length > 1 ? ' is-records' : ''}`);
       const itemCount = current.rows.length > 1 ? current.rows.length : current.columns.length;
       const perLine = Math.max(1, Math.min(itemCount, Math.floor(Number(options.perLine) || 1)));
-      lines.style.gridTemplateColumns = `repeat(${perLine}, minmax(0, 1fr))`;
+      lines.setCssStyles({ gridTemplateColumns: `repeat(${perLine}, minmax(0, 1fr))` });
 
       const appendRecord = (rowIndex: number, columnIndexes: number[], record?: boolean): void => {
         const linesTable = node('table', 'statblock-forge__preview-score-lines-table atlas-sb-score-group');

@@ -57,7 +57,14 @@ const BORDER_KEYS = ['id', 'name', 'style', 'color', 'width', 'radius', 'inner',
  * event handlers, executable expressions, or arbitrary extension properties.
  * The allowlisted schema below is the only import surface.
  */
-const UNSAFE_TEXT = /[<>\u0000-\u001f]|(?:javascript|vbscript|data|file)\s*:|https?:\/\/|\b(?:on[a-z]+\s*=|@import|expression\s*\(|url\s*\(|eval\s*\(|function\s*\(|new\s+Function|document\s*\.|window\s*\.|globalThis\s*\.)/i;
+const UNSAFE_TEXT = /[<>]|(?:javascript|vbscript|data|file)\s*:|https?:\/\/|\b(?:on[a-z]+\s*=|@import|expression\s*\(|url\s*\(|eval\s*\(|function\s*\(|new\s+Function|document\s*\.|window\s*\.|globalThis\s*\.)/i;
+
+function containsControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charCodeAt(index) < 0x20) return true;
+  }
+  return false;
+}
 
 function assertExactKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {
   const allowedSet = new Set(allowed);
@@ -69,7 +76,7 @@ function assertExactKeys(value: Record<string, unknown>, allowed: readonly strin
 }
 
 function assertSafeText(value: unknown, label: string, maxLength: number): asserts value is string {
-  if (typeof value !== 'string' || value.trim().length === 0 || value.length > maxLength || UNSAFE_TEXT.test(value)) {
+  if (typeof value !== 'string' || value.trim().length === 0 || value.length > maxLength || containsControlCharacters(value) || UNSAFE_TEXT.test(value)) {
     throw new Error(`The style package contains unsafe ${label}. Only plain text is allowed.`);
   }
 }
@@ -322,7 +329,7 @@ export function downloadForgeStylePackage(stylePackage: ForgeStylePackage, sugge
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = `${slug}.${FORGE_STYLE_PACKAGE_EXTENSION}`;
-  anchor.style.display = 'none';
+  anchor.setCssStyles({ display: 'none' });
   document.body.append(anchor);
   anchor.click();
   anchor.remove();

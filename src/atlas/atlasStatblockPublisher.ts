@@ -255,8 +255,8 @@ export async function publishAtlasStatblock(request: PublishAtlasStatblockReques
   } catch (error) {
     // If this publish created a new Atlas template but could not create its note,
     // remove only that newly-created copy. Never remove an existing template.
-    if (createdTemplateCopy) {
-      try { await app.vault.delete(atlasTemplateFile); } catch { /* Preserve the original publish error. */ }
+    if (createdTemplateCopy && atlasTemplateFile) {
+      try { await app.fileManager.trashFile(atlasTemplateFile); } catch { /* Preserve the original publish error. */ }
     }
     throw error;
   }

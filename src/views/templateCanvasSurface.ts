@@ -78,17 +78,17 @@ function syncCanvasGridOverlay(grid: HTMLElement, overlay: HTMLElement): void {
 
   // An absolutely-positioned child uses the parent's padding box as its
   // containing block. Insets therefore begin at the content box after padding.
-  overlay.style.left = `${paddingLeft}px`;
-  overlay.style.right = `${paddingRight}px`;
-  overlay.style.top = `${paddingTop}px`;
-  overlay.style.bottom = `${paddingBottom}px`;
-  overlay.style.setProperty('--forge-grid-overlay-row-height', `${geometry.rowHeight}px`);
-  overlay.style.setProperty('--forge-grid-overlay-row-gap', `${geometry.rowGap}px`);
+  overlay.setCssStyles({ left: `${paddingLeft}px` });
+  overlay.setCssStyles({ right: `${paddingRight}px` });
+  overlay.setCssStyles({ top: `${paddingTop}px` });
+  overlay.setCssStyles({ bottom: `${paddingBottom}px` });
+  overlay.setCssProps({ ['--forge-grid-overlay-row-height']: `${geometry.rowHeight}px` });
+  overlay.setCssProps({ ['--forge-grid-overlay-row-gap']: `${geometry.rowGap}px` });
   const rowBoundary = geometry.rowGap > 0
     ? geometry.rowHeight + geometry.rowGap / 2
     : Math.max(0, geometry.rowHeight - 0.5);
-  overlay.style.setProperty('--forge-grid-overlay-row-boundary', `${rowBoundary}px`);
-  overlay.style.setProperty('--forge-grid-overlay-column-half-gap-negative', `${-geometry.columnGap / 2}px`);
+  overlay.setCssProps({ ['--forge-grid-overlay-row-boundary']: `${rowBoundary}px` });
+  overlay.setCssProps({ ['--forge-grid-overlay-column-half-gap-negative']: `${-geometry.columnGap / 2}px` });
 
   // Keep the column guides tied to the resolved track count instead of
   // assuming that a previously rendered overlay is still up to date. Query
@@ -110,8 +110,8 @@ function syncCanvasGridOverlay(grid: HTMLElement, overlay: HTMLElement): void {
     const column = columns[index];
     if (!column) continue;
     const width = geometry.columnWidths[index] ?? 0;
-    column.style.left = `${cursor}px`;
-    column.style.width = `${width}px`;
+    column.setCssStyles({ left: `${cursor}px` });
+    column.setCssStyles({ width: `${width}px` });
     cursor += width + (index < geometry.columnWidths.length - 1 ? geometry.columnGap : 0);
   }
 
@@ -133,10 +133,10 @@ function syncCanvasGridOverlay(grid: HTMLElement, overlay: HTMLElement): void {
       rows.push(row);
     }
     while (rows.length > rowPositions.length) rows.pop()?.remove();
-    rows.forEach((row, index) => { row.style.top = `${rowPositions[index] ?? 0}px`; });
+    rows.forEach((row, index) => { row.setCssStyles({ top: `${rowPositions[index] ?? 0}px` }); });
   }
 
-  overlay.style.visibility = geometry.contentWidth > 0 ? 'visible' : 'hidden';
+  overlay.setCssStyles({ visibility: geometry.contentWidth > 0 ? 'visible' : 'hidden' });
 }
 
 /** Keep all guide positions exact when the Canvas is resized, Dense changes
@@ -235,7 +235,7 @@ export function renderTemplateCanvasSurface(options: TemplateCanvasSurfaceOption
     collapsedSectionIds,
   });
   card.classList.add('statblock-forge__canvas-sheet');
-  card.style.setProperty('--statblock-forge-sheet-width', `${normalizeForgeSheetWidth(layout.sheetWidth)}px`);
+  card.setCssProps({ ['--statblock-forge-sheet-width']: `${normalizeForgeSheetWidth(layout.sheetWidth)}px` });
 
   if (showGrid) {
     // Every Section owns an independent Grid with the template's configured

@@ -12,7 +12,7 @@ test('Entries actions use the concise Custom and Compendium labels', () => {
 
 test('Compendium picker is viewport-aware and remains anchored to its trigger', () => {
   assert.match(source, /const rect = trigger\.getBoundingClientRect\(\)/);
-  assert.match(source, /popover\.style\.position = 'fixed'/);
+  assert.match(source, /popover\.setCssStyles\(\{ position: 'fixed' \}\)/);
   assert.match(source, /const left = Math\.max\(12, Math\.min\(rect\.left, viewportWidth - width - 12\)\)/);
   assert.match(source, /const openAbove = availableBelow < 280 && availableAbove > availableBelow/);
   assert.match(source, /window\.addEventListener\('resize', positionPopover\)/);

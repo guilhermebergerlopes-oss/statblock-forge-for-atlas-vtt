@@ -6,8 +6,8 @@ export interface TemplateEditorDirtyBaseline {
 
 /** Current editor state relevant to detecting unsaved template changes. */
 export interface TemplateEditorDirtyState {
-  template: unknown | null;
-  layout: unknown | null;
+  template: unknown;
+  layout: unknown;
   jsonDraftText: string | null;
   jsonAppliedText: string | null;
 }

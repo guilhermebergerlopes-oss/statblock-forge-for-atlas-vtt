@@ -254,7 +254,7 @@ function safeLegacyTableModifier(value: unknown): string | null {
     .replace(/;\s*$/, '')
     .replace(/\bMath\.(floor|ceil|round|abs|min|max)\b/g, '$1')
     .replace(/\bstat\b/g, 'value');
-  if (!formula || /[{};=\[\]`]|=>|\b(?:monster|this|globalThis|window|document|function|const|let|var|new|import|require)\b/i.test(formula)) return null;
+  if (!formula || /[{};=\x5B\x5D`]|=>|\b(?:monster|this|globalThis|window|document|function|const|let|var|new|import|require)\b/i.test(formula)) return null;
   if (!/^[A-Za-z0-9_\s()+\-*/%.,?:<>!&|]+$/.test(formula)) return null;
   const identifiers = formula.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [];
   if (identifiers.some((identifier) => !SAFE_MODIFIER_FUNCTIONS.has(identifier))) return null;

@@ -63,7 +63,7 @@ function createImportRow<T extends { id: string; name: string }>(
     swatches.className = 'statblock-forge__style-import-swatches';
     for (const key of ['background', 'surface', 'raised', 'border', 'accent', 'accentStrong', 'text', 'muted'] as const) {
       const swatch = document.createElement('span');
-      swatch.style.backgroundColor = palette[key];
+      swatch.setCssStyles({ backgroundColor: palette[key] });
       swatch.setAttribute('aria-label', `${key}: ${palette[key]}`);
       swatches.append(swatch);
     }
@@ -72,10 +72,10 @@ function createImportRow<T extends { id: string; name: string }>(
     const border = source as unknown as ForgeCustomBorder;
     const preview = document.createElement('div');
     preview.className = 'statblock-forge__style-import-frame';
-    preview.style.border = `${border.width}px ${border.style} ${border.color}`;
-    preview.style.borderRadius = `${border.radius}px`;
+    preview.setCssStyles({ border: `${border.width}px ${border.style} ${border.color}` });
+    preview.setCssStyles({ borderRadius: `${border.radius}px` });
     if (border.inner) {
-      preview.style.boxShadow = `inset 0 0 0 ${border.innerWidth}px ${border.innerColor}, inset 0 0 0 ${border.innerWidth + border.innerGap}px transparent`;
+      preview.setCssStyles({ boxShadow: `inset 0 0 0 ${border.innerWidth}px ${border.innerColor}, inset 0 0 0 ${border.innerWidth + border.innerGap}px transparent` });
     }
     row.append(preview);
   }

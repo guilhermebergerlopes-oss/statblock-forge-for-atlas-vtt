@@ -4,8 +4,8 @@
  * presentation-only details are intentionally excluded.
  */
 export function templateEditorDraftContentSnapshot(
-  template: unknown | null,
-  layout: unknown | null,
+  template: unknown,
+  layout: unknown,
   jsonDraftText: string | null,
   jsonAppliedText: string | null,
 ): string | null {

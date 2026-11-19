@@ -226,7 +226,7 @@ export class StatblockRenderSurface {
     }, { capture: true, passive: false });
 
     const sheetWidth = resolveForgeSheetWidth(source.raw[FORGE_STATBLOCK_SHEET_WIDTH_KEY], layout.sheetWidth);
-    root.style.setProperty('--statblock-forge-sheet-width', `${sheetWidth}px`);
+    root.setCssProps({ ['--statblock-forge-sheet-width']: `${sheetWidth}px` });
     const sheetWidthControl = this.renderSheetWidthControl(source, layout, root, language, sheetWidth);
     let editPanel: HTMLElement | null = null;
     let card: HTMLElement | null = null;
@@ -361,7 +361,7 @@ export class StatblockRenderSurface {
       const width = normalizeForgeSheetWidth(Number(slider.value));
       output.textContent = `${width} px`;
       summary.textContent = `${portuguese ? 'Largura da ficha' : 'Sheet width'} · ${width} px`;
-      root.style.setProperty('--statblock-forge-sheet-width', `${width}px`);
+      root.setCssProps({ ['--statblock-forge-sheet-width']: `${width}px` });
       if (resetButton) resetButton.disabled = false;
     });
     slider.addEventListener('change', () => {
@@ -379,7 +379,7 @@ export class StatblockRenderSurface {
       slider.value = String(templateWidth);
       output.textContent = `${templateWidth} px`;
       summary.textContent = `${portuguese ? 'Largura da ficha' : 'Sheet width'} · ${templateWidth} px (template)`;
-      root.style.setProperty('--statblock-forge-sheet-width', `${templateWidth}px`);
+      root.setCssProps({ ['--statblock-forge-sheet-width']: `${templateWidth}px` });
       reset.disabled = true;
       void this.saveStatblockSheetWidth(source, null, language).catch((error: unknown) => {
         this.showNotice(error instanceof Error ? error.message : String(error), 10000);
@@ -1024,8 +1024,8 @@ export class StatblockRenderSurface {
   private queueImageFrameSave(source: LoadedStatblockSource, blockId: string, frame: StatblockImageFrame): void {
     this.imageFrames = withStatblockImageFrame(this.imageFrames, blockId, frame);
     this.pendingImageFrameSave = { source, frames: { ...this.imageFrames } };
-    if (this.imageFrameSaveTimer !== null) clearTimeout(this.imageFrameSaveTimer);
-    this.imageFrameSaveTimer = setTimeout(() => {
+    if (this.imageFrameSaveTimer !== null) window.clearTimeout(this.imageFrameSaveTimer);
+    this.imageFrameSaveTimer = window.setTimeout(() => {
       this.imageFrameSaveTimer = null;
       void this.flushImageFrameSave();
     }, 350);
@@ -1034,7 +1034,7 @@ export class StatblockRenderSurface {
   /** Persist the latest framing snapshot in the Forge-owned note metadata key. */
   private async flushImageFrameSave(): Promise<void> {
     if (this.imageFrameSaveTimer !== null) {
-      clearTimeout(this.imageFrameSaveTimer);
+      window.clearTimeout(this.imageFrameSaveTimer);
       this.imageFrameSaveTimer = null;
     }
     const pending = this.pendingImageFrameSave;
@@ -1080,7 +1080,7 @@ export class StatblockRenderSurface {
 
     // A new drag/wheel event may have arrived while this snapshot was being written.
     if (this.pendingImageFrameSave && this.imageFrameSaveTimer === null) {
-      this.imageFrameSaveTimer = setTimeout(() => {
+      this.imageFrameSaveTimer = window.setTimeout(() => {
         this.imageFrameSaveTimer = null;
         void this.flushImageFrameSave();
       }, 0);

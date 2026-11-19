@@ -248,7 +248,7 @@ export function setForgeTokenInstanceOverride(
   store: ForgeTokenLinkStore,
   mapPathValue: unknown,
   tokenIdValue: unknown,
-  targetValue: unknown | null,
+  targetValue: unknown,
 ): ForgeTokenLinkStore {
   const mapPath = normalizeMapPath(mapPathValue);
   const tokenId = normalizeOpaqueId(tokenIdValue);

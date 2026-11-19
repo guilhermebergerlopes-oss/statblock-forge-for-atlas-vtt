@@ -24,8 +24,8 @@ export type AtlasTokenViewportAccessStatus =
  */
 export interface AtlasTokenViewportAccess {
   readonly status: AtlasTokenViewportAccessStatus;
-  readonly viewport: unknown | null;
-  readonly tokenRenderer: unknown | null;
+  readonly viewport: unknown;
+  readonly tokenRenderer: unknown;
   readonly viewportAvailable: boolean;
   readonly tokenRendererAvailable: boolean;
 }

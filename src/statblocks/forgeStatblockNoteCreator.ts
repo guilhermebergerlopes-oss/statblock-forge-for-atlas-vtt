@@ -1,4 +1,4 @@
-import type { App, TFile } from 'obsidian';
+import type { App } from 'obsidian';
 import { cloneJson, headerFieldForPart, isRecord, slugify, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
 import { createForgeStatblockTemplateLink, FORGE_STATBLOCK_LINK_KEY, type ForgeStatblockTemplateLink } from './forgeTemplateLink.ts';
 
@@ -81,7 +81,8 @@ export async function createForgeStatblockNoteFromTemplate(
     throw new Error('A origem do statblock precisa ser um arquivo .forgetemplate.');
   }
   const sourceFile = app.vault.getAbstractFileByPath(sourcePath);
-  if (!sourceFile || (sourceFile as TFile).extension?.toLowerCase() !== 'forgetemplate') {
+  if (!sourceFile || !('extension' in sourceFile) || typeof sourceFile.extension !== 'string'
+    || sourceFile.extension.toLowerCase() !== 'forgetemplate') {
     throw new Error('O .forgetemplate de origem não existe mais no Vault.');
   }
 

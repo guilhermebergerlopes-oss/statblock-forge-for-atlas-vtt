@@ -143,7 +143,7 @@ export async function loadForgeRestDiceSet(app: App, template: ForgeTemplate): P
 }
 
 function cryptographicRandom(): number {
-  const cryptoApi = globalThis.crypto;
+  const cryptoApi = window.crypto;
   if (!cryptoApi?.getRandomValues) throw new Error('Secure random number generation is unavailable.');
   const value = cryptoApi.getRandomValues(new Uint32Array(1))[0]!;
   return value / 0x1_0000_0000;

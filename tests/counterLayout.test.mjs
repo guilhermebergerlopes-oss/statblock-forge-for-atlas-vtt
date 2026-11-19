@@ -35,15 +35,15 @@ test('live Counter tracks lay out names side by side with each indicator group b
   const renderer = await readSource('../src/render/statblockPreviewRenderer.ts');
   const help = await readSource('../src/views/componentHelp.ts');
   const css = await readSource('../styles.css');
-  assert.match(renderer, /--forge-counters-per-row',\s*String\(normalizeCountersPerRow\(layout\.blocks\[block\.id\]\?\.countersPerRow/);
+  assert.match(renderer, /\[\s*'--forge-counters-per-row'\s*\]:\s*String\(normalizeCountersPerRow\(layout\.blocks\[block\.id\]\?\.countersPerRow/);
   assert.match(renderer, /row\.append\(name\)/);
   assert.match(renderer, /row\.append\(main\)/);
   assert.doesNotMatch(renderer, /main\.append\(name\)/);
-  assert.match(renderer, /main\.style\.flexDirection\s*=\s*'column'/);
-  assert.match(renderer, /main\.style\.justifyContent\s*=\s*'center'/);
-  assert.match(renderer, /name\.style\.width\s*=\s*'100%'/);
-  assert.match(renderer, /pips\.style\.justifyContent\s*=\s*'center'/);
-  assert.match(renderer, /pips\.style\.width\s*=\s*'max-content'/);
+  assert.match(renderer, /main\.setCssStyles\(\{ flexDirection: 'column' \}\)/);
+  assert.match(renderer, /main\.setCssStyles\(\{ justifyContent: 'center' \}\)/);
+  assert.match(renderer, /name\.setCssStyles\(\{ width: '100%' \}\)/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ justifyContent: 'center' \}\)/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ width: 'max-content' \}\)/);
   assert.match(help, /row\.append\(make\('span', 'statblock-forge__preview-counter-name', name\)\)/);
   assert.match(help, /row\.append\(main\)/);
   assert.match(css, /grid-template-columns:\s*repeat\(var\(--forge-counters-per-row,\s*2\),\s*minmax\(0,\s*1fr\)\)/);
@@ -88,10 +88,10 @@ test('changing the number of Counters per row updates only the selected Block la
 test('Counter indicator groups size to their marker count and center each wrapped line', async () => {
   const renderer = await readSource('../src/render/statblockPreviewRenderer.ts');
   const css = await readSource('../styles.css');
-  assert.match(renderer, /pips\.style\.flexWrap\s*=\s*'wrap'/);
-  assert.match(renderer, /pips\.style\.justifyContent\s*=\s*'center'/);
-  assert.match(renderer, /pips\.style\.width\s*=\s*'max-content'/);
-  assert.match(renderer, /pips\.style\.maxWidth\s*=\s*'100%'/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ flexWrap: 'wrap' \}\)/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ justifyContent: 'center' \}\)/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ width: 'max-content' \}\)/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ maxWidth: '100%' \}\)/);
   assert.match(css, /statblock-forge__preview-counter-pips \{[^}]*justify-content: center;[^}]*width: max-content;[^}]*max-width: 100%/);
   assert.match(css, /\.statblock-forge__statblock \.atlas-sb-counter__pips \{[^}]*justify-content: center;[^}]*flex-wrap: wrap;[^}]*width: max-content;[^}]*max-width: 100%/);
 });
@@ -102,7 +102,7 @@ test('Counter marker geometry is identical in Template Editor previews and open 
   const css = await readSource('../styles.css');
   // Passive pips get a same-size cell as interactive buttons; both renderers
   // now use 0.74rem cells containing a 0.66rem marker, with no extra group gap.
-  assert.match(renderer, /pips\.style\.gap = '0'/);
+  assert.match(renderer, /pips\.setCssStyles\(\{ gap: '0' \}\)/);
   assert.match(renderer, /const hitbox = element\('span', 'atlas-sb-counter__pip-hitbox'\)/);
   assert.match(css, /\.statblock-forge__statblock :is\(\.atlas-sb-counter__pip-button, \.atlas-sb-counter__pip-hitbox\)[^}]*width: 0\.74rem;[^}]*height: 0\.74rem/);
   assert.match(css, /\.statblock-forge__statblock \.atlas-sb-counter__pip \{[^}]*width: 0\.66rem;[^}]*height: 0\.66rem/);

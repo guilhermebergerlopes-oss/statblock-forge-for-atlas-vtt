@@ -44,9 +44,9 @@ test('Rest chooser measures and constrains the panel to create a bounded inner s
   const source = await readFile(chooserUrl, 'utf8');
   const styles = await readFile(stylesUrl, 'utf8');
 
-  assert.match(source, /panel\.style\.height = 'auto'/);
+  assert.match(source, /panel\.setCssStyles\(\{ height: 'auto' \}\)/);
   assert.match(source, /const naturalHeight = panel\.getBoundingClientRect\(\)\.height/);
-  assert.match(source, /panel\.style\.height = `\$\{Math\.min\(naturalHeight, maxPanelHeight\)\}px`/);
+  assert.match(source, /panel\.setCssStyles\(\{ height: `\$\{Math\.min\(naturalHeight, maxPanelHeight\)\}px` \}\)/);
 
   const bodyRule = styles.match(/\.statblock-forge__rest-panel-body\s*\{([^}]*)\}/s)?.[1];
   assert.ok(bodyRule, 'Rest panel body styles should exist');

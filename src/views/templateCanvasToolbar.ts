@@ -81,11 +81,11 @@ function mountCanvasActionMenu(
       Math.min(rect.left, viewportLeft + viewportWidth - panelWidth - margin),
     );
 
-    content.style.position = 'fixed';
-    content.style.left = `${left}px`;
-    content.style.top = `${top}px`;
-    content.style.width = `${panelWidth}px`;
-    content.style.maxHeight = `${maxHeight}px`;
+    content.setCssStyles({ position: 'fixed' });
+    content.setCssStyles({ left: `${left}px` });
+    content.setCssStyles({ top: `${top}px` });
+    content.setCssStyles({ width: `${panelWidth}px` });
+    content.setCssStyles({ maxHeight: `${maxHeight}px` });
   };
 
   const schedulePosition = (): void => { window.requestAnimationFrame(positionMenu); };

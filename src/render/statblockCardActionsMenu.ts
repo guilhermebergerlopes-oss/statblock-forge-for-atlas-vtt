@@ -172,8 +172,8 @@ export function renderStatblockCardActionsMenu(options: StatblockCardActionsMenu
     const top = below + height <= window.innerHeight - 8
       ? below
       : Math.max(8, triggerRect.top - height - 4);
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
+    menu.setCssStyles({ left: `${left}px` });
+    menu.setCssStyles({ top: `${top}px` });
 
     document.addEventListener('pointerdown', onOutside, true);
     document.addEventListener('keydown', onKeyDown, true);

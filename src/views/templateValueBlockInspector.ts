@@ -202,11 +202,11 @@ export function renderValueBlockInspector(context: TemplateBlockInspectorContext
       const previewGeometry = context.getImagePreviewGeometry?.(block.id);
       const fallbackSpan = Math.max(1, Math.min(12, Number(metadata.span) || 12));
       const fallbackRows = Math.max(1, Math.min(512, Number(metadata.rows) || 1));
-      preview.style.aspectRatio = previewGeometry?.aspectRatio && Number.isFinite(previewGeometry.aspectRatio)
+      preview.setCssStyles({ aspectRatio: previewGeometry?.aspectRatio && Number.isFinite(previewGeometry.aspectRatio)
         ? String(previewGeometry.aspectRatio)
-        : `${fallbackSpan} / ${fallbackRows}`;
-      if (previewGeometry?.clipPath) preview.style.clipPath = previewGeometry.clipPath;
-      if (previewGeometry?.borderRadius) preview.style.borderRadius = previewGeometry.borderRadius;
+        : `${fallbackSpan} / ${fallbackRows}` });
+      if (previewGeometry?.clipPath) preview.setCssStyles({ clipPath: previewGeometry.clipPath });
+      if (previewGeometry?.borderRadius) preview.setCssStyles({ borderRadius: previewGeometry.borderRadius });
       preview.tabIndex = 0;
       preview.setAttribute('role', 'group');
       preview.setAttribute('aria-label', 'Image framing preview. Drag to reposition; use arrow keys for fine adjustment.');
