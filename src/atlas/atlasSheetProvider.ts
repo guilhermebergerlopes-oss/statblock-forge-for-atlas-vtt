@@ -116,7 +116,7 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
   const provider: AtlasSheetProvider = {
     id: FORGE_SHEET_PROVIDER_ID,
     name: 'Statblock Forge',
-    version: '0.4.2',
+    version: '0.4.3',
     async getSheet(sourceId) {
       const resolved = await resolveDefinition(sourceId);
       if (!resolved) return null;

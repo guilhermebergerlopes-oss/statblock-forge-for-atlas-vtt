@@ -1,3 +1,9 @@
+## 0.4.3 — Metadados de publicação
+
+### Changed
+- Updates the Forge package, manifest, Atlas sheet-provider, and bundled documentation version to 0.4.3.
+- Replaces the public package description with a concise, platform-neutral summary of the statblock authoring features.
+
 ## 0.4.2 — Conformidade de estilos do editor inline
 
 ### Fixed

@@ -66,18 +66,20 @@ test('Atlas compatibility warning variants are translated when embedded in the e
 });
 
 
-test('package metadata and bundled documentation remain on release 0.4.2', async () => {
+test('package metadata and bundled documentation remain on release 0.4.3', async () => {
   const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   const ptDocs = await readFile(resolve(root, 'src/documentation/documentationPackage.ts'), 'utf8');
   const enDocs = await readFile(resolve(root, 'src/documentation/documentationPackage.en.ts'), 'utf8');
-  assert.equal(packageJson.version, '0.4.2');
-  assert.equal(manifest.version, '0.4.2');
-  assert.match(ptDocs, /v0\.4\.2/);
-  assert.match(enDocs, /v0\.4\.2/);
+  assert.equal(packageJson.version, '0.4.3');
+  assert.equal(manifest.version, '0.4.3');
+  assert.match(ptDocs, /v0\.4\.3/);
+  assert.match(enDocs, /v0\.4\.3/);
   assert.ok(manifest.description.length < 250);
   assert.ok(packageJson.description.length < 250);
   assert.ok(!manifest.description.startsWith(manifest.name));
+  assert.doesNotMatch(manifest.description, /obsidian|vault|atlas|plugin|extension|workspace|note/i);
+  assert.equal(packageJson.description, manifest.description);
   assert.equal(manifest.authorUrl, 'https://github.com/guilhermebergerlopes-oss');
   assert.doesNotMatch(ptDocs, /Configurações do Obsidian → Atalhos/);
   assert.doesNotMatch(enDocs, /Obsidian Settings → Hotkeys/);
