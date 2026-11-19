@@ -1,4 +1,4 @@
-import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, TFolder } from 'obsidian';
+import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, TFolder, type EventRef } from 'obsidian';
 import { ForgeSettingTab } from './src/settings/ForgeSettingTab';
 import { DEFAULT_TOGGLE_STATBLOCK_MODE_SHORTCUT, matchesForgeShortcut, normalizeForgeShortcut } from './src/settings/forgeShortcut.ts';
 import { TemplateEditorView, STATBLOCK_FORGE_EDITOR_VIEW } from './src/views/TemplateEditorView';
@@ -18,7 +18,7 @@ import { createForgeLayout, isRecord } from './src/templates/forgeTemplate.ts';
 import { createForgeStatblockNoteFromTemplate } from './src/statblocks/forgeStatblockNoteCreator.ts';
 import { openForgeStatblockNoteForEditing } from './src/statblocks/forgeStatblockEditorWorkflow.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './src/atlas/forgeTemplateLinkResolver';
-import { registerForgeAtlasSheetProvider } from './src/atlas/atlasSheetProvider.ts';
+import { getForgeAtlasPublicAPI, registerForgeAtlasSheetProvider } from './src/atlas/atlasSheetProvider.ts';
 import { refreshForgeStatblockTemplateLinkPath } from './src/statblocks/forgeTemplateLink';
 import { assessAtlasTokenCreation, dispatchAtlasCreateTokenCommand } from './src/atlas/atlasTokenWorkflow';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from './src/i18n/localization';
@@ -110,21 +110,41 @@ export default class StatblockForgePlugin extends Plugin {
       toggleStatblockModeShortcut: normalizeForgeShortcut(storedSettings.toggleStatblockModeShortcut),
     };
 
-    // The Atlas fork owns map scenes and the hover-preview lifecycle. Forge supplies its
-    // renderer through Atlas' public sheet-provider API, so Ctrl-hover can display the
-    // exact Forge statblock instead of the Atlas-native fallback. Retry at layout-ready
-    // because Obsidian may load this plugin before the Atlas fork.
+    // The fork owns the Ctrl-hover preview lifecycle. Forge supplies its exact
+    // renderer through the public sheet-provider API. The API can appear or be
+    // replaced after Forge loads, so reconnect on workspace changes and when
+    // the fork explicitly requests registration immediately before Ctrl-hover.
+    let registeredAtlasAPI: ReturnType<typeof getForgeAtlasPublicAPI> = null;
     let unregisterAtlasProvider: (() => void) | null = null;
     const tryRegisterAtlasProvider = (): void => {
-      if (unregisterAtlasProvider) return;
-      unregisterAtlasProvider = registerForgeAtlasSheetProvider(this.app, this);
-      if (unregisterAtlasProvider) this.register(() => {
+      const currentAtlasAPI = getForgeAtlasPublicAPI(this.app);
+      if (registeredAtlasAPI !== currentAtlasAPI) {
         unregisterAtlasProvider?.();
         unregisterAtlasProvider = null;
-      });
+        registeredAtlasAPI = null;
+      }
+      if (!currentAtlasAPI || unregisterAtlasProvider) return;
+      const unregister = registerForgeAtlasSheetProvider(this.app, this, currentAtlasAPI);
+      if (!unregister) return;
+      unregisterAtlasProvider = unregister;
+      registeredAtlasAPI = currentAtlasAPI;
     };
+    this.register(() => {
+      unregisterAtlasProvider?.();
+      unregisterAtlasProvider = null;
+      registeredAtlasAPI = null;
+    });
     tryRegisterAtlasProvider();
     this.app.workspace.onLayoutReady(tryRegisterAtlasProvider);
+    this.registerEvent(this.app.workspace.on('layout-change', tryRegisterAtlasProvider));
+    this.registerEvent(this.app.workspace.on('active-leaf-change', tryRegisterAtlasProvider));
+    const workspaceProviderEvents = this.app.workspace as unknown as {
+      on: (name: string, callback: () => void) => EventRef;
+    };
+    this.registerEvent(workspaceProviderEvents.on(
+      'statblock-forge-atlas-provider-registration-requested',
+      tryRegisterAtlasProvider,
+    ));
 
     this.registerView(STATBLOCK_FORGE_EDITOR_VIEW, (leaf) => new TemplateEditorView(leaf, this));
     this.registerExtensions([FORGE_TEMPLATE_EXTENSION], STATBLOCK_FORGE_EDITOR_VIEW);

@@ -327,30 +327,25 @@
   min-height: 0;
   pointer-events: none;
 }
-
-.statblock-forge__custom-border-frame::before,
-.statblock-forge__custom-border-frame::after {
+.statblock-forge__custom-border-frame::before, .statblock-forge__custom-border-frame::after {
   position: absolute;
   inset: 0;
-  content: '';
+  content: "";
   clip-path: var(--forge-custom-border-shape);
 }
-
 .statblock-forge__custom-border-frame::before {
   background: var(--forge-custom-border-color, var(--forge-theme-border, var(--background-modifier-border)));
 }
-
 .statblock-forge__custom-border-frame::after {
   inset: var(--forge-custom-border-width, 1px);
   background: var(--forge-custom-border-surface, var(--forge-theme-surface, var(--background-primary)));
 }
 
-.statblock-forge__preview-block.has-forge-border-frame > :not(.statblock-forge__custom-border-frame):not(.statblock-forge__resize-handle):not(.statblock-forge__section-select-handle):not(.statblock-forge__row-select-handle) {
+.statblock-forge__preview-block.has-forge-border-frame > :not(.statblock-forge__custom-border-frame):not(.statblock-forge__resize-handle) {
   position: relative;
   z-index: 1;
 }
 
-/* Keep image artwork inside the inset surface of geometric custom borders. */
 .statblock-forge__preview-block.is-image.has-forge-border-frame > .statblock-forge__preview-image.is-portrait {
   position: absolute;
   inset: var(--forge-custom-border-width, 1px);
@@ -363,61 +358,60 @@
   clip-path: var(--forge-custom-border-shape);
 }
 
-.statblock-forge__preview-block[data-border-preset='oval'] {
+.statblock-forge__preview-block[data-border-preset=oval] {
   --forge-custom-border-shape: ellipse(50% 50% at 50% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='diamond'] {
+.statblock-forge__preview-block[data-border-preset=diamond] {
   --forge-custom-border-shape: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='regular-hexagon'] {
+.statblock-forge__preview-block[data-border-preset=regular-hexagon] {
   --forge-custom-border-shape: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-up'] {
+.statblock-forge__preview-block[data-border-preset=triangle-up] {
   --forge-custom-border-shape: polygon(50% 0%, 100% 100%, 0% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-right'] {
+.statblock-forge__preview-block[data-border-preset=triangle-right] {
   --forge-custom-border-shape: polygon(0% 0%, 100% 50%, 0% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-down'] {
+.statblock-forge__preview-block[data-border-preset=triangle-down] {
   --forge-custom-border-shape: polygon(0% 0%, 100% 0%, 50% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-left'] {
+.statblock-forge__preview-block[data-border-preset=triangle-left] {
   --forge-custom-border-shape: polygon(100% 0%, 100% 100%, 0% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='pointed'] {
+.statblock-forge__preview-block[data-border-preset=pointed] {
   --forge-custom-border-shape: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
 }
 
-.statblock-forge__preview-block[data-border-preset='angular'] {
+.statblock-forge__preview-block[data-border-preset=angular] {
   --forge-custom-border-shape: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
 }
 
-.statblock-forge__preview-block[data-border-preset='hexagonal'] {
+.statblock-forge__preview-block[data-border-preset=hexagonal] {
   --forge-custom-border-shape: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='shield'] {
+.statblock-forge__preview-block[data-border-preset=shield] {
   --forge-custom-border-shape: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
 }
+
 .statblock-forge__token-header-frame {
   position: relative;
   isolation: isolate;
   overflow: visible;
 }
-
 .statblock-forge__token-header-frame > .statblock-forge__preview-image {
   position: relative;
   z-index: 1;
 }
 
-/* Token art fills the complete inner surface of an enabled token border. */
 .atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border {
   aspect-ratio: 1;
 }
@@ -470,6 +464,7 @@
   object-fit: cover;
   border-radius: 0;
 }
+
 .statblock-forge__token-border-frame {
   position: absolute;
   z-index: 0;
@@ -481,79 +476,233 @@
   box-sizing: border-box;
 }
 
-.statblock-forge__token-header-frame[data-token-border-preset='double'] .statblock-forge__token-border-frame {
+.statblock-forge__token-header-frame[data-token-border-preset=double] .statblock-forge__token-border-frame {
   border-style: double;
 }
 
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='oval'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: ellipse(50% 50% at 50% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='diamond'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='regular-hexagon'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-up'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-right'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0% 0%, 100% 50%, 0% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-down'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-left'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(100% 0%, 100% 100%, 0% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='pointed'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='angular'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='hexagonal'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='shield'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame {
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=oval] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: ellipse(50% 50% at 50% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=diamond] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=regular-hexagon] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-up] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-right] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-down] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-left] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=pointed] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=angular] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=hexagonal] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=shield] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=oval] .statblock-forge__token-border-frame {
   border: 0;
   border-radius: 0;
   background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: ellipse(50% 50% at 50% 50%);
 }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame { clip-path: ellipse(50% 50% at 50% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame { clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame { clip-path: polygon(0% 0%, 100% 50%, 0% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame { clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame { clip-path: polygon(100% 0%, 100% 100%, 0% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame { clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%); }
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame { clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame::after {
+.statblock-forge__token-header-frame[data-token-border-preset=oval] .statblock-forge__token-border-frame::after {
   position: absolute;
   inset: var(--forge-token-border-width, 2px);
-  content: '';
+  content: "";
   background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
-  clip-path: inherit;
+  clip-path: ellipse(50% 50% at 50% 50%);
 }
-/* Image-field framing controls (source: border-presets.scss). */
+
+.statblock-forge__token-header-frame[data-token-border-preset=diamond] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=diamond] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=regular-hexagon] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=regular-hexagon] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-up] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-up] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-right] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-right] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-down] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-down] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-left] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-left] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=pointed] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=pointed] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=angular] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=angular] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=hexagonal] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=hexagonal] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=shield] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=shield] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-frame {
   width: 100%;
   height: 100%;
-  min-height: 2.8rem;
-  max-height: 8rem;
-  overflow: auto;
+  min-height: 7rem;
   aspect-ratio: auto;
   overflow: hidden;
 }
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-frame.has-image {
   border: 0;
   border-radius: inherit;
   background: transparent;
 }
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-art {
   width: 100%;
   height: 100%;
@@ -561,17 +710,29 @@
   max-height: none;
   object-fit: cover;
 }
-.statblock-forge__preview-image.is-token .statblock-forge__image-socket-frame { overflow: hidden; }
+
+.statblock-forge__preview-image.is-token .statblock-forge__image-socket-frame {
+  overflow: hidden;
+}
+
 .statblock-forge__preview-image.is-token .statblock-forge__image-socket-art {
   object-fit: cover;
 }
+
 .statblock-forge__preview-image.is-framing-interactive.is-image-zoomed .statblock-forge__image-socket {
   cursor: grab;
   touch-action: none;
 }
-.statblock-forge__preview-image.is-framing-interactive.is-image-dragging .statblock-forge__image-socket { cursor: grabbing; }
-.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket-art { user-select: none; -webkit-user-drag: none; }
-.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket:active { transform: none; }
+.statblock-forge__preview-image.is-framing-interactive.is-image-dragging .statblock-forge__image-socket {
+  cursor: grabbing;
+}
+.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket:active {
+  transform: none;
+}
+.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket-art {
+  user-select: none;
+  -webkit-user-drag: none;
+}
 
 .statblock-forge__image-framing-controls {
   display: flex;
@@ -580,12 +741,20 @@
   margin-top: 0.65rem;
   min-width: 0;
 }
-.statblock-forge__image-framing-controls .statblock-forge__hint { margin: 0; }
-.statblock-forge__image-framing-heading { display: flex; flex-direction: column; gap: 0.15rem; }
+.statblock-forge__image-framing-controls .statblock-forge__hint {
+  margin: 0;
+}
+
+.statblock-forge__image-framing-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
 .statblock-forge__image-framing-preview {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16/10;
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
@@ -598,8 +767,13 @@
   user-select: none;
   outline-offset: 2px;
 }
-.statblock-forge__image-framing-preview.is-dragging { cursor: grabbing; }
-.statblock-forge__image-framing-preview:focus-visible { outline: 2px solid var(--interactive-accent); }
+.statblock-forge__image-framing-preview.is-dragging {
+  cursor: grabbing;
+}
+.statblock-forge__image-framing-preview:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+}
+
 .statblock-forge__image-framing-preview-image {
   position: absolute;
   inset: 0;
@@ -611,15 +785,60 @@
   object-fit: cover;
   pointer-events: none;
 }
-.statblock-forge__image-framing-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 1rem; color: var(--text-muted); text-align: center; font-size: var(--font-smaller); }
-.statblock-forge__image-framing-axis-controls { display: grid; gap: 0.55rem; min-width: 0; }
-.statblock-forge__image-framing-slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.3rem 0.65rem; min-width: 0; }
-.statblock-forge__image-framing-slider > span:first-child { font-size: var(--font-small); }
-.statblock-forge__image-framing-slider input[type='range'] { grid-column: 1 / -1; width: 100%; min-width: 0; margin: 0; accent-color: var(--interactive-accent); }
-.statblock-forge__image-framing-output { color: var(--text-muted); font-size: var(--font-smallest); font-variant-numeric: tabular-nums; }
-.statblock-forge__image-framing-precise { border-top: 1px solid var(--background-modifier-border); padding-top: 0.45rem; }
-.statblock-forge__image-framing-precise > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-small); }
-.statblock-forge__image-framing-precise > .statblock-forge__image-framing-slider { margin-top: 0.55rem; }
+
+.statblock-forge__image-framing-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: var(--font-smaller);
+}
+
+.statblock-forge__image-framing-axis-controls {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.statblock-forge__image-framing-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.3rem 0.65rem;
+  min-width: 0;
+}
+.statblock-forge__image-framing-slider > span:first-child {
+  font-size: var(--font-small);
+}
+.statblock-forge__image-framing-slider input[type=range] {
+  grid-column: 1/-1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--interactive-accent);
+}
+
+.statblock-forge__image-framing-output {
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-variant-numeric: tabular-nums;
+}
+
+.statblock-forge__image-framing-precise {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 0.45rem;
+}
+.statblock-forge__image-framing-precise > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+.statblock-forge__image-framing-precise > .statblock-forge__image-framing-slider {
+  margin-top: 0.55rem;
+}
 /* END GENERATED FORGE BORDER PRESETS */
 
 .statblock-forge__statblock-create-modal {

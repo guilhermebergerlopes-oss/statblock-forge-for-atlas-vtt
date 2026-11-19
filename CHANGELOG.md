@@ -5,6 +5,10 @@
 - Exposes the effective width to the Atlas fork preview window while preserving the existing scrollable-body behavior.
 - Updates package, manifest, provider and bundled documentation versions to 0.4.4.
 
+
+### Atlas provider integration
+- Register and refresh the Forge sheet renderer when the Forked Atlas requests it during Ctrl-hover, including when the fork becomes available after Forge has loaded.
+
 ## 0.4.3 — Metadados de publicação
 
 ### Changed

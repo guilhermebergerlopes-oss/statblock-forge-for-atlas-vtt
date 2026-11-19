@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import type { ForgeRestDiceSet } from './restDiceRoller.ts';
 import { forgeStatblockAdvantageSides, type ForgeAdvantageSide } from './statblockDiceMenuModel.ts';
+import { ATLAS_PLUGIN_ID } from '../atlas/atlasRuntimeDetection.ts';
 
 export interface AtlasRestDiceRoll {
   formula: string;
@@ -119,7 +120,7 @@ function findAtlasDiceTool(app: App): AtlasDiceToolLike | null {
 /** Finds Atlas' versioned app-wide dice API; unlike a map Dice Tool, it works with no scene open. */
 function findAtlasPublicDiceAPI(app: App): AtlasPublicDiceAPI | null {
   const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, AtlasPublicDicePluginLike | undefined> } }).plugins;
-  const api = pluginManager?.plugins?.['statblock-forge-forked-atlas-vtt-compatibility']?.publicAPI;
+  const api = pluginManager?.plugins?.[ATLAS_PLUGIN_ID]?.publicAPI;
   if (api?.apiVersion !== 1 || !api.capabilities?.includes('dice.statblock-rolls')) return null;
   if (typeof api.dice?.rollStatblock !== 'function' || typeof api.dice?.rollingDiceForStatblock !== 'function') return null;
   return api.dice;
@@ -127,7 +128,7 @@ function findAtlasPublicDiceAPI(app: App): AtlasPublicDiceAPI | null {
 
 function findAtlasPublicDiceHistoryAPI(app: App): AtlasPublicDiceAPI | null {
   const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, AtlasPublicDicePluginLike | undefined> } }).plugins;
-  const api = pluginManager?.plugins?.['statblock-forge-forked-atlas-vtt-compatibility']?.publicAPI;
+  const api = pluginManager?.plugins?.[ATLAS_PLUGIN_ID]?.publicAPI;
   if (api?.apiVersion !== 1 || !api.capabilities?.includes('dice.statblock-history')) return null;
   const dice = api.dice;
   if (typeof dice?.getStatblockRollHistory !== 'function' || typeof dice?.repeatStatblockRoll !== 'function'

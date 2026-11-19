@@ -23,7 +23,7 @@ const SET = {
 function appWithoutScene(publicAPI) {
   return {
     workspace: { getLeavesOfType: () => [] },
-    plugins: { plugins: { 'statblock-forge-forked-atlas-vtt-compatibility': { publicAPI } } },
+    plugins: { plugins: { 'forked-atlas-vtt-compatibility-for-statblock-forge': { publicAPI } } },
   };
 }
 

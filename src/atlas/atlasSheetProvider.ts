@@ -11,6 +11,7 @@ import { resolveVaultImageResource } from '../render/vaultImageResolver.ts';
 import { attachForgeStatblockDiceRolling } from '../render/statblockDiceLinks.ts';
 import { normalizeForgeLanguage } from '../i18n/localization.ts';
 import { FORGE_STATBLOCK_SHEET_WIDTH_KEY, resolveForgeSheetWidth } from '../templates/sheetWidth.ts';
+import { ATLAS_PLUGIN_ID } from './atlasRuntimeDetection.ts';
 
 const FORGE_SHEET_PROVIDER_ID = 'statblock-forge';
 
@@ -228,16 +229,30 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
   return provider;
 }
 
-/** Register the Forge renderer with the currently enabled Atlas fork, if available. */
-export function registerForgeAtlasSheetProvider(app: App, plugin: StatblockForgePlugin): (() => void) | null {
-  const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, { publicAPI?: AtlasPublicAPI }> } }).plugins;
-  const atlas = pluginManager?.plugins?.['statblock-forge-forked-atlas-vtt-compatibility'];
-  const api = atlas?.publicAPI;
-  if (api?.apiVersion !== 1 || !api.capabilities.includes('sheets.provider-registration') || !api.sheets?.registerProvider) return null;
+/** Return the currently enabled Forked Atlas public API, when it supports sheet providers. */
+export function getForgeAtlasPublicAPI(app: App): AtlasPublicAPI | null {
+  try {
+    const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, { publicAPI?: AtlasPublicAPI }> } }).plugins;
+    const api = pluginManager?.plugins?.[ATLAS_PLUGIN_ID]?.publicAPI;
+    if (api?.apiVersion !== 1 || !api.capabilities.includes('sheets.provider-registration') || !api.sheets?.registerProvider) return null;
+    return api;
+  } catch {
+    // The fork can be unloading while the workspace changes.
+    return null;
+  }
+}
+
+/** Register the Forge renderer with the currently enabled fork. */
+export function registerForgeAtlasSheetProvider(
+  app: App,
+  plugin: StatblockForgePlugin,
+  api: AtlasPublicAPI | null = getForgeAtlasPublicAPI(app),
+): (() => void) | null {
+  if (!api) return null;
   try {
     return api.sheets.registerProvider(createForgeSheetProvider(app, plugin));
   } catch (error) {
-    console.warn('[Statblock Forge] Could not register the Atlas sheet renderer:', error);
+    console.warn('[Statblock Forge] Could not register the Forked Atlas sheet renderer:', error);
     return null;
   }
 }
