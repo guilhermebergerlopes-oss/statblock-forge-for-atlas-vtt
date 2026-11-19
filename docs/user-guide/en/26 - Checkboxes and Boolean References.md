@@ -34,10 +34,12 @@ Example:
 | `traits` | `magical` | Magical |
 | `defenses` | `armored` | Armored |
 
-The complete reference is the Field key, a dot, and the option key:
+The complete reference is the Field key, a dot, and the option key. Because the shared numeric evaluator accepts bare keys, `@`, and braces, the same reference can be written in all three forms:
 
 ```text
 traits.flying
+@traits.flying
+{traits.flying}
 defenses.armored
 ```
 

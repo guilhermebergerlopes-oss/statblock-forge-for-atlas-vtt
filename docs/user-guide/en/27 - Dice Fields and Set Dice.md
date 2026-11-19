@@ -37,14 +37,15 @@ The content must be an expression accepted by the parser and contain at least on
 
 ### `@field` references in dice text
 
-The editor's syntax validator recognizes `@field` references in dice expressions as numeric placeholders while checking notation. This is not the Template's **Dice Formula** dependency mechanism: it does not offer the same Number/Rating dependency validation as `{fieldKey}`. For a Template-controlled roll built from integer Values, prefer **Dice Formula**.
+The editor's syntax validator recognizes explicit Field references in dice expressions as numeric placeholders while checking notation. For a Template-controlled roll, use **Dice Formula**, which validates Number/Rating Field dependencies and accepts both `@fieldKey` and `{fieldKey}`.
 
-## 2. Dynamic Dice Formula with `{fieldKey}`
+## 2. Dynamic Dice Formula with `@field` or `{fieldKey}`
 
-**Dice Formula** is configured in the Dice Field's Template properties. It turns statblock Values into a resolved dice expression. Use braces around the exact key of the source Field:
+**Dice Formula** is configured in the Dice Field's Template properties. It turns statblock Values into a resolved dice expression. Use `@key` or `{key}` around the exact key of the source Field. Both forms can appear in one expression; use braces for keys containing hyphens:
 
 ```text
-{proficiency}d{might}+{level}
+@proficiency d{might}+{level}
+{proficiency}d@might+@level
 ```
 
 Given these Values:
@@ -67,7 +68,7 @@ The configured formula stays in the Template. The numbers `2`, `8`, and `3` belo
 
 1. Create or select a **Dice** Field.
 2. Open that Field's properties.
-3. Enter the expression in **Dice Formula** using `{fieldKey}`.
+3. Enter the expression in **Dice Formula** using `@fieldKey` or `{fieldKey}`.
 4. Confirm that each placeholder points to another **Number** or **Rating** Field in the same Template.
 5. Fill Samples with valid integers to preview the resolved expression.
 6. Save the Template and test it on a real statblock.
@@ -76,7 +77,7 @@ The configured formula accepts up to **500 characters**. The final expanded expr
 
 ### Which Fields can be referenced
 
-Only **Number** and **Rating** Fields can be referenced by `{fieldKey}`. A Dice Field cannot reference itself.
+Only **Number** and **Rating** Fields can be referenced by `@fieldKey` or `{fieldKey}`. A Dice Field cannot reference itself.
 
 Every substituted Value must be a **safe integer**. This matters because the number before `d` means the number of dice, and the number after `d` means the die's faces.
 
@@ -96,7 +97,7 @@ If any reference is missing, empty, fractional, or the wrong type, the formula d
 
 - Changing a source Number/Rating Value updates the displayed Dice Formula on the sheet.
 - If the source Field has its own formula, its calculated numeric result is used for that substitution.
-- Renaming a key through the editor updates recognized `{oldKey}` placeholders.
+- Renaming a key through the editor updates recognized `@oldKey` and `{oldKey}` references.
 - A Number/Rating Field used by a Dice Formula cannot be deleted or converted to an incompatible type until the dependency is fixed.
 - The sheet user edits source Values, not the expression defined in the Template.
 
@@ -106,7 +107,7 @@ Template:
 
 | Field key | Type | Dice Formula / setting |
 |---|---|---|
-| `weapon_dice` | Dice | `{proficiency}d{might}+{level}` |
+| `weapon_dice` | Dice | `@proficiency d{might}+{level}` or `{proficiency}d{might}+@level` |
 | `proficiency` | Number | Per-sheet Value |
 | `might` | Number | Per-sheet Value |
 | `level` | Rating | Per-sheet Value |
@@ -172,7 +173,7 @@ For simple linear additive expressions, Forge may show an `avg` hint with an est
 - `3dF` → `avg 0`.
 - `d%` → `avg 50.5`.
 
-The interface suppresses the hint for dynamic references (`@...`), rerolls, explosions, keep/drop, success/failure counting, products, and quotients. No `avg` hint does not mean the formula is invalid; it means Forge is not showing a simplified estimate.
+The interface suppresses the hint for dynamic references (`@...` or `{...}`), rerolls, explosions, keep/drop, success/failure counting, products, and quotients. No `avg` hint does not mean the formula is invalid; it means Forge is not showing a simplified estimate.
 
 ## Set Dice
 
@@ -231,12 +232,12 @@ When the fork's `dice.statblock-history` API capability is available, the contex
 | Family | Reference syntax | Result |
 |---|---|---|
 | Number/Rating | `strength + proficiency`, `value * 2` | Deterministic number; no roll. |
-| Dice Formula | `{proficiency}d{might}+{level}` | Substitutes integer Values and creates a roll. |
+| Dice Formula | `@proficiency d{might}+{level}` or `{proficiency}d{might}+@level` | Substitutes integer Values and creates a roll. |
 | Rest Formula | `(@level)d4`, `1d8+2` | Recovery/spending rule with `@field` references and its own validator. |
 | Counter `regain` | `1d4`, `2d6+1` | Literal per-row dice formula used by **Restore to full**. |
 
 > [!warning] Do not copy syntax without adapting it
-> `{fieldKey}` is a Dice Formula placeholder. `@field_key` belongs to the dice-text/Rest reference syntax. Number/Rating uses direct names without `@` or braces.
+> Number/Rating, Dice Formula, and Rest accept `@field` and `{field}` references; Number/Rating also keeps direct `field` names. Each formula family retains its own grammar and operators.
 
 ## Troubleshooting
 

@@ -43,20 +43,20 @@ Com `proficiency = 2`, a ficha exibe `14`. O valor-base `12` continua sendo o da
 
 ## Referenciar outros Fields
 
-Use a `key` do Field diretamente, sem `@` e sem chaves:
+As fórmulas continuam aceitando a referência direta pela `key`. Agora também aceitam `@key` e `{key}`; as três formas podem ser misturadas na mesma expressão:
 
 ```text
 strength + proficiency
+@strength + {proficiency}
 attributes.dexterity + 2
+{might-score} - @proficiency
 ```
 
 O avaliador procura a chave no registro de Values do statblock. Caminhos separados por ponto permitem acessar propriedades de objetos aninhados; segmentos numéricos também podem selecionar posições de arrays quando o caminho de dados contém uma lista.
 
 ### Regras para identificadores
 
-O analisador de fórmulas reconhece nomes iniciados por letra ou `_`, seguidos por letras, números, `_` ou pontos. Para referências em fórmulas, prefira keys como `might`, `proficiency`, `base_hp` e `attributes.dexterity`.
-
-Embora as keys gerais do Forge possam aceitar hífen, um hífen dentro de um nome de fórmula é interpretado como operador de subtração. Evite keys com hífen quando elas precisarem ser referenciadas em uma fórmula Number/Rating.
+O analisador reconhece identificadores diretos iniciados por letra ou `_`, seguidos por letras, números, `_` ou pontos. As formas explícitas `@key` e `{key}` também aceitam caminhos com ponto. Para keys que contêm hífen, use `{key}`: as chaves delimitam o nome completo e evitam confusão com o operador de subtração. Exemplo: `{might-score} - @proficiency`.
 
 Uma referência precisa existir e resolver para um número ou booleano utilizável. Um Field ausente, vazio ou com texto não numérico torna o resultado indisponível; o Forge não transforma automaticamente texto inválido em zero.
 
@@ -196,7 +196,7 @@ Ela pode criar um número derivado para aquela Metric sem alterar o Value nem a 
 | `value` não retorna o número esperado | Confirme o Value-base salvo no próprio Field. |
 | Uma referência com ponto falha | Confira a estrutura real do objeto no Sample/JSON. |
 | Uma fração falha | Confirme que o Field de origem é Rating, não Number. |
-| A expressão funciona em Dice, mas não em Number | Confira a sintaxe: Number usa nomes sem `{}`; Dice Formula usa placeholders `{fieldKey}`. |
+| A expressão funciona em Dice, mas não em Number | Confira se a referência usa uma key válida: Number/Rating aceita key direta, `@key` e `{key}`; Dice Formula aceita as duas formas explícitas. |
 
 ## Veja também
 

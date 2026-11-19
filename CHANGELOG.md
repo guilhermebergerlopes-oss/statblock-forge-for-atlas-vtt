@@ -1,11 +1,39 @@
-- Creator and maintainer: Guilherme Berger Lopes. Support and issue reporting: https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues.
+## 0.4.0 — Busca no JSON, proteção de rascunhos e estabilidade de Sections
 
-## 0.4.0
+### Fixed
+- Restaura a cadeia flex da prévia Forge aberta com Ctrl sobre Tokens do Atlas: o contêiner do provider e o cartão respeitam o limite de altura da janela, enquanto o corpo do statblock ganha rolagem vertical/horizontal real. Isso permite ao manipulador Ctrl+roda do Atlas mover fichas longas em vez de interceptar a rolagem sem um scrollport disponível.
+- Fixes Ctrl-hover scrolling for large Forge statblocks by constraining the provider mount and card to Atlas' preview height and making the statblock body the actual scroll viewport.
+
+### Added
+- Adiciona busca por palavras no editor JSON, agora alinhada ao lado do título **Edit JSON** para reduzir a altura ocupada pela barra de busca.
+- Exige confirmação explícita antes de descartar alterações não aplicadas com Reset draft.
+- Adds word search and previous/next match navigation to the JSON editor; Reset draft now requires confirmation.
+
+### Fixed
+- Corrige a interface da busca no JSON: o campo agora usa o estilo padrão dos inputs do Forge e os controles de anterior/próximo têm largura compacta, sem expandir para ocupar toda a linha.
+- Exibe a quantidade real de ocorrências e a posição atual entre elas, em vez de comparar deslocamento de caractere com o tamanho total do JSON; a navegação mantém o foco na caixa de busca.
+- A busca revela a primeira ocorrência em tempo real enquanto o usuário digita, sem transferir o foco para o textarea; Enter e os botões anterior/próximo percorrem as ocorrências seguintes. A seleção é aplicada sem ativar o editor e a rolagem vertical e horizontal leva a palavra à área visível.
+- Calcula as posições a partir do texto JSON original com correspondência Unicode sem diferenciar maiúsculas, evitando deslocamentos de seleção causados por conversões de caixa que alteram o comprimento de caracteres.
+- Fixes JSON search navigation by scrolling the textarea viewport to the selected occurrence while keeping focus in the search field; match offsets are calculated against the original Unicode text.
+- Fixes JSON search presentation with Forge-native input styling and compact previous/next controls; reports actual match counts and keeps keyboard focus in the search field after navigation.
+- Resolves the latest Canvas selection when **Add block** or **Add container** is activated, so insertion is anchored beside the most recently selected block whenever the selected node cannot accept the new item as a child.
+- Mantém **When Empty** como configuração única de estado vazio no Block Inspector; remove do editor de Field o controle duplicado e deixa de usar `Field.prompt` como placeholder de estado vazio no Forge. Dados legados `Field.prompt` continuam preservados no JSON, mas não controlam mais a interface.
+- Corrige a avaliação do fallback: `rollFrom` não conta como conteúdo exibido; quando há Pattern, somente os Fields referenciados por ele determinam se está vazio.
+- Fórmulas numéricas e slots de Metric consideram referências `@field` e `{field}`, inclusive keys com hífen, ao avaliar o estado vazio.
+- Keeps a single **When Empty** setting on the block Inspector; legacy `Field.prompt` data is preserved but no longer acts as an empty-state placeholder in Forge.
+- Fixes fallback visibility when the bound Field renders no content: the empty source is removed from layout and the fallback participates in normal layout flow instead of being absolutely positioned over a zero-height source.
+- Treats a lone `-`, `–`, `—`, or `−` as an empty-value placeholder for **When Empty**, including nested collection values, without changing the general Atlas empty-value semantics.
+- Ao recolher/mostrar uma Section com o mouse, guarda a coordenada e o ponto clicado por botão (sem depender de um snapshot global limpo no `pointerup`). Depois da mudança, redescobre os scrollports vivos a partir do botão e compensa primeiro o contêiner mais próximo, transferindo o delta restante aos ancestrais. A compensação continua até a posição do botão estabilizar; o acionamento por teclado mantém a restauração de foco sem rolagem.
+- Mouse toggling of folded Sections now keeps a per-button pointer anchor through the click, re-discovers the live scrollports after the layout changes, and applies the remaining movement from the nearest scrollport outward until the button position is stable. Keyboard activation retains focus restoration with `preventScroll`.
+- Disables browser scroll anchoring on the published, stacked-note, and Canvas scrollports used by folded Sections.
+
+- Creator and maintainer: Guilherme Berger Lopes. Support and issue reporting: https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues.
 
 ### Added
 - Completed the language-aware documentation download workflow, including nested-folder creation and preservation of existing Vault notes.
-- Dice Fields can use dynamic Dice Formula expressions with `{fieldKey}` references to Number/Rating Values; roll links recalculate when source Values change.
-- Dice Formula dependencies are validated and updated when source Field keys are renamed.
+- Dice Fields can use dynamic Dice Formula expressions with `@fieldKey` and `{fieldKey}` references to Number/Rating Values; roll links recalculate when source Values change.
+- Formula references now accept both `@field` and `{field}` syntax across Number/Rating, Metric, Scores, Dice Formula, Rest, and Counter-row `regain`; existing bare-key Number/Rating references remain supported and saved formulas are not rewritten during evaluation.
+- Dice Formula dependencies are validated and updated when source Field keys are renamed; dependency discovery and renaming also recognize both explicit reference forms.
 - Added Atlas public history API integration and a per-statblock contextual roll-history menu with repetition by Atlas roll ID.
 
 ### Improved
@@ -20,6 +48,10 @@
 - Legacy `forgeConditionDefinitions`, `__forgeConditions`, `__forgeConditionValues`, and Rest `step`/`clear` records are retained as unrecognized JSON for manual review; Forge does not interpret, execute, or migrate them automatically.
 - Older Atlas builds without `dice.statblock-history` retain the previous Forge roll route.
 - Scene-independent statblock rolls remain Atlas-owned; Forge does not fabricate a scene or token origin.
+
+### Changed
+
+- Standardized the Canvas More options panel into a consistent responsive layout for grid, sheet, density, background-grid, and selection controls. Removed the Atlas-native column selector from the Forge toolbar; Forge retains the existing Atlas layout metadata without exposing a second Atlas setting.
 
 ## 0.3.0 — Rolagens Atlas sem cena aberta
 - Mantém o Dice Tool de uma visualização Atlas visível como primeira opção; usa a capacidade pública `dice.statblock-rolls` quando não há view visível, inclusive quando só restam abas ocultas.

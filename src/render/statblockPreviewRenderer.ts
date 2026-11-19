@@ -28,6 +28,7 @@ import { resolveNestedLayoutInlineBleeds } from './nestedLayoutSizing.ts';
 import { normalizeStatblockThemeId, themePaletteFor } from '../templates/statblockThemes.ts';
 import { groupRowChildrenBySpan, packPhysicalGrid, packVisibleGrid, requiredRowsForBlock, requiredRowsForRowLines } from '../templates/gridLayout.ts';
 import { foldedSectionFooterLabel, isFoldedSectionExpanded, setFoldedSectionExpanded } from '../templates/foldedSectionModel.ts';
+import { alignTargetAtViewportY } from './foldedSectionPointerAnchor.ts';
 import { DEFAULT_GRID_COLUMN_COUNT, GRID_COLUMN_COUNT, MAX_GRID_COLUMN_COUNT } from '../templates/layoutLimits.ts';
 import { readTemplateGridGeometry } from '../views/templateGridGeometry.ts';
 import { evaluatePreviewFormula, scorePreviewGrid, spellPreviewGroups } from './previewValueModel.ts';
@@ -1849,14 +1850,14 @@ function renderTitle(app: App, markdownComponent: Component, sourcePath: string,
   return title;
 }
 
-function renderStat(app: App, markdownComponent: Component, sourcePath: string, block: ForgeBlock, fields: readonly ForgeField[], sample: JsonRecord, layout: ForgeLayoutDocument, header?: JsonRecord, numericRuntime?: NumericFieldRuntime): HTMLElement {
+function renderStat(app: App, markdownComponent: Component, sourcePath: string, block: ForgeBlock, fields: readonly ForgeField[], sample: JsonRecord, layout: ForgeLayoutDocument, sourceBlocks: readonly ForgeBlock[], header?: JsonRecord, numericRuntime?: NumericFieldRuntime): HTMLElement {
   const key = typeof block.field === 'string' ? block.field : '';
   const field = fieldOf(fields, key);
   const readNumber = (source: ForgeField): number | null => isFormulaCapableNumericField(source) && numericRuntime
     ? numericRuntime.value(source, sample)
     : numberValue(valueOf(sample, source.key));
   const trackedValue = field?.type === 'number'
-    ? trackedNumberDisplayForField(field, fields, sample, readNumber, layout.blocks, header)
+    ? trackedNumberDisplayForField(field, fields, sample, readNumber, sourceBlocks, header)
     : null;
   // Atlas Patterns read a tracked Number's current value, not its maximum.
   const patternSample = trackedValue ? { ...sample, [key]: trackedValue.current } : sample;
@@ -1882,7 +1883,7 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
   let trackedMaximumEditor: HTMLElement | null = null;
   const refreshTrackedDisplay = (): void => {
     if (!field || field.type !== 'number' || !trackedCurrentText || !trackedMaximumText) return;
-    const next = trackedNumberDisplayForField(field, fields, sample, readNumber, layout.blocks, header);
+    const next = trackedNumberDisplayForField(field, fields, sample, readNumber, sourceBlocks, header);
     if (!next) {
       trackedCurrentText.data = readablePreviewValue(valueOf(sample, key)) || '—';
       trackedMaximumText.data = '';
@@ -1923,7 +1924,7 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
     if (trackedCurrentText) refreshTrackedDisplay();
     if (pattern !== null) {
       const nextTracked = field?.type === 'number'
-        ? trackedNumberDisplayForField(field, fields, sample, readNumber, layout.blocks, header)
+        ? trackedNumberDisplayForField(field, fields, sample, readNumber, sourceBlocks, header)
         : null;
       const nextSample = nextTracked ? { ...sample, [key]: nextTracked.current } : sample;
       const next = expandedPattern(block.pattern, nextSample);
@@ -2482,7 +2483,7 @@ function createInlineListFieldValue(
       const input = element('input', 'atlas-sb-pane-input atlas-sb-pane-chips__input statblock-forge__inline-list-input');
       input.type = 'text';
       input.autocomplete = 'off';
-      input.placeholder = typeof field.prompt === 'string' && field.prompt.trim() ? field.prompt : field.label || field.key;
+      input.placeholder = field.label || field.key;
       input.setAttribute('aria-label', runtime.language === 'pt-BR' ? `Adicionar item a ${field.label || field.key}` : `Add item to ${field.label || field.key}`);
       const error = element('span', 'statblock-forge__inline-field-editor-error');
       error.hidden = true;
@@ -5251,6 +5252,7 @@ function renderLeafBlock(
   imageFrames?: Readonly<StatblockImageFrames>,
   onImageFrameChange?: (blockId: string, frame: StatblockImageFrame) => void,
   header?: JsonRecord,
+  sourceBlocks: readonly ForgeBlock[] = [],
 ): HTMLElement {
   const key = typeof block.field === 'string' ? block.field : '';
   const field = fieldOf(fields, key);
@@ -5310,7 +5312,7 @@ function renderLeafBlock(
       });
       return line;
     }
-    case 'stat': return renderStat(app, markdownComponent, sourcePath, block, fields, sample, layout, header, numericRuntime);
+    case 'stat': return renderStat(app, markdownComponent, sourcePath, block, fields, sample, layout, sourceBlocks, header, numericRuntime);
     case 'metric': return renderMetric(block, fields, sample, layout, numericRuntime);
     case 'scores': return renderScores(block, field, sample, onScoreTableEdit
       ? (edit) => onScoreTableEdit(block.id, edit)
@@ -5532,7 +5534,7 @@ function renderBlockNode(
   else {
     const source = renderLeafBlock(
       options.app, options.markdownComponent!, options.sourcePath ?? '', block, template.fields, sample, layout, options.resolveImage, options.onScoreTableEdit,
-      options.interactiveCounters, insideTab, options.language ?? 'en', options.onAbilityCounterMaxChange, options.numericFieldRuntime, options.onFieldValueChange, options.onImageFieldAction, options.onImageBlockSelect, options.imageFrames, options.onImageFrameChange, template.header,
+      options.interactiveCounters, insideTab, options.language ?? 'en', options.onAbilityCounterMaxChange, options.numericFieldRuntime, options.onFieldValueChange, options.onImageFieldAction, options.onImageBlockSelect, options.imageFrames, options.onImageFrameChange, template.header, template.layout.blocks,
     );
     node.append(source);
     appendWhenEmptyFallback(node, source, block, sample, options);
@@ -5944,6 +5946,7 @@ interface PreviewAncestorScrollPosition {
   left: number;
 }
 
+
 /** Preserve Obsidian/workspace scrollports when a folded Section changes height. */
 function readPreviewAncestorScrollPositions(root: HTMLElement): PreviewAncestorScrollPosition[] {
   const positions: PreviewAncestorScrollPosition[] = [];
@@ -5967,6 +5970,29 @@ function readPreviewAncestorScrollPositions(root: HTMLElement): PreviewAncestorS
     positions.push({ element: documentScroller, top: documentScroller.scrollTop, left: documentScroller.scrollLeft });
   }
   return positions;
+}
+
+/** Re-resolve scrollports from the actual footer button after every reflow. */
+function readPreviewButtonScrollports(action: HTMLElement): HTMLElement[] {
+  const scrollports: HTMLElement[] = [];
+  const seen = new Set<HTMLElement>();
+  const view = action.ownerDocument.defaultView;
+  let ancestor = action.parentElement;
+  while (ancestor) {
+    const style = view?.getComputedStyle(ancestor);
+    const overflowY = style?.overflowY ?? '';
+    const canScrollVertically = /^(auto|scroll|overlay|hidden)$/.test(overflowY)
+      || ancestor.scrollHeight > ancestor.clientHeight + 1
+      || ancestor.scrollTop !== 0;
+    if (canScrollVertically) {
+      scrollports.push(ancestor);
+      seen.add(ancestor);
+    }
+    ancestor = ancestor.parentElement;
+  }
+  const documentScroller = action.ownerDocument.scrollingElement as HTMLElement | null;
+  if (documentScroller && !seen.has(documentScroller)) scrollports.push(documentScroller);
+  return scrollports;
 }
 
 /**
@@ -6099,6 +6125,17 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
   layoutHost.append(grid);
   const footerButtons = new Map<string, HTMLButtonElement>();
   let foldedSectionScrollRestoreSequence = 0;
+  // Keep pointer coordinates per button. A WeakMap avoids the pointerup/RAF
+  // race in which a global pending snapshot could be cleared before click.
+  const pointerAnchors = new WeakMap<HTMLButtonElement, { clientY: number; buttonOffsetY: number }>();
+  const capturePointerAnchor = (event: MouseEvent | PointerEvent, action: HTMLButtonElement): void => {
+    if (event.button !== 0 || pointerAnchors.has(action)) return;
+    const rect = action.getBoundingClientRect();
+    pointerAnchors.set(action, {
+      clientY: event.clientY,
+      buttonOffsetY: event.clientY - rect.top,
+    });
+  };
   if (uiState.foldableSections.length > 0) {
     const footer = element('div', 'statblock-forge__folded-section-footer');
     for (const section of uiState.foldableSections) {
@@ -6111,15 +6148,30 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
         ? `${expanded ? 'Recolher' : 'Mostrar'} seção: ${section.label}`
         : `${expanded ? 'Collapse' : 'Show'} section: ${section.label}`;
       action.setAttribute('aria-label', actionLabel(section.expanded));
+      // Capture before native focus can scroll the Obsidian leaf. The button's
+      // own WeakMap entry survives pointerup until this click consumes it.
+      action.addEventListener('pointerdown', (event) => capturePointerAnchor(event, action), true);
+      action.addEventListener('mousedown', (event) => capturePointerAnchor(event, action), true);
+      action.addEventListener('pointercancel', () => { pointerAnchors.delete(action); }, true);
       action.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
+        const capturedPointerAnchor = pointerAnchors.get(action);
+        pointerAnchors.delete(action);
+        const isPointerClick = event.detail > 0;
+        const pointerAnchor = isPointerClick
+          ? capturedPointerAnchor ?? {
+            clientY: event.clientY,
+            buttonOffsetY: event.clientY - action.getBoundingClientRect().top,
+          }
+          : null;
         const ancestorScrollPositions = readPreviewAncestorScrollPositions(card);
         // The footer action moves down when its Section is restored to the
         // layout. Keeping that button focused during reflow can make Chromium
         // scroll it back into view, which looks like the whole screen jumps.
-        // Temporarily release focus and restore it with preventScroll after
-        // the new layout has settled.
+        // Release focus before reflow. Keyboard activation restores focus
+        // with preventScroll; pointer activation keeps focus off the moving
+        // footer button so the browser cannot perform a second scroll.
         const restoreActionFocus = card.ownerDocument.activeElement === action;
         if (restoreActionFocus) action.blur();
         const expansionState = {
@@ -6162,36 +6214,64 @@ export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
         }
         syncNestedLayoutInlineBleedsAfterMount(card);
         const restoreSequence = ++foldedSectionScrollRestoreSequence;
-        const restoreAncestorScroll = (): void => {
-          if (restoreSequence !== foldedSectionScrollRestoreSequence) return;
+        const restorePointerButtonAtMouse = (): number => {
+          if (!pointerAnchor || !action.isConnected) return 0;
+          const targetButtonTop = pointerAnchor.clientY - pointerAnchor.buttonOffsetY;
+          // Re-read scrollports from the live button after each layout pass.
+          // The actual scroll owner can differ between published, stacked and
+          // Canvas views, and can become scrollable only after expansion.
+          return alignTargetAtViewportY(
+            action,
+            readPreviewButtonScrollports(action),
+            targetButtonTop,
+          );
+        };
+        const restoreAncestorScroll = (): number => {
+          if (restoreSequence !== foldedSectionScrollRestoreSequence) return 0;
           for (const position of ancestorScrollPositions) {
             if (!position.element.isConnected) continue;
-            if (Math.abs(position.element.scrollTop - position.top) > 0.5) position.element.scrollTop = position.top;
+            if (!pointerAnchor && Math.abs(position.element.scrollTop - position.top) > 0.5) {
+              position.element.scrollTop = position.top;
+            }
             if (Math.abs(position.element.scrollLeft - position.left) > 0.5) position.element.scrollLeft = position.left;
           }
-          if (restoreActionFocus && action.isConnected && card.ownerDocument.activeElement !== action) {
+          // Pointer activation does not restore focus: native focus on a footer
+          // button can trigger another browser scroll after the anchor is set.
+          if (!pointerAnchor && restoreActionFocus && action.isConnected && card.ownerDocument.activeElement !== action) {
             action.focus({ preventScroll: true });
-            // Some Obsidian workspace hosts react to focus changes. Reapply
-            // the captured viewport offsets after restoring keyboard focus.
             for (const position of ancestorScrollPositions) {
               if (!position.element.isConnected) continue;
-              if (Math.abs(position.element.scrollTop - position.top) > 0.5) position.element.scrollTop = position.top;
-              if (Math.abs(position.element.scrollLeft - position.left) > 0.5) position.element.scrollLeft = position.left;
+              if (Math.abs(position.element.scrollTop - position.top) > 0.5) {
+                position.element.scrollTop = position.top;
+              }
+              if (Math.abs(position.element.scrollLeft - position.left) > 0.5) {
+                position.element.scrollLeft = position.left;
+              }
             }
           }
+          return pointerAnchor ? restorePointerButtonAtMouse() : 0;
         };
         restoreAncestorScroll();
         const view = card.ownerDocument.defaultView;
         if (view && typeof view.requestAnimationFrame === 'function') {
-          // Layout and scroll anchoring can settle over more than one frame
-          // when a Section contains nested Grids. Keep the original viewport
-          // offsets through the complete reflow rather than only two frames.
-          let remainingFrames = 4;
+          // Re-align after layout, ResizeObserver and nested-grid measurements.
+          // Stop only after the actual button has stayed on target for two
+          // consecutive frames, with a hard cap to avoid a permanent RAF loop.
+          let remainingFrames = 18;
+          let stableFrames = 0;
+          const targetButtonTop = pointerAnchor
+            ? pointerAnchor.clientY - pointerAnchor.buttonOffsetY
+            : null;
           const restoreAcrossFrames = (): void => {
             if (restoreSequence !== foldedSectionScrollRestoreSequence) return;
-            restoreAncestorScroll();
+            const residual = restoreAncestorScroll();
+            if (targetButtonTop !== null) {
+              stableFrames = Math.abs(residual) <= 0.75 ? stableFrames + 1 : 0;
+            }
             remainingFrames -= 1;
-            if (remainingFrames > 0) view.requestAnimationFrame(restoreAcrossFrames);
+            if (remainingFrames > 0 && (targetButtonTop === null || stableFrames < 2)) {
+              view.requestAnimationFrame(restoreAcrossFrames);
+            }
           };
           view.requestAnimationFrame(restoreAcrossFrames);
         }

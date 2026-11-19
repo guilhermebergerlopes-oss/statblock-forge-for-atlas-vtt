@@ -1,0 +1,109 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 800b06a..fdee1ef 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,9 @@
+ ## 0.4.0 — Busca no JSON, proteção de rascunhos e estabilidade de Sections
+ 
++### Fixed
++- Restaura a cadeia flex da prévia Forge aberta com Ctrl sobre Tokens do Atlas: o contêiner do provider e o cartão respeitam o limite de altura da janela, enquanto o corpo do statblock ganha rolagem vertical/horizontal real. Isso permite ao manipulador Ctrl+roda do Atlas mover fichas longas em vez de interceptar a rolagem sem um scrollport disponível.
++- Fixes Ctrl-hover scrolling for large Forge statblocks by constraining the provider mount and card to Atlas' preview height and making the statblock body the actual scroll viewport.
++
+ ### Added
+ - Adiciona busca por palavras no editor JSON, agora alinhada ao lado do título **Edit JSON** para reduzir a altura ocupada pela barra de busca.
+ - Exige confirmação explícita antes de descartar alterações não aplicadas com Reset draft.
+diff --git a/src/atlas/atlasSheetProvider.ts b/src/atlas/atlasSheetProvider.ts
+index bd88214..8379fd4 100644
+--- a/src/atlas/atlasSheetProvider.ts
++++ b/src/atlas/atlasSheetProvider.ts
+@@ -148,6 +148,14 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
+ 
+       const draw = async (): Promise<void> => {
+         clear();
++        // Atlas' Ctrl-hover window is a height-constrained flex column. Mark
++        // only its preview render container so Forge can make the card/body
++        // participate in that constraint and expose a real scroll viewport.
++        // The Atlas-owned class and data attributes are left untouched.
++        activeContext.container.classList.toggle(
++          'statblock-forge__atlas-preview-mount',
++          activeContext.variant === 'preview',
++        );
+         const sourceId = _definition.sourceId;
+         const resolved = await resolveDefinition(sourceId);
+         if (disposed || activeContext.signal.aborted) return;
+@@ -184,7 +192,7 @@ function createForgeSheetProvider(app: App, plugin: StatblockForgePlugin): Atlas
+           clear();
+           return;
+         }
+-        context.container.replaceChildren(renderedCard);
++        activeContext.container.replaceChildren(renderedCard);
+         diceCleanup = attachForgeStatblockDiceRolling(renderedCard, {
+           app,
+           template: resolved.template,
+diff --git a/styles.css b/styles.css
+index 20fd45e..2c05767 100644
+--- a/styles.css
++++ b/styles.css
+@@ -7796,3 +7796,42 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
+   .statblock-forge__json-header { gap: 0.35rem; }
+   .statblock-forge__json-header > .statblock-forge__panel-title { font-size: var(--font-ui-small); }
+ }
++
++/* Atlas Ctrl-hover provider previews: keep the provider mount and Forge card
++   inside Atlas' max-height flex window. The card's body is the scrollport
++   consumed by Atlas' capture-phase Ctrl+wheel handler. Without this flex chain
++   the body grows to the statblock's full content height and has nothing to
++   scroll, even though Atlas intercepts the wheel event. */
++.atlas-statblock-preview-window .atlas-sheet-render-container.statblock-forge__atlas-preview-mount {
++  display: flex;
++  flex: 1 1 auto;
++  flex-direction: column;
++  align-self: stretch;
++  width: 100%;
++  min-width: 0;
++  min-height: 0;
++  max-width: 100%;
++  max-height: 100%;
++  overflow: hidden;
++}
++.atlas-statblock-preview-window .statblock-forge__atlas-preview-mount > .statblock-forge__final-card.atlas-statblock {
++  display: flex;
++  flex: 1 1 auto;
++  flex-direction: column;
++  min-width: 0;
++  min-height: 0;
++  max-width: 100%;
++  max-height: 100%;
++  overflow: hidden;
++}
++.atlas-statblock-preview-window .statblock-forge__atlas-preview-mount > .statblock-forge__final-card.atlas-statblock > .statblock-forge__preview-body {
++  display: flow-root;
++  flex: 1 1 auto;
++  min-width: 0;
++  min-height: 0;
++  max-height: 100%;
++  overflow-x: auto;
++  overflow-y: auto;
++  overscroll-behavior: contain;
++  scrollbar-width: thin;
++}
+diff --git a/tests/atlasSheetProviderIntegration.test.mjs b/tests/atlasSheetProviderIntegration.test.mjs
+index 42c7301..7e74447 100644
+--- a/tests/atlasSheetProviderIntegration.test.mjs
++++ b/tests/atlasSheetProviderIntegration.test.mjs
+@@ -26,3 +26,15 @@ test('Forge uses the current Fork plugin id for the public Atlas integration', a
+   assert.match(dice, /statblock-forge-forked-atlas-vtt-compatibility/);
+   assert.doesNotMatch(detection + dice, /statblock-forge-atlas-compat/);
+ });
++
++
++test('Forge provider previews create a bounded scroll viewport for Atlas Ctrl-hover', async () => {
++  const [provider, styles] = await Promise.all([
++    read('../src/atlas/atlasSheetProvider.ts'),
++    read('../styles.css'),
++  ]);
++  assert.match(provider, /activeContext\.container\.classList\.toggle\([\s\S]*?statblock-forge__atlas-preview-mount[\s\S]*?activeContext\.variant === 'preview'/);
++  assert.match(styles, /\.atlas-sheet-render-container\.statblock-forge__atlas-preview-mount\s*\{[\s\S]*?display:\s*flex;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/);
++  assert.match(styles, /\.statblock-forge__atlas-preview-mount\s*>\s*\.statblock-forge__final-card\.atlas-statblock\s*\{[\s\S]*?display:\s*flex;[\s\S]*?min-height:\s*0;/);
++  assert.match(styles, /\.statblock-forge__preview-body\s*\{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
++});

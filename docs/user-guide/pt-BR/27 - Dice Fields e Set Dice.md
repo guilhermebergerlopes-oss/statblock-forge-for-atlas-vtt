@@ -39,14 +39,15 @@ O conteúdo precisa ser uma expressão reconhecida pelo parser e conter pelo men
 
 ### Referências `@field` em texto de dados
 
-A validação do editor reconhece referências `@field` em expressões de dados como placeholders numéricos ao verificar a sintaxe. Essa forma não é o mecanismo de **Dice Formula** do Template: ela não oferece a mesma validação de dependências Number/Rating e não deve ser confundida com `{fieldKey}`. Para construir uma rolagem controlada pelo Template com valores inteiros, prefira **Dice Formula**.
+A validação do editor reconhece referências explícitas em expressões de dados como placeholders numéricos ao verificar a sintaxe. Para uma rolagem controlada pelo Template, use **Dice Formula**, que valida dependências de Fields Number/Rating e aceita tanto `@fieldKey` quanto `{fieldKey}`.
 
-## 2. Dice Formula dinâmica com `{fieldKey}`
+## 2. Dice Formula dinâmica com `@field` ou `{fieldKey}`
 
-**Dice Formula** é configurada nas propriedades do Field Dice no Template. Ela transforma os Values da ficha em uma expressão de dados resolvida. Use chaves em torno da key exata do Field de origem:
+**Dice Formula** é configurada nas propriedades do Field Dice no Template. Ela transforma os Values da ficha em uma expressão de dados resolvida. Use `@key` ou `{key}` em torno da key exata do Field de origem. As duas formas podem aparecer na mesma expressão; use chaves para keys que contenham hífen:
 
 ```text
-{proficiency}d{might}+{level}
+@proficiency d{might}+{level}
+{proficiency}d@might+@level
 ```
 
 Com estes Values:
@@ -69,7 +70,7 @@ A fórmula configurada permanece no Template. Os números `2`, `8` e `3` pertenc
 
 1. Crie ou selecione um Field do tipo **Dice**.
 2. Abra as propriedades desse Field.
-3. Preencha **Dice Formula** com a expressão usando `{fieldKey}`.
+3. Preencha **Dice Formula** com a expressão usando `@fieldKey` ou `{fieldKey}`.
 4. Confira se cada placeholder corresponde a outro Field **Number** ou **Rating** do mesmo Template.
 5. Preencha os Samples com inteiros válidos para conferir a fórmula resolvida.
 6. Salve o Template e teste em uma ficha real.
@@ -78,7 +79,7 @@ O campo aceita até **500 caracteres** para a fórmula configurada. O texto fina
 
 ### Quais Fields podem ser usados
 
-Somente Fields do tipo **Number** e **Rating** podem ser referenciados por `{fieldKey}`. O próprio Dice Field não pode referenciar a si mesmo.
+Somente Fields do tipo **Number** e **Rating** podem ser referenciados por `@fieldKey` ou `{fieldKey}`. O próprio Dice Field não pode referenciar a si mesmo.
 
 Cada valor substituído precisa ser um **inteiro seguro**. Isso é importante porque o número antes de `d` representa a quantidade de dados e o número depois de `d` representa suas faces.
 
@@ -98,7 +99,7 @@ Se alguma referência estiver ausente, vazia, fracionária ou for de tipo incomp
 
 - Alterar o Value de um Number/Rating de origem atualiza a Dice Formula exibida na ficha.
 - Alterar o Value de um Field de origem que possui sua própria fórmula usa o resultado numérico calculado desse Field como substituição.
-- Renomear a key pelo editor atualiza placeholders `{oldKey}` reconhecidos.
+- Renomear a key pelo editor atualiza referências `@oldKey` e `{oldKey}` reconhecidas.
 - Um Field Number/Rating usado por Dice Formula não pode ser excluído ou convertido para um tipo incompatível até que a dependência seja corrigida.
 - O usuário da ficha edita os Values de origem, não a expressão definida no Template.
 
@@ -108,7 +109,7 @@ Template:
 
 | Field key | Tipo | Dice Formula / configuração |
 |---|---|---|
-| `weapon_dice` | Dice | `{proficiency}d{might}+{level}` |
+| `weapon_dice` | Dice | `@proficiency d{might}+{level}` ou `{proficiency}d{might}+@level` |
 | `proficiency` | Number | Value individual |
 | `might` | Number | Value individual |
 | `level` | Rating | Value individual |
@@ -174,7 +175,7 @@ Para expressões simples, lineares e aditivas, o Forge pode exibir uma dica `avg
 - `3dF` → `avg 0`.
 - `d%` → `avg 50.5`.
 
-A interface suprime a dica para referências dinâmicas (`@...`), rerrolagens, explosões, keep/drop, contagem de sucessos/falhas, produtos e quocientes. A ausência de `avg` não significa que a fórmula seja inválida; significa que o Forge não apresenta uma estimativa simplificada.
+A interface suprime a dica para referências dinâmicas (`@...` ou `{...}`), rerrolagens, explosões, keep/drop, contagem de sucessos/falhas, produtos e quocientes. A ausência de `avg` não significa que a fórmula seja inválida; significa que o Forge não apresenta uma estimativa simplificada.
 
 ## Set Dice
 
@@ -233,12 +234,12 @@ Quando a API `dice.statblock-history` do fork Atlas está disponível, o menu co
 | Família | Sintaxe de referência | Resultado |
 |---|---|---|
 | Number/Rating | `strength + proficiency`, `value * 2` | Um número determinístico; sem rolagem. |
-| Dice Formula | `{proficiency}d{might}+{level}` | Substitui Values inteiros e gera uma rolagem. |
+| Dice Formula | `@proficiency d{might}+{level}` ou `{proficiency}d{might}+@level` | Substitui Values inteiros e gera uma rolagem. |
 | Rest Formula | `(@level)d4`, `1d8+2` | Regra de recuperação/gasto, com referências `@field` e validação própria. |
 | Counter `regain` | `1d4`, `2d6+1` | Fórmula literal de dados por linha, usada no fluxo **Restore to full**. |
 
 > [!warning] Não copie a sintaxe sem adaptar
-> `{fieldKey}` é placeholder de Dice Formula. `@field_key` pertence ao sistema de referências de dados/Rest. Number/Rating usa nomes diretos sem `@` ou chaves.
+> Number/Rating, Dice Formula e Rest aceitam referências `@field` e `{field}`; Number/Rating também preserva a forma direta `field`. As famílias mantêm gramáticas e operadores próprios.
 
 ## Diagnóstico
 

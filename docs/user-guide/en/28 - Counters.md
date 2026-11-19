@@ -103,7 +103,7 @@ Valid examples:
 (1d8+2)
 ```
 
-Do not use `floor()`, `max()`, ternaries, `{fieldKey}`, or `@field` in `regain`. It is not a Number Formula or a dynamic Rest Formula with references; it is the row's literal dice formula. The dice parser limits still apply (100 characters, 20 terms, and the other limits described in [[27 - Dice Fields and Set Dice]]).
+Do not use `floor()`, `max()`, or ternaries in `regain`. The formula must contain at least one die, but it may use `@field` and `{field}` references resolved against the statblock Values during Rest. The dice parser limits still apply (100 characters, 20 terms, and the other limits described in [[27 - Dice Fields and Set Dice]]).
 
 ### When `regain` is used
 

@@ -73,19 +73,19 @@ Forge has different formula families. They are not interchangeable:
 
 | Family | Where it is used | Syntax and example |
 |---|---|---|
-| **Number/Rating Formula** | Calculates the numeric Value of a Number/Rating Field. | [[25 - Formulas in Number and Rating]]; uses keys without `@` or `{}`. Example: `floor(value / 2)`. |
-| **Dice Formula** | Configured on a `dice` Field; builds a roll from statblock Values. | [[27 - Dice Fields and Set Dice]]; uses `{fieldKey}` placeholders. Example: `{proficiency}d{might}+{level}`. |
-| **Rest formula** | Recovery, per-unit spending, and `regain` rules. | [[31 - Rest Rules and Formulas]]; uses `@field_key` references. Example: `@level d4`. |
+| **Number/Rating Formula** | Calculates the numeric Value of a Number/Rating Field. | [[25 - Formulas in Number and Rating]]; accepts bare keys, `@key`, and `{key}`. Example: `floor(@strength / 2)`. |
+| **Dice Formula** | Configured on a `dice` Field; builds a roll from statblock Values. | [[27 - Dice Fields and Set Dice]]; accepts `@fieldKey` and `{fieldKey}`; both forms can be mixed. Example: `@proficiency d{might}+{level}`. |
+| **Rest formula** | Recovery, per-unit spending, and `regain` rules. | [[31 - Rest Rules and Formulas]]; accepts `@field_key` and `{field_key}`. Example: `@level d4` or `{level}d4`. |
 | **Scores column formula** | Calculates a derived cell in a Scores table. | [[05 - Fields]]; uses `value` for the current row cell and the column's documented syntax. |
 | **Metric formula** | Calculates the value of a Metric slot. | [[05 - Fields]] and [[25 - Formulas in Number and Rating]]; it is slot configuration, not the Field's own formula. |
 
 > [!warning] Do not mix formula syntaxes
-> `{fieldKey}` is Dice Formula interpolation; `@field_key` is a Rest reference; `value` belongs to the Number/Rating, Scores, or Metric formula context. Check the relevant note before copying an expression.
+> `@key` and `{key}` are alternative Field-reference forms in Number/Rating formulas, Dice Formula, and Rest formulas. Number/Rating formulas also retain bare-key references. `value` belongs to the Number/Rating, Scores, or Metric formula context. Check the relevant note before copying an expression.
 
 ## Reading the examples
 
-- `{proficiency}` represents a placeholder replaced by a numeric Value when a Dice Formula is resolved.
-- `@level` represents a Rest reference filled from an integer in the sheet.
+- `@proficiency` and `{proficiency}` are alternative references to the same Field and can be mixed in Dice and Rest formulas.
+- Number/Rating formulas also accept the bare key, such as `strength`, alongside `@strength` and `{strength}`.
 - `value` represents the value in the formula's current context; check the matching note.
 - An expression shown as `2d8+3` may be the resolved result of a stored configuration such as `{proficiency}d{might}+{level}`.
 - A block controls presentation. A Field defines data. The layout must connect them.

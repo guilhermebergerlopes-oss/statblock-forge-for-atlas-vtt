@@ -103,7 +103,7 @@ Exemplos válidos:
 (1d8+2)
 ```
 
-Não use `floor()`, `max()`, ternários, `{fieldKey}` ou `@field` em `regain`. Não é uma Number Formula nem uma Rest Formula com referência dinâmica; é a fórmula de dados literal da linha. O limite do parser de dados continua valendo (100 caracteres, 20 termos e os demais limites descritos em [[27 - Dice Fields e Set Dice]]).
+Não use `floor()`, `max()` ou ternários em `regain`. A fórmula precisa conter pelo menos um dado, mas pode usar referências `@field` e `{field}` resolvidas com os Values do statblock durante o Rest. O limite do parser de dados continua valendo (100 caracteres, 20 termos e os demais limites descritos em [[27 - Dice Fields e Set Dice]]).
 
 ### Quando `regain` é usada
 

@@ -125,7 +125,7 @@ export class StatblockMarkdownFieldsPanel {
       textarea.wrap = 'soft';
       textarea.spellcheck = true;
       textarea.value = typeof data[field.key] === 'string' ? data[field.key] as string : '';
-      textarea.placeholder = field.prompt?.trim() || this.t('Write Markdown text…');
+      textarea.placeholder = this.t('Write Markdown text…');
       textarea.setAttribute('aria-label', field.label?.trim() || field.key);
       label.htmlFor = `forge-markdown-${field.key}`;
       textarea.id = `forge-markdown-${field.key}`;

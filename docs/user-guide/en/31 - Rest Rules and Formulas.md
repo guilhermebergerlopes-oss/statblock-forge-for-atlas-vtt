@@ -68,7 +68,7 @@ The association uses stable Rest button IDs even though the editor displays butt
 
 When Counter uses are restored to maximum, each selected row without a `regain` formula has `used` set to zero. If a row has `regain`, Forge rolls that formula for the row when it still has spent uses and decreases `used` by the rolled amount, never below zero.
 
-`regain` is a literal dice formula. A valid formula must contain at least one die. Do not use a deterministic expression or `@field_key` interpolation in this property; Counter-row `regain` does not substitute field references. `regain` is evaluated per row, unlike **Restore an amount** targeting a Counter Field.
+`regain` is a dice formula that must contain at least one die. It accepts `@field_key` and `{field_key}` references, resolved against the statblock Values during Rest. `regain` is evaluated per row, unlike **Restore an amount** targeting a Counter Field.
 
 ### Restore an amount on Counters
 
@@ -140,9 +140,9 @@ Forge validates the source, target, amount, and formula against current Values. 
 
 **Restore an amount**, **Per unit**, and `regain` use the Forge/Atlas dice parser, not the Number/Rating formula language.
 
-### `@field` references
+### `@field` and `{field}` references
 
-Use `@` followed by a Field key to insert its numeric value:
+Use `@` or braces around a Field key to insert its numeric value. Both forms can be mixed in one formula:
 
 ```text
 @level d4
@@ -161,10 +161,10 @@ The dice grammar supports `+`, `-`, `*`, `/`, parentheses, and the dice terms do
 Rest formula fields are limited to **100 characters**. The parser also applies its own limits for terms, dice, faces, and nesting depth.
 
 > [!warning] Do not mix formula families
-> Rest formulas use `@field_key`. They do not accept `floor()`, `ceil()`, `round()`, `min()`, `max()`, comparisons, boolean operators, ternaries, or Dice Formula's `{fieldKey}` placeholders. Use [[25 - Formulas in Number and Rating]] for deterministic Field calculations and [[27 - Dice Fields and Set Dice]] for dynamic dice rolls in `dice` Fields.
+> Rest formulas accept `@field_key` and `{field_key}` references. They do not accept `floor()`, `ceil()`, `round()`, `min()`, `max()`, comparisons, boolean operators, or ternaries. Use [[25 - Formulas in Number and Rating]] for deterministic Field calculations and [[27 - Dice Fields and Set Dice]] for dynamic dice rolls in `dice` Fields.
 
 > [!important] `regain` exception
-> A Counter row's `regain` formula is validated as a literal dice expression containing at least one die. Do not use `@field_key` references in this property.
+> A Counter row's `regain` formula must contain at least one die. It also accepts `@field_key` and `{field_key}` references, resolved against the statblock Values during Rest; each row is evaluated separately.
 
 ## Order, failures, and data safety
 

@@ -73,19 +73,19 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 
 | Família | Onde é usada | Sintaxe e exemplo |
 |---|---|---|
-| **Number/Rating Formula** | Calcula o Value numérico de um Field Number/Rating. | [[25 - Fórmulas em Number e Rating]]; usa keys sem `@` e sem `{}`. Ex.: `floor(value / 2)`. |
-| **Dice Formula** | Configurada em um Field `dice`; constrói uma rolagem a partir dos Values da ficha. | [[27 - Dice Fields e Set Dice]]; usa placeholders `{fieldKey}`. Ex.: `{proficiency}d{might}+{level}`. |
-| **Rest formula** | Recuperação, gasto por unidade e regras `regain`. | [[31 - Regras e fórmulas de Rest]]; usa referências `@field_key`. Ex.: `@level d4`. |
+| **Number/Rating Formula** | Calcula o Value numérico de um Field Number/Rating. | [[25 - Fórmulas em Number e Rating]]; aceita keys diretas, `@key` e `{key}`. Ex.: `floor(@strength / 2)`. |
+| **Dice Formula** | Configurada em um Field `dice`; constrói uma rolagem a partir dos Values da ficha. | [[27 - Dice Fields e Set Dice]]; aceita `@fieldKey` e `{fieldKey}`; as formas podem ser misturadas. Ex.: `@proficiency d{might}+{level}`. |
+| **Rest formula** | Recuperação, gasto por unidade e regras `regain`. | [[31 - Regras e fórmulas de Rest]]; aceita `@field_key` e `{field_key}`. Ex.: `@level d4` ou `{level}d4`. |
 | **Scores column formula** | Calcula uma célula derivada em uma tabela Scores. | [[05 - Fields]]; usa `value` para a célula da linha atual e a sintaxe documentada para a coluna. |
 | **Metric formula** | Calcula o valor de um slot Metric. | [[05 - Fields]] e [[25 - Fórmulas em Number e Rating]]; é configuração do slot e não substitui a fórmula do Field. |
 
 > [!warning] Não misture sintaxes
-> `{fieldKey}` é interpolação de Dice Formula; `@field_key` é referência de Rest; `value` é a entrada do contexto de fórmulas Number/Rating, Scores ou Metric. Consulte a nota específica antes de copiar uma expressão.
+> `@key` e `{key}` são formas alternativas de referenciar Fields em fórmulas Number/Rating, Dice Formula e Rest. Fórmulas Number/Rating também mantêm a referência direta por key. `value` é a entrada do contexto de fórmulas Number/Rating, Scores ou Metric. Consulte a nota específica antes de copiar uma expressão.
 
 ## Como ler os exemplos
 
-- `{proficiency}` representa um placeholder substituído por um Value numérico quando uma Dice Formula é resolvida.
-- `@level` representa uma referência de Rest preenchida com um inteiro da ficha.
+- `@proficiency` e `{proficiency}` representam a mesma referência a um Field e podem ser misturados em fórmulas Dice e Rest.
+- Number/Rating também aceita a key direta, como `strength`, além de `@strength` e `{strength}`.
 - `value` em uma fórmula representa o valor do contexto em que aquela fórmula está sendo avaliada; verifique a nota correspondente.
 - Uma expressão mostrada como `2d8+3` pode ser o resultado resolvido de uma configuração armazenada como `{proficiency}d{might}+{level}`.
 - Um bloco controla a apresentação. Um Field define o dado. A relação entre ambos precisa ser configurada no layout.

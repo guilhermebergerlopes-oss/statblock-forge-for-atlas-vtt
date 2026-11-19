@@ -1,6 +1,6 @@
 import { resolveAtlasVersionAdapter, type AtlasAdapterResolution } from './atlasVersionAdapter.ts';
 
-export const ATLAS_PLUGIN_ID = 'statblock-forge-atlas-compat';
+export const ATLAS_PLUGIN_ID = 'statblock-forge-forked-atlas-vtt-compatibility';
 
 export interface AtlasManifestStorage {
   configDir: string;

@@ -43,20 +43,20 @@ With `proficiency = 2`, the sheet displays `14`. The base `12` remains the store
 
 ## Referencing other Fields
 
-Use the Field's `key` directly, without `@` and without braces:
+Formulas continue to accept a Field `key` directly. They now also accept `@key` and `{key}`; all three forms can be mixed in one expression:
 
 ```text
 strength + proficiency
+@strength + {proficiency}
 attributes.dexterity + 2
+{might-score} - @proficiency
 ```
 
 The evaluator looks up the key in the statblock's Values record. Dot-separated paths can access nested object properties; numeric path segments can select array positions when the data contains an array.
 
 ### Identifier rules
 
-The formula tokenizer recognizes names beginning with a letter or `_`, followed by letters, digits, `_`, or dots. For formula references, prefer keys such as `might`, `proficiency`, `base_hp`, and `attributes.dexterity`.
-
-Although general Forge Field keys may contain hyphens, a hyphen inside a formula name is read as the subtraction operator. Avoid hyphenated keys when they need to be referenced in a Number/Rating formula.
+The tokenizer recognizes bare identifiers beginning with a letter or `_`, followed by letters, digits, `_`, or dots. Explicit `@key` and `{key}` forms also accept dotted paths. For keys containing hyphens, use `{key}`: braces delimit the complete name and avoid ambiguity with subtraction. Example: `{might-score} - @proficiency`.
 
 A reference must exist and resolve to a usable number or boolean. A missing Field, empty Value, or non-numeric text makes the result unavailable; Forge does not silently convert invalid text to zero.
 
@@ -196,7 +196,7 @@ It can create a derived Metric number without changing the `strength` Field Valu
 | `value` is not the expected number | Check the base Value stored in this Field. |
 | A dotted reference fails | Check the actual object structure in Sample/JSON. |
 | A fraction fails | Confirm the source Field is Rating, not Number. |
-| It works in Dice but not Number | Check syntax: Number uses names without `{}`; Dice Formula uses `{fieldKey}` placeholders. |
+| It works in Dice but not Number | Check that the reference uses a valid key: Number/Rating accepts bare keys, `@key`, and `{key}`; Dice Formula accepts both explicit forms. |
 
 ## See also
 

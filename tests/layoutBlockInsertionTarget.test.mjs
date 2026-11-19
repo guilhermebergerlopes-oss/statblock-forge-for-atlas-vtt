@@ -99,3 +99,35 @@ test('container acceptance rules remain explicit and type-specific', () => {
   assert.equal(canContainerAcceptBlockType('tabs', 'section'), true);
   assert.equal(canContainerAcceptBlockType('tabs', 'heading'), false);
 });
+
+
+test('the newest selected nested block is the insertion anchor even when the toolbar predates the selection', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const toolbarSource = await readFile(new URL('../src/views/templateCanvasToolbar.ts', import.meta.url), 'utf8');
+  const viewSource = await readFile(new URL('../src/views/TemplateEditorView.ts', import.meta.url), 'utf8');
+
+  assert.match(toolbarSource, /getInsertionSelectionId\(\),\s*resolvedBlockType/);
+  assert.match(toolbarSource, /getInsertionSelectionId\(\),\s*containerType/);
+  assert.match(viewSource, /getInsertionSelectionId:\s*\(\)\s*=>\s*this\.selectedBlockIds\[this\.selectedBlockIds\.length - 1\]\s*\?\?\s*this\.selectedBlockId/);
+
+  const section = block('section-a', 'section', [block('first'), block('second'), block('third')]);
+  const { template, layout } = makeTemplate([section]);
+  // Simulate the toolbar being rendered before the user changes selection.
+  let selectedIds = ['first'];
+  const readLatestSelection = () => selectedIds[selectedIds.length - 1] ?? null;
+  selectedIds = ['first', 'second'];
+  const target = resolveLayoutInsertionTarget(template, readLatestSelection(), 'heading');
+  const added = addLayoutBlock(template, layout, 'heading', null, target.targetContainerId, target.insertAfterBlockId);
+
+  assert.deepEqual(section.blocks.map((item) => item.id), ['first', 'second', added.id, 'third']);
+});
+
+test('a newly added container is inserted beside the selected non-container block', () => {
+  const section = block('section-a', 'section', [block('before'), block('selected'), block('after')]);
+  const { template, layout } = makeTemplate([section]);
+  const target = resolveLayoutInsertionTarget(template, 'selected', 'row');
+  const added = addLayoutBlock(template, layout, 'row', null, target.targetContainerId, target.insertAfterBlockId);
+
+  assert.equal(target.targetContainerId, 'section-a');
+  assert.deepEqual(section.blocks.map((item) => item.id), ['before', 'selected', added.id, 'after']);
+});

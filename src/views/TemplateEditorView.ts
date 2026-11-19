@@ -135,6 +135,7 @@ import {
   findFirstBlockForField,
 } from './templateCanvasDragDrop.ts';
 import { renderTemplateCanvasToolbar } from './templateCanvasToolbar.ts';
+import { findJsonTextMatches, revealJsonTextMatch, type JsonSearchMatch } from './jsonEditorSearch.ts';
 
 export const STATBLOCK_FORGE_EDITOR_VIEW = 'statblock-forge-template-editor';
 
@@ -1701,11 +1702,23 @@ export class TemplateEditorView extends FileView {
     const template = this.template as ForgeTemplate;
     const panel = section('Edit JSON', 'Edit the native Atlas template JSON. Typing does not refresh the preview; select Apply JSON when ready.');
     panel.classList.add('statblock-forge__json-panel');
+    const header = el('div', 'statblock-forge__json-header');
+    const heading = panel.querySelector<HTMLElement>('.statblock-forge__panel-title');
+    if (heading) {
+      panel.prepend(header);
+      header.append(heading);
+    }
     const canonical = serializeTemplate(template);
     if (this.jsonDraftText === null || this.jsonDraftText === this.jsonAppliedText) {
       this.jsonDraftText = canonical;
       this.jsonAppliedText = canonical;
     }
+
+    const search = el('input', 'statblock-forge__input statblock-forge__json-search') as HTMLInputElement;
+    search.type = 'search';
+    search.placeholder = normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR'
+      ? 'Buscar palavras no JSON' : 'Search words in JSON';
+    search.setAttribute('aria-label', search.placeholder);
 
     const editor = textareaInput(this.jsonDraftText, 'Atlas template JSON', 24);
     editor.classList.add('statblock-forge__json-editor');
@@ -1730,13 +1743,123 @@ export class TemplateEditorView extends FileView {
     else if (this.jsonStatus) status.classList.add('is-success');
     this.jsonStatusElement = status;
 
+    const searchActions = el('div', 'statblock-forge__json-search-actions');
+    searchActions.setAttribute('role', 'group');
+    searchActions.setAttribute('aria-label', normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR'
+      ? 'Pesquisar no JSON' : 'Search JSON');
+    const searchStatus = el('span', 'statblock-forge__json-search-status');
+    searchStatus.setAttribute('role', 'status');
+    searchStatus.setAttribute('aria-live', 'polite');
+    let lastSearch = '';
+    let matchIndexes: JsonSearchMatch[] = [];
+    let activeMatch = -1;
+    const noMatchLabel = (): string => normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR'
+      ? 'Nenhum resultado' : 'No matches';
+    const matchCountLabel = (count: number): string => {
+      if (normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR') {
+        return `${count} ${count === 1 ? 'resultado' : 'resultados'}`;
+      }
+      return `${count} ${count === 1 ? 'match' : 'matches'}`;
+    };
+    const updateSearchStatus = (): void => {
+      if (!lastSearch) {
+        searchStatus.setText('');
+      } else if (matchIndexes.length === 0) {
+        searchStatus.setText(noMatchLabel());
+      } else if (activeMatch < 0) {
+        searchStatus.setText(matchCountLabel(matchIndexes.length));
+      } else {
+        searchStatus.setText(`${activeMatch + 1} / ${matchIndexes.length}`);
+      }
+    };
+    const collectMatches = (): void => {
+      matchIndexes = findJsonTextMatches(editor.value, search.value);
+    };
+    const revealActiveMatch = (): void => {
+      const match = matchIndexes[activeMatch];
+      if (!match) {
+        editor.setSelectionRange(0, 0);
+        return;
+      }
+      revealJsonTextMatch(editor, match);
+    };
+    const updateSearchPreview = (): void => {
+      lastSearch = search.value.trim();
+      collectMatches();
+      // Live preview makes the first occurrence visible while the user types.
+      // If the JSON textarea itself emitted this event, only refresh the count:
+      // never replace the user's JSON caret/selection while they are editing.
+      const searchHasFocus = search.ownerDocument.activeElement === search;
+      activeMatch = matchIndexes.length > 0 && searchHasFocus ? 0 : -1;
+      if (activeMatch >= 0) revealActiveMatch();
+      updateSearchStatus();
+    };
+    const findNext = (backwards = false): void => {
+      const query = search.value.trim();
+      if (!query) {
+        lastSearch = '';
+        matchIndexes = [];
+        activeMatch = -1;
+        updateSearchStatus();
+        editor.setSelectionRange(0, 0);
+        search.focus({ preventScroll: true });
+        return;
+      }
+      if (query !== lastSearch) {
+        lastSearch = query;
+        collectMatches();
+        activeMatch = matchIndexes.length > 0 ? 0 : -1;
+      } else if (matchIndexes.length > 0) {
+        activeMatch = backwards
+          ? (activeMatch <= 0 ? matchIndexes.length - 1 : activeMatch - 1)
+          : (activeMatch + 1) % matchIndexes.length;
+      }
+      revealActiveMatch();
+      updateSearchStatus();
+      // Arrow buttons take focus on click. Return it to the search input, but
+      // never focus the textarea; its selection and scroll position persist.
+      search.focus({ preventScroll: true });
+    };
+    const previousMatchButton = button('↑', () => findNext(true), true);
+    previousMatchButton.classList.add('statblock-forge__json-search-nav');
+    previousMatchButton.setAttribute('aria-label', normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR'
+      ? 'Resultado anterior' : 'Previous match');
+    previousMatchButton.title = previousMatchButton.getAttribute('aria-label') ?? '';
+    const nextMatchButton = button('↓', () => findNext(false), true);
+    nextMatchButton.classList.add('statblock-forge__json-search-nav');
+    nextMatchButton.setAttribute('aria-label', normalizeForgeLanguage(this.plugin.settings.language) === 'pt-BR'
+      ? 'Próximo resultado' : 'Next match');
+    nextMatchButton.title = nextMatchButton.getAttribute('aria-label') ?? '';
+    search.addEventListener('input', updateSearchPreview);
+    editor.addEventListener('input', updateSearchPreview);
+    search.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); findNext(event.shiftKey); }
+      else if (event.key === 'Escape' && search.value) {
+        event.preventDefault();
+        search.value = '';
+        updateSearchPreview();
+      }
+    });
+    searchActions.append(search, previousMatchButton, nextMatchButton, searchStatus);
+    header.append(searchActions);
+
     const actions = el('div', 'statblock-forge__json-actions');
     actions.append(button('Reset draft', () => {
-      const fresh = serializeTemplate(this.template as ForgeTemplate);
-      this.jsonDraftText = fresh;
-      this.jsonAppliedText = fresh;
-      this.jsonStatus = '';
-      this.render();
+      const language = normalizeForgeLanguage(this.plugin.settings.language);
+      new DestructiveActionConfirmationModal(this.app, language, 'JSON draft', () => {
+        const fresh = serializeTemplate(this.template as ForgeTemplate);
+        this.jsonDraftText = fresh;
+        this.jsonAppliedText = fresh;
+        this.jsonStatus = '';
+        this.render();
+      }, undefined, {
+        title: language === 'pt-BR' ? 'Redefinir rascunho JSON?' : 'Reset JSON draft?',
+        question: language === 'pt-BR'
+          ? 'Deseja descartar as alterações não aplicadas e restaurar o JSON atual do template?'
+          : 'Discard unapplied changes and restore the current template JSON?',
+        confirmLabel: language === 'pt-BR' ? 'Redefinir rascunho' : 'Reset draft',
+        detail: language === 'pt-BR' ? 'As alterações não aplicadas serão perdidas.' : 'Unapplied changes will be lost.',
+      }).open();
     }, true));
     actions.append(button('Apply JSON', () => { this.applyJsonDraft(); }, true));
     actions.append(button('Done', () => this.closeJsonSidebar()));
@@ -2822,6 +2945,10 @@ export class TemplateEditorView extends FileView {
       },
       selectedBlockId: this.selectedBlockId,
       selectedBlockIds: this.selectedBlockIds,
+      // The Canvas toolbar is not rebuilt for an in-place selection change.
+      // Read the latest selection at click time instead of capturing the
+      // selection from the render that originally created the toolbar.
+      getInsertionSelectionId: () => this.selectedBlockIds[this.selectedBlockIds.length - 1] ?? this.selectedBlockId,
       renderComponentHelpPicker: (group, options, selectedValue, onSelect, sections) =>
         this.renderComponentHelpPicker(group, options, selectedValue, onSelect, sections),
       setSelection: (blockId, blockIds) => {

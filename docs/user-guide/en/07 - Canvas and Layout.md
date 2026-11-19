@@ -17,7 +17,6 @@ The **Canvas** is the visual area of the template editor. Blocks are positioned,
 
 | Control | Purpose |
 |---|---|
-| **Atlas: 1 col / 2 cols / 3 cols** | Sets Atlas-native `layout.maxColumns`. It does not change the configurable Grid used to position blocks in Forge. |
 | **Dense Layout** | Switches between compact placement and stable/manual block positions. See [[14 - Dense Layout]]. |
 | **Background grid** | Shows or hides guides for the configurable main Grid and the independent Grids inside Sections. It does not change saved placement. |
 | **More options** | Expands or collapses secondary controls such as Grid columns, Dense Layout, sheet width, and selection actions. |

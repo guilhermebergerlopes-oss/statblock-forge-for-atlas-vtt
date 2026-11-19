@@ -47,9 +47,6 @@ O controle **Background grid** mostra guias na Grid principal e em cada Grid int
 
 Cada Section possui sua própria Grid interna, com a mesma quantidade de colunas definida no template. As posições dos filhos dessa Section são independentes das posições de outros blocos fora dela. Rows, por outro lado, distribuem os filhos em faixas flexíveis e não usam coordenadas de Grid individuais.
 
-## Não confunda com a opção de colunas do Atlas
-
-A lista **Atlas: 1 col / 2 cols / 3 cols** não transforma a grade do Forge em uma grade de uma, duas ou três colunas. Ela controla `layout.maxColumns`, a informação de colunas do layout nativo do Atlas. O posicionamento do Canvas Forge usa a quantidade configurada no template, de 4 a 24 colunas físicas (12 por padrão).
 
 ## Exemplo de composição
 

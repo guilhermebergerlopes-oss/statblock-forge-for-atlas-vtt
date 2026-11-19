@@ -68,7 +68,7 @@ A associação usa IDs estáveis dos botões Rest, embora o editor mostre os nom
 
 Ao recuperar Counters até o máximo, cada linha selecionada sem fórmula `regain` tem `used` zerado. Se uma linha tem `regain`, o Forge rola essa fórmula para a linha que ainda tem usos gastos e reduz `used` pelo resultado, sem passar abaixo de zero.
 
-`regain` é uma fórmula de dados literal e válida precisa conter pelo menos um dado. Não use aqui uma expressão puramente numérica nem a sintaxe `@field_key`; o campo `regain` do Counter não faz interpolação de referências. Fórmulas de `regain` são avaliadas por linha, ao contrário de **Restore formula** em um Counter Field.
+`regain` é uma fórmula de dados que precisa conter pelo menos um dado. Ela aceita referências `@field_key` e `{field_key}`, resolvidas com os Values do statblock durante o Rest. Fórmulas de `regain` são avaliadas por linha, ao contrário de **Restore formula** em um Counter Field.
 
 ### Restore formula em Counters
 
@@ -140,9 +140,9 @@ O Forge valida a origem, o alvo, a quantidade e a fórmula com os Values atuais.
 
 As fórmulas de **Restore formula**, **Per unit** e `regain` usam o parser de dados do Forge/Atlas, não a linguagem Number/Rating.
 
-### Referências `@field`
+### Referências `@field` e `{field}`
 
-Use `@` seguido da key do Field para inserir o seu valor numérico:
+Use `@` ou chaves em torno da key do Field para inserir seu valor numérico. As duas formas podem ser misturadas na mesma fórmula:
 
 ```text
 @level d4
@@ -152,7 +152,7 @@ Use `@` seguido da key do Field para inserir o seu valor numérico:
 
 Para Fields Number/Rating, o Forge lê o valor numérico calculado desse Field. Uma referência que não resolve para um inteiro seguro é recusada; o motor não arredonda silenciosamente frações para utilizá-las como quantidade de dados ou constante.
 
-Se a referência for seguida por `d` (com ou sem espaço), ela é interpretada como quantidade de dados e precisa ficar entre 0 e 999. Em outros contextos, ela entra como constante inteira com módulo máximo 9.999. Referências podem usar caminhos com ponto quando os dados estão aninhados, por exemplo `@attributes.might`.
+Se a referência for seguida por `d` (com ou sem espaço), ela é interpretada como quantidade de dados e precisa ficar entre 0 e 999. Em outros contextos, ela entra como constante inteira com módulo máximo 9.999. Referências podem usar caminhos com ponto quando os dados estão aninhados, por exemplo `@attributes.might` ou `{attributes.might}`. Para keys com hífen, prefira `{field-key}`.
 
 ### Operadores e dados
 
@@ -161,10 +161,10 @@ A gramática de dados aceita `+`, `-`, `*`, `/`, parênteses e os termos de dado
 O limite do campo de fórmula de Rest é **100 caracteres**. Além disso, o parser aplica os próprios limites de termos, dados, faces e profundidade.
 
 > [!warning] Não misture as famílias de fórmulas
-> Fórmulas de Rest usam `@field_key`. Elas não aceitam `floor()`, `ceil()`, `round()`, `min()`, `max()`, comparações, operadores booleanos, ternários ou os placeholders `{fieldKey}` de Dice Formula. Use [[25 - Fórmulas em Number e Rating]] para cálculos determinísticos do Field e [[27 - Dice Fields e Set Dice]] para rolagens dinâmicas em Fields `dice`.
+> Fórmulas de Rest aceitam referências `@field_key` e `{field_key}`. Elas não aceitam `floor()`, `ceil()`, `round()`, `min()`, `max()`, comparações, operadores booleanos ou ternários. Use [[25 - Fórmulas em Number e Rating]] para cálculos determinísticos do Field e [[27 - Dice Fields e Set Dice]] para rolagens dinâmicas em Fields `dice`.
 
 > [!important] Exceção de `regain`
-> A fórmula `regain` de uma linha Counter é validada como uma expressão de dados literal com pelo menos um dado. Não use referências `@field_key` nesse campo.
+> A fórmula `regain` de uma linha Counter precisa conter pelo menos um dado. Ela também aceita referências `@field_key` e `{field_key}`, resolvidas com os Values do statblock durante o Rest; cada linha é avaliada separadamente.
 
 ## Ordem, falhas e segurança dos dados
 

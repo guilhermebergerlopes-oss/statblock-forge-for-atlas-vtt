@@ -42,9 +42,6 @@ The **Background grid** control shows guides on the main Grid and on every indep
 
 Each Section has an independent internal Grid; its children do not share coordinates with blocks outside that Section. Rows, by contrast, distribute children in flexible lines and do not assign each child an independent Grid position.
 
-## Atlas column setting is different
-
-**Atlas: 1 col / 2 cols / 3 cols** controls Atlas-native `layout.maxColumns`. Forge Canvas placement uses the template's own configured column count (4–24, 12 by default).
 
 ## Example
 

@@ -19,7 +19,6 @@ Esta parte explica como a organização visual funciona. Para entender a diferen
 
 | Controle | Função |
 |---|---|
-| **Atlas: 1 col / 2 cols / 3 cols** | Define a quantidade de colunas do layout nativo do Atlas (`layout.maxColumns`). Não altera a quantidade de colunas configurada para posicionar blocos no Canvas do Forge. |
 | **Dense Layout** | Alterna entre o encaixe compacto e o posicionamento estável/manual dos blocos. Consulte [[14 - Dense Layout]]. |
 | **Background grid** | Exibe ou oculta as guias visuais das Grids configuráveis do Canvas principal e das Sections. É apenas uma referência visual; não muda o posicionamento salvo. |
 | **More options** | Expande ou recolhe as configurações secundárias, como quantidade de colunas, Dense Layout, largura da ficha e opções de seleção. |

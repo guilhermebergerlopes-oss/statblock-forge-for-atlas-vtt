@@ -139,6 +139,7 @@ function replacePatternReference(pattern: string, from: string, to: string): str
 /** Formula references in numeric/Metric/Score formulas use exact field identifiers. */
 function formulaUsesField(formula: string, key: string): boolean {
   if (diceFieldFormulaUsesField(formula, key)) return true;
+  if (restFormulaReferences(formula).some(({ path }) => path === key || path.startsWith(`${key}.`) || path.startsWith(`${key}-`))) return true;
   const pattern = /[A-Za-z_][A-Za-z0-9_.]*/g;
   for (const match of formula.matchAll(pattern)) {
     const token = match[0];
@@ -153,7 +154,9 @@ function formulaUsesField(formula: string, key: string): boolean {
 }
 
 function renameFormulaFieldReference(formula: string, from: string, to: string): string {
-  return formula.replace(/[A-Za-z_][A-Za-z0-9_.]*/g, (token, offset: number, source: string) => {
+  const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let updated = formula.replace(new RegExp(`@${escaped}(?![A-Za-z0-9_.-])|\\{${escaped}\\}`, 'g'), (match) => match.startsWith('@') ? `@${to}` : `{${to}}`);
+  updated = updated.replace(/[A-Za-z_][A-Za-z0-9_.]*/g, (token, offset: number, source: string) => {
     if (token !== from && !token.startsWith(`${from}.`)) return token;
     // These names have evaluator-specific meanings and are not Field lookups.
     if (token === from && ['value', 'true', 'false'].includes(token.toLowerCase())) return token;
@@ -162,12 +165,14 @@ function renameFormulaFieldReference(formula: string, from: string, to: string):
     if (token === from && next === '(') return token;
     return `${to}${token.slice(from.length)}`;
   });
+  return updated;
 }
 
-/** Reads active @Field references, skipping bracketed labels just like the Rest formula parser. */
-function restFormulaReferences(formula: string): Array<{ start: number; end: number; path: string }> {
-  const result: Array<{ start: number; end: number; path: string }> = [];
-  const pattern = /@([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)/y;
+/** Reads explicit formula references, skipping bracketed labels. */
+function restFormulaReferences(formula: string): Array<{ start: number; end: number; path: string; delimiter: '@' | '{}' }> {
+  const result: Array<{ start: number; end: number; path: string; delimiter: '@' | '{}' }> = [];
+  const atPattern = /@([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)/y;
+  const bracePattern = /\{([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)\}/y;
   let cursor = 0;
   while (cursor < formula.length) {
     if (formula[cursor] === '[') {
@@ -175,23 +180,19 @@ function restFormulaReferences(formula: string): Array<{ start: number; end: num
       cursor = close < 0 ? formula.length : close + 1;
       continue;
     }
-    if (formula[cursor] !== '@') {
-      cursor += 1;
-      continue;
-    }
+    const delimiter = formula[cursor] === '@' ? '@' : formula[cursor] === '{' ? '{}' : null;
+    if (!delimiter) { cursor += 1; continue; }
+    const pattern = delimiter === '@' ? atPattern : bracePattern;
     pattern.lastIndex = cursor;
     const match = pattern.exec(formula);
-    if (!match) {
-      cursor += 1;
-      continue;
-    }
-    result.push({ start: cursor, end: pattern.lastIndex, path: match[1] ?? '' });
+    if (!match) { cursor += 1; continue; }
+    result.push({ start: cursor, end: pattern.lastIndex, path: match[1] ?? '', delimiter });
     cursor = pattern.lastIndex;
   }
   return result;
 }
 
-/** Rest formulas use @Field references, optionally followed by a nested path or dice suffix. */
+/** Both @Field and {Field} references are recognized in Rest and formula dependencies. */
 function restFormulaUsesField(formula: string, key: string): boolean {
   return restFormulaReferences(formula).some(({ path }) => path === key || path.startsWith(`${key}.`)
     || path.startsWith(`${key}-`)
@@ -204,14 +205,16 @@ function renameRestFormulaFieldReference(formula: string, from: string, to: stri
   let result = '';
   let cursor = 0;
   for (const reference of references) {
-    const { path, start, end } = reference;
+    const { path, start, end, delimiter } = reference;
     let replacement = formula.slice(start, end);
     if (path === from || path.startsWith(`${from}.`) || path.startsWith(`${from}-`)) {
-      replacement = `@${to}${path.slice(from.length)}`;
+      const renamed = `${to}${path.slice(from.length)}`;
+      replacement = delimiter === '@' ? `@${renamed}` : `{${renamed}}`;
     } else {
       const suffix = path.slice(from.length);
       if (path.startsWith(from) && /^[dD](?:\d|%|[fF](?![A-Za-z]))/.test(suffix)) {
-        replacement = `@${to}${suffix}`;
+        const renamed = `${to}${suffix}`;
+        replacement = delimiter === '@' ? `@${renamed}` : `{${renamed}}`;
       }
     }
     result += formula.slice(cursor, start) + replacement;

@@ -8,7 +8,7 @@ export interface DiceAverageResult {
 }
 
 /** References are validated as numeric placeholders; their actual values are filled when rolled. */
-const REFERENCE = /^@([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)/;
+const REFERENCE = /^(?:@([A-Za-z_][\w.]*)|\{([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)\})/;
 
 /**
  * Replaces statblock references outside labels so the shared Atlas formula parser can validate
@@ -27,7 +27,7 @@ function formulaWithReferencePlaceholders(text: string): string {
       cursor = end;
       continue;
     }
-    if (character === '@') {
+    if (character === '@' || character === '{') {
       const match = REFERENCE.exec(text.slice(cursor));
       if (match) {
         result += '1';
@@ -49,7 +49,8 @@ function normalizeFormulaText(text: string): string {
 }
 
 function parsedDiceField(text: string): ParsedFormula | null {
-  const source = formulaWithReferencePlaceholders(normalizeFormulaText(text).trim());
+  const source = formulaWithReferencePlaceholders(normalizeFormulaText(text).trim())
+    .replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
   if (!source) return null;
   const parsed = parseFormula(source);
   return parsed.ok && parsed.terms.some((term) => term.kind === 'dice') ? parsed : null;
@@ -102,7 +103,7 @@ export function isDiceFieldValue(text: string): boolean {
 
 /** Atlas-style average hint; references and expressions without a reliable average suppress it. */
 export function diceAverageHint(text: string): string | null {
-  if (/@/.test(text)) return null;
+  if (/@|\{/.test(text)) return null;
   const parsed = parseDiceAverage(text);
   if (!parsed) return null;
   const rounded = Math.round(parsed.average * 10) / 10;

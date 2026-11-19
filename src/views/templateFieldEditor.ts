@@ -146,11 +146,6 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
   const typeControl = el('div', 'statblock-forge__add-field-type');
   typeHost.append(typeControl);
 
-  const prompt = inputText('', 'e.g. Add speed');
-  const promptControl = labeledControl(translateForgeText('Texto quando vazio', context.language), prompt,
-    translateForgeText('Sugestão exibida quando o campo ainda não possui valor.', context.language));
-  promptControl.classList.add('statblock-forge__add-field-prompt');
-
   const meaning = selectInput('', FIELD_MEANING_OPTIONS.map((option) => ({
     value: option.value,
     label: translateForgeText(option.label, context.language),
@@ -233,7 +228,7 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
   }
 
   const properties = el('div', 'statblock-forge__add-field-properties');
-  properties.append(categoryControl, typeHost, promptControl, meaningControl, typeSpecificHost);
+  properties.append(categoryControl, typeHost, meaningControl, typeSpecificHost);
 
   const add = button(translateForgeText('Create Field', context.language), () => {
     try {
@@ -253,7 +248,6 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
       const field = registerTemplateField(context.template, label, selectedType);
       currentLayout.fieldKinds ??= {};
       currentLayout.fieldKinds[field.key] = selectedCategory;
-      if (prompt.value.trim()) field.prompt = prompt.value.trim();
       if (meaning.value) setTemplateFieldMeaning(context.template, field.key, meaning.value as FieldMeaning);
       if (selectedType === 'number' && unitValue.trim()) field.unit = unitValue.trim();
       if ((selectedType === 'number' || selectedType === 'rating') && formulaValue.trim()) {
@@ -544,13 +538,6 @@ export function renderTemplateFieldCard(context: TemplateFieldEditorContext, fie
     )));
     card.append(tableOptions);
   }
-
-  const prompt = inputText(typeof field.prompt === 'string' ? field.prompt : '', 'e.g. Add speed');
-  prompt.addEventListener('change', () => {
-    if (prompt.value.trim()) field.prompt = prompt.value.trim();
-    else delete field.prompt;
-  });
-  card.append(labeledControl('Texto quando vazio', prompt, 'Sugestão exibida quando o campo ainda não possui valor.'));
 
   const meaning = selectInput(typeof field.meaning === 'string' ? field.meaning : '', FIELD_MEANING_OPTIONS);
   meaning.addEventListener('change', () => {

@@ -153,6 +153,8 @@ export interface TemplateCanvasToolbarOptions {
   setStatblockMode(enabled: boolean): void;
   selectedBlockId: string | null;
   selectedBlockIds: readonly string[];
+  /** Reads the most recently selected block at action time; the Canvas may update selection without rebuilding the toolbar. */
+  getInsertionSelectionId(): string | null;
   renderComponentHelpPicker(
     group: ComponentHelpGroup,
     options: Array<{ value: string; label: string; disabled?: boolean }>,
@@ -179,6 +181,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
     setStatblockMode,
     selectedBlockId,
     selectedBlockIds,
+    getInsertionSelectionId,
     renderComponentHelpPicker,
     setSelection,
     setSidebarModeToOptions,
@@ -214,17 +217,6 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
   );
   modeGroup.append(modeToggle);
   toolbar.append(modeGroup);
-
-  const nativeColumns = selectInput(String(template.layout.maxColumns ?? 2), [
-    { value: '1', label: 'Atlas: 1 col' },
-    { value: '2', label: 'Atlas: 2 cols' },
-    { value: '3', label: 'Atlas: 3 cols' },
-  ]);
-  nativeColumns.addEventListener('change', () => {
-    template.layout.maxColumns = Number(nativeColumns.value);
-    render();
-  });
-  settingsGroup.append(nativeColumns);
 
   const columnsControl = el('label', 'statblock-forge__canvas-columns-control');
   columnsControl.append(el('span', '', translateForgeText('Grid columns', language)));
@@ -314,11 +306,8 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
 
   const fieldChoices = templateFields(template).map((field) => ({ value: field.key, label: field.label.trim() || field.key }));
   const titleFieldChoices = titleFieldsForTemplate(template).map((field) => ({ value: field.key, label: field.label.trim() || field.key }));
-  // selectedBlockIds preserves selection order; its final item is the last
-  // block explicitly selected and therefore the insertion anchor.
-  const insertionSelectionId = selectedBlockIds.length > 0
-    ? selectedBlockIds[selectedBlockIds.length - 1] ?? selectedBlockId
-    : selectedBlockId;
+  // Selection changes update the Canvas in place. Always ask the owning view
+  // for the current insertion anchor when an add action is actually activated.
 
   // Add Block exposes presentation choices rather than every native renderer
   // separately. Collections and Resources resolve to their specific renderer
@@ -431,7 +420,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
       if (!resolvedDefinition) throw new Error('This block type is not allowed in the selected container.');
       const needsField = resolvedDefinition.requiresField;
       if (needsField && !field.value) throw new Error('Choose a compatible Field before adding this block.');
-      const insertion = resolveLayoutInsertionTarget(template, insertionSelectionId, resolvedBlockType);
+      const insertion = resolveLayoutInsertionTarget(template, getInsertionSelectionId(), resolvedBlockType);
       const block = addLayoutBlock(
         template,
         layout,
@@ -556,7 +545,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
   const addContainer = button('Add container', () => {
     try {
       const containerType = selectedContainerType as LayoutBlockType;
-      const insertion = resolveLayoutInsertionTarget(template, insertionSelectionId, containerType);
+      const insertion = resolveLayoutInsertionTarget(template, getInsertionSelectionId(), containerType);
       const insertionParent = insertion.targetContainerId
         ? findLayoutBlock(template, insertion.targetContainerId)
         : null;

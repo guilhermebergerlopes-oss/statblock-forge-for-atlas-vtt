@@ -66,7 +66,7 @@ test('Atlas compatibility warning variants are translated when embedded in the e
 });
 
 
-test('package metadata and bundled documentation identify release 0.4.0', async () => {
+test('package metadata and bundled documentation remain on release 0.4.0', async () => {
   const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   const ptDocs = await readFile(resolve(root, 'src/documentation/documentationPackage.ts'), 'utf8');

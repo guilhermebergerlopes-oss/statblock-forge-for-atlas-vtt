@@ -44,6 +44,22 @@ test('a tracked Number can use another Number Field as its maximum without becom
   assert.equal(template.layout.blocks[0].type, 'stat');
 });
 
+test('When Empty is a block presentation setting and survives Number/Track conversion', () => {
+  const template = makeTemplate();
+  const block = template.layout.blocks[0];
+  block.whenEmpty = 'fallback';
+  block.fallback = 'Not entered';
+  assert.equal(setValueDisplayMode(template, block.id, 'boxes'), true);
+  assert.equal(template.layout.blocks[0].type, 'track');
+  assert.equal(template.layout.blocks[0].whenEmpty, 'fallback');
+  assert.equal(template.layout.blocks[0].fallback, 'Not entered');
+  assert.equal(setValueDisplayMode(template, block.id, 'number'), true);
+  assert.equal(template.layout.blocks[0].whenEmpty, 'fallback');
+  assert.equal(template.layout.blocks[0].fallback, 'Not entered');
+  assert.equal(Object.hasOwn(template.fields[0], 'whenEmpty'), false);
+  assert.equal(Object.hasOwn(template.fields[0], 'fallback'), false);
+});
+
 test('changing a Track presentation back to Number keeps the Field tracked', () => {
   const template = makeTemplate();
   template.layout.blocks[0] = { id: 'hp-stat-123456', type: 'track', field: 'hp', look: 'gauge', counts: 'down' };
@@ -99,7 +115,7 @@ test('the Number Value inspector exposes Tracking independently of Number/Boxes/
   assert.match(valueInspector, /if \(isNumberValueField\) \{[\s\S]*?renderNumericTrackingControls\(context, valueFieldForMode, panel\)/);
   assert.match(trackingControls, /if \(field\.type !== 'number'\) return/);
   assert.match(trackingControls, /setNumericFieldTracking\(context\.template, field\.key, mode\.value/);
-  assert.match(renderer, /trackedNumberDisplayForField\(field, fields, sample, readNumber, layout\.blocks, header\)/);
+  assert.match(renderer, /trackedNumberDisplayForField\(field, fields, sample, readNumber, sourceBlocks, header\)/);
   assert.match(renderer, /atlas-sb-tracked statblock-forge__tracked-number/);
 });
 

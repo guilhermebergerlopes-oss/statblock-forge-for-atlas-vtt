@@ -34,10 +34,12 @@ Exemplo:
 | `traits` | `magical` | Magical |
 | `defenses` | `armored` | Armored |
 
-A referência completa é formada pela key do Field, um ponto e a option key:
+A referência completa é formada pela key do Field, um ponto e a option key. Como o avaliador numérico compartilhado aceita key direta, `@` e chaves, você pode escrever a mesma referência das três formas:
 
 ```text
 traits.flying
+@traits.flying
+{traits.flying}
 defenses.armored
 ```
 

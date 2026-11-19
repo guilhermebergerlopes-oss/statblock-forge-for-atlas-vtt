@@ -213,7 +213,7 @@ export function evaluatePreviewFormula(
     | { kind: 'call'; name: string; args: FormulaNode[] };
 
   const tokens: Token[] = [];
-  const pattern = /\s*(?:(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_.]*)|(>=|<=|==|!=|&&|\|\||[+\-*/%><!?:(),]))/gy;
+  const pattern = /\s*(?:(\d+(?:\.\d+)?)|(@[A-Za-z_][A-Za-z0-9_.]*|\{[A-Za-z_][A-Za-z0-9_.-]*\})|([A-Za-z_][A-Za-z0-9_.]*)|(>=|<=|==|!=|&&|\|\||[+\-*/%><!?:(),]))/gy;
   let offset = 0;
   while (offset < source.length) {
     pattern.lastIndex = offset;
@@ -224,9 +224,12 @@ export function evaluatePreviewFormula(
       if (!Number.isFinite(value)) return null;
       tokens.push({ type: 'number', value });
     } else if (match[2] !== undefined) {
-      tokens.push({ type: 'name', value: match[2] });
+      const reference = match[2];
+      tokens.push({ type: 'name', value: reference.startsWith('@') ? reference.slice(1) : reference.slice(1, -1) });
     } else if (match[3] !== undefined) {
-      tokens.push({ type: 'op', value: match[3] });
+      tokens.push({ type: 'name', value: match[3] });
+    } else if (match[4] !== undefined) {
+      tokens.push({ type: 'op', value: match[4] });
     }
     offset = pattern.lastIndex;
     if (tokens.length > 300) return null;

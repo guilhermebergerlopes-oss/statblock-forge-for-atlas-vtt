@@ -62,22 +62,31 @@ function lookupValue(template: ForgeTemplate, data: JsonRecord, path: string): u
   return nestedValue(data, path);
 }
 
-function referencePathAt(text: string, at: number): string | null {
+function referenceAt(text: string, at: number): { path: string; end: number; explicit: boolean } | null {
+  if (text[at] === '{') {
+    const close = text.indexOf('}', at + 1);
+    if (close < 0) return null;
+    const path = text.slice(at + 1, close);
+    return /^[A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*$/.test(path)
+      ? { path, end: close + 1, explicit: true } : null;
+  }
   if (text[at] !== '@') return null;
   REFERENCE.lastIndex = at;
-  return REFERENCE.exec(text)?.[1] ?? null;
+  const match = REFERENCE.exec(text);
+  return match?.[1] ? { path: match[1], end: REFERENCE.lastIndex, explicit: false } : null;
 }
 
 type ReferenceRead = { field: string; value: unknown; end: number } | { missing: string; end: number } | null;
 
 /** Same longest-existing-path fallback as Atlas: @con-1 and @leveld6. */
 function readReference(text: string, at: number, lookup: (path: string) => unknown): ReferenceRead {
-  const path = referencePathAt(text, at);
-  if (path === null) return null;
+  const parsed = referenceAt(text, at);
+  if (parsed === null) return null;
+  const { path, end, explicit } = parsed;
   const start = at + 1;
-  const end = start + path.length;
   const whole = lookup(path);
   if (whole !== undefined) return { field: path, value: whole, end };
+  if (explicit) return { missing: path, end };
   for (let split = path.length - 1; split > 0; split -= 1) {
     const field = path.slice(0, split);
     if (field.endsWith('.') || field.endsWith('-')) continue;

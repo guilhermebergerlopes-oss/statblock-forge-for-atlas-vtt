@@ -18,6 +18,7 @@ import { createForgeLayout } from './src/templates/forgeTemplate.ts';
 import { createForgeStatblockNoteFromTemplate } from './src/statblocks/forgeStatblockNoteCreator.ts';
 import { openForgeStatblockNoteForEditing } from './src/statblocks/forgeStatblockEditorWorkflow.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './src/atlas/forgeTemplateLinkResolver';
+import { registerForgeAtlasSheetProvider } from './src/atlas/atlasSheetProvider.ts';
 import { refreshForgeStatblockTemplateLinkPath } from './src/statblocks/forgeTemplateLink';
 import { assessAtlasTokenCreation, dispatchAtlasCreateTokenCommand } from './src/atlas/atlasTokenWorkflow';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from './src/i18n/localization';
@@ -108,6 +109,22 @@ export default class StatblockForgePlugin extends Plugin {
       showCanvasGrid: storedSettings.showCanvasGrid !== false,
       toggleStatblockModeShortcut: normalizeForgeShortcut(storedSettings.toggleStatblockModeShortcut),
     };
+
+    // The Atlas fork owns map scenes and the hover-preview lifecycle. Forge supplies its
+    // renderer through Atlas' public sheet-provider API, so Ctrl-hover can display the
+    // exact Forge statblock instead of the Atlas-native fallback. Retry at layout-ready
+    // because Obsidian may load this plugin before the Atlas fork.
+    let unregisterAtlasProvider: (() => void) | null = null;
+    const tryRegisterAtlasProvider = (): void => {
+      if (unregisterAtlasProvider) return;
+      unregisterAtlasProvider = registerForgeAtlasSheetProvider(this.app, this);
+      if (unregisterAtlasProvider) this.register(() => {
+        unregisterAtlasProvider?.();
+        unregisterAtlasProvider = null;
+      });
+    };
+    tryRegisterAtlasProvider();
+    this.app.workspace.onLayoutReady(tryRegisterAtlasProvider);
 
     this.registerView(STATBLOCK_FORGE_EDITOR_VIEW, (leaf) => new TemplateEditorView(leaf, this));
     this.registerExtensions([FORGE_TEMPLATE_EXTENSION], STATBLOCK_FORGE_EDITOR_VIEW);
