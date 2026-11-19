@@ -1,51 +1,150 @@
-# Statblock Forge for Atlas VTT
+# Statblock Forge
 
-Statblock Forge for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. [Support and issue reporting](https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues).
+**Statblock Forge** is an independent tool for building reusable tabletop RPG statblocks. Create a Template, define the data it needs, arrange that data in a visual editor, and then use the Template to create individual character, creature, or NPC sheets. Each sheet keeps its own values while sharing the Template's structure and presentation.
 
-**Creator and maintainer:** Guilherme Berger Lopes.
+Forge can be used on its own. It also supports compatible workflows with Atlas VTT and can be paired with the **Statblock Forge: Forked Atlas VTT Compatibility** fork for expanded integration. Forge is not made, endorsed, or supported by Atlas VTT or Atlas Online.
 
-An independent Obsidian plugin for creating reusable statblock templates and linked statblock notes. Forge includes a visual canvas editor, nested layouts, a per-template configurable 4–24 column Grid (12 by default) with a solid primary Canvas grid and subtly dashed nested block grids, structured Fields, dice links with a right-click **Add to next roll** action, and Atlas-compatible export workflows. Secondary Canvas controls are grouped under **More options**; **Statblock Mode**, **Add block**, and **Add container** remain directly available. The Statblock Mode command defaults to `Mod + Shift + S` and can be remapped in **Statblock Forge settings** by clicking the shortcut field and pressing a key combination. `Mod` means Ctrl on Windows/Linux and Cmd on macOS. Hold `N` and click any roll link to add or remove its formula from that statblock's next-roll queue; a normal click still rolls, and right-click keeps the context menu.
+**Creator and maintainer:** Guilherme Berger Lopes  
+**Support and issue reporting:** [GitHub Issues](https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues)
 
-## Build from source
+## What you can do
 
-### Requirements
+### Build statblocks your way
 
-- Node.js 22 or newer
-- npm
+- Create reusable Templates and use them for multiple characters, creatures, NPCs, or other game entities.
+- Define Fields for Text, Markdown, Number, Rating, Dice, Choice, List, Tabular Data, Entries/Abilities, Pairs, Images, Spells, Counters, and Checkboxes.
+- Keep a Template's definitions separate from the values stored by each statblock.
 
-### Build
+### Arrange the information visually
 
-1. Extract this source package.
-2. Open a terminal in the project directory.
-3. Install the development dependencies with `npm install`.
-4. Run `npm run build`.
+- Use a configurable **4–24 column Canvas Grid** (12 columns by default).
+- Compose layouts with blocks and nested containers, including Sections, Rows, and Tabs.
+- Resize and reorder blocks, adjust their placement, and use Dense Layout for more compact arrangements.
+- Use the **More options** panel for secondary Canvas controls.
 
-The build generates `main.js` and the compiled `styles.css` needed by Obsidian. Run `npm run typecheck` to check TypeScript without generating a bundle.
+### Customize the appearance
 
-## Install
+- Choose a built-in theme or create a reusable custom theme with an eight-color palette.
+- Adjust the outer frame, token-art frame, borders, shapes, and individual block appearance.
+- Import and export reusable themes and frames with `.forgestyle` packages.
+- Frame and reposition images directly in the statblock.
 
-Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/statblock-forge/`, then enable **Statblock Forge for Atlas VTT** in Obsidian Community plugins.
+### Add rules and interactive data
 
-## Template Compendium
+- Calculate Number and Rating values with formulas that reference other Fields.
+- Build dynamic Dice Field formulas from the current statblock's values.
+- Use clickable dice expressions in statblock text; rolling uses the Atlas dice service when the integration is available.
+- Track Resources and Counter uses, including maximums, spending, and recovery.
+- Configure Rest buttons with rules, player choices, and actions that affect compatible Resources and Counters.
+- Control player access to supported Fields in compatible Atlas workflows.
 
-The template editor includes a separate **Compendium** tab for reusable content. Each Collections Field (Entries/Abilities, List, Pairs, or Spells) owns an independent library identified by a stable Forge-only Field ID, so two Fields with the same visible label never share entries. The selector opens in a floating popover with search and category filters. Ability previews show every configured Part in both the template library and the statblock picker. The **Custom ability** and **Add from...** actions share the same button styling. The selector includes the Field key to distinguish same-label Fields. Renaming a Field key keeps its library attached; removing the Field removes only its library. Duplicate saved IDs are normalized to prevent accidental sharing.
+### Reuse content with the Compendium
 
-Create and edit reusable entries in the template. In an editable statblock, add a copy from the linked Field's Compendium or create a **Custom ability** directly in the statblock. Custom abilities and changes made to copied entries remain local to that statblock and never write back to the template library. Inserted Entries, List, Pairs, and Spells values are deep-copied before the note is updated. Compendium data is stored in Forge metadata/sidecars and is not added to the native Atlas template JSON.
+The Template editor includes a **Compendium** for reusable Entries/Abilities, Lists, Pairs, and Spells. Each collection Field has its own library by default; compatible Fields can also share a library. Libraries support optional categories and search. Content inserted into a statblock is copied into that sheet, so editing the copy does not change the Template library.
 
-Each library item can also have a freeform **Category**. Categories are scoped to the owning Field ID, shown as grouped sections, and can be filtered independently in the Template Editor and the statblock picker. Search matches item names, categories, descriptions, Parts, and other serialized content. Existing items without a category remain available under **Uncategorized**; entering a new category name while editing an item creates that category for the current Field library.
+## How a Template becomes a statblock
 
-## Compendium tests
+1. **Create a Template** from the ribbon menu or Command Palette.
+2. **Define Fields** for the information your game needs.
+3. **Build the Canvas** by connecting Fields to blocks and arranging the layout.
+4. **Customize the appearance** with themes and block-level settings.
+5. **Save the Template**, then create a statblock note from it.
+6. **Fill in the sheet's Values** in the rendered statblock.
 
-Run `npm run test:compendium` to execute the automated isolation, persistence, duplication, category, search/filter, and statblock-copy checks for the template Compendium. The tests use Node.js built-in test APIs and do not require Obsidian to be running.
+A Template defines the reusable structure and presentation. A statblock note stores the Values for one individual. Multiple notes can use the same Template without sharing their sheet data.
 
 ## Dice links
 
-Right-click any clickable dice formula in a Forge statblock and choose **Add to next roll**. The formula is queued for the next successful roll in that statblock; queued formulas are temporary and are not written to the template or note. Select the same link again to remove it from the queue.
+With a compatible Atlas integration available, click a dice link to roll its formula. To prepare a roll with additional modifiers:
 
-## Compatibility
+- Hold **N** and click a dice link to add or remove its formula from that statblock's next-roll queue.
+- Alternatively, right-click a dice link and choose **Add to next roll** or **Remove from next roll**.
+- Right-click also provides the roll menu and, when available, access to that statblock's roll history.
 
-Forge is an independent community plugin. It can integrate with Atlas VTT when Atlas is installed, but it does not replace or modify Atlas. Token Conditions are defined, applied, and stored by Atlas; Forge no longer provides a duplicate Condition catalog, per-statblock Condition panel, or Condition-targeted Rest rules. Atlas-native per-Value `addsToRolls` switches are omitted from newly exported templates because the Forge context-menu action replaces that editor setting.
+Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
+
+## Working with Atlas VTT
+
+Atlas integration is optional for creating Templates and editing Forge statblocks. When a compatible Atlas installation and API are available, Forge can use Atlas-supported workflows for dice rolls, roll history, token links, and compatible Resources.
+
+The projects have separate responsibilities:
+
+- **Forge** manages its Template editor, statblock notes, Fields, formulas, appearance settings, Compendium, and Rest rules.
+- **Atlas VTT** manages maps, scenes, Tokens, collection Resources, and Token Conditions.
+
+Forge does not maintain a second Conditions catalog or apply Token Conditions through Rest. Configure and manage Conditions in Atlas.
+
+For expanded integration, Forge can be used with the separate **Statblock Forge: Forked Atlas VTT Compatibility** project. Compatibility depends on the versions and public API capabilities available in the installed projects.
+
+## Installation
+
+### Requirements
+
+- Obsidian **1.8.7 or later**.
+- Obsidian Desktop; Forge is marked as desktop-only.
+- For building from source: Node.js **22 or later** and npm.
+
+### Install a built release manually
+
+1. Create the plugin folder in your vault: `.obsidian/plugins/statblock-forge/`.
+2. Copy `main.js`, `manifest.json`, and `styles.css` into that folder.
+3. Open **Settings → Community plugins** and enable **Statblock Forge for Atlas VTT**.
+
+A source ZIP is not a ready-to-install plugin package. Build it first using the steps below.
+
+## Build from source
+
+```bash
+npm install
+npm run build
+```
+
+The build creates `main.js` and the compiled `styles.css`. Copy those files, together with `manifest.json`, into the plugin folder described above.
+
+### Development and checks
+
+```bash
+npm test
+npm run test:compendium
+npm run test:layout
+npm run typecheck
+```
+
+To build while watching source files:
+
+```bash
+npm run dev
+```
+
+## Documentation
+
+The full user guide is available in both English and Brazilian Portuguese under `docs/user-guide/`. It covers installation, Templates, Fields, Canvas layout, appearance, formulas, Dice Fields, Counters, Rest, player permissions, and Atlas integration.
+
+You can also download the documentation from **Settings → Community plugins → Statblock Forge → Download documentation**. Choose the language and destination folder in the settings first. Existing documentation files are preserved rather than overwritten.
+
+## Project files
+
+| File or format | Purpose |
+|---|---|
+| `.forgetemplate` | Template saved by Forge, including Forge-specific layout and appearance metadata. |
+| `.atlastemplate` | Atlas-native Template format that Forge can open in supported workflows. |
+| Markdown (`.md`) | Individual statblock note with its own Values and a link to its Template. |
+| `.forgestyle` | Portable package of reusable custom themes and frames. |
+| `.statblock-forge/layouts/` | Sidecar location for Forge layout metadata associated with Atlas-format Templates, when needed. |
+
+Back up Templates and statblock notes before bulk edits, conversions, or manual changes to their JSON/frontmatter data.
+
+## Support
+
+For Forge bugs, questions, or feature requests, open an issue in the [project repository](https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues). Include:
+
+- Forge version;
+- application version;
+- steps to reproduce the issue;
+- relevant error messages or console output.
+
+For issues specifically related to Atlas itself, use the support channels of the original Atlas VTT project.
 
 ## License
 
-This project is distributed under GNU AGPL-3.0-only. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+Statblock Forge is distributed under **GNU AGPL-3.0-only**. See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
