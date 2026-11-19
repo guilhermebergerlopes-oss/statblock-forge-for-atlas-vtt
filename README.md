@@ -1,8 +1,10 @@
 # Statblock Forge
 
+Statblock Forge is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online.
+
 **Statblock Forge** is an independent tool for building reusable tabletop RPG statblocks. Create a Template, define the data it needs, arrange that data in a visual editor, and then use the Template to create individual character, creature, or NPC sheets. Each sheet keeps its own values while sharing the Template's structure and presentation.
 
-Forge can be used on its own. It also supports compatible workflows with Atlas VTT and can be paired with the **Statblock Forge: Forked Atlas VTT Compatibility** fork for expanded integration. Forge is not made, endorsed, or supported by Atlas VTT or Atlas Online.
+Forge can be used on its own. It also supports compatible workflows with Atlas VTT and can be paired with the **Forked Atlas VTT Compatibility for Statblock Forge** fork for expanded integration.
 
 **Creator and maintainer:** Guilherme Berger Lopes  
 **Support and issue reporting:** [GitHub Issues](https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues)
