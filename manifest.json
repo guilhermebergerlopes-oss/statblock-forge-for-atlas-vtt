@@ -1,10 +1,10 @@
 {
   "id": "statblock-forge",
   "name": "Statblock Forge for Atlas VTT",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "minAppVersion": "1.8.7",
-  "description": "Statblock Forge for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues.",
+  "description": "A community extension for building tabletop RPG statblocks in Obsidian with Atlas VTT integration. Not made, endorsed, or supported by Atlas VTT or Atlas Online.",
   "author": "Guilherme Berger Lopes",
   "isDesktopOnly": true,
-  "authorUrl": "https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt"
+  "authorUrl": "https://github.com/guilhermebergerlopes-oss"
 }

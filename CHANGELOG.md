@@ -1,4 +1,4 @@
-## 0.4.0 — Busca no JSON, proteção de rascunhos e estabilidade de Sections
+## 0.4.1 — API do Obsidian e metadados de publicação
 
 ### Obsidian API and source-safety cleanup
 - Replaces SVG icon fragment parsing through `innerHTML` with explicit SVG DOM-node construction.
@@ -6,6 +6,12 @@
 - Awaits workspace leaf reveals, removes the plugin startup console message, and uses `getActiveViewOfType` instead of the deprecated `activeLeaf` property.
 - Uses Obsidian's configured trash behavior when rolling back a newly created Atlas template file; tightens file guards and simplifies redundant `unknown | null` unions.
 - Makes intentionally unawaited microtask scheduling explicit and updates browser timers/animation frames to use the correct `window`.
+
+### Publication metadata
+- Bumps the plugin version to 0.4.1 and shortens the package/manifest description.
+- Points `authorUrl` directly to the creator's GitHub profile.
+
+## 0.4.0 — Busca no JSON, proteção de rascunhos e estabilidade de Sections
 
 
 ### Fixed
