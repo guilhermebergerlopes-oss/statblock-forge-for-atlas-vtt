@@ -32,7 +32,7 @@ export function attachTemplateCanvasZoom(
   onZoomChange: (zoom: number) => void,
 ): () => void {
   let zoom = clamp(initialZoom, MIN_TEMPLATE_CANVAS_ZOOM, MAX_TEMPLATE_CANVAS_ZOOM);
-  sheet.setCssProps({ ['zoom']: String(zoom) });
+  sheet.setCssStyles({ zoom: String(zoom) });
 
   const onWheel = (event: WheelEvent): void => {
     if (!event.ctrlKey) return;
@@ -55,7 +55,7 @@ export function attachTemplateCanvasZoom(
     const localY = clamp((event.clientY - beforeRect.top) / zoom, 0, beforeRect.height / zoom);
 
     zoom = nextZoom;
-    sheet.setCssProps({ ['zoom']: String(zoom) });
+    sheet.setCssStyles({ zoom: String(zoom) });
     const afterRect = sheet.getBoundingClientRect();
 
     const contentX = previousScrollLeft + (afterRect.left - viewportRect.left) + localX * zoom;

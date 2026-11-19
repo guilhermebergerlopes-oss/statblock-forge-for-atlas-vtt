@@ -8,7 +8,7 @@ tags:
   - documentação
   - índice
 status: revisão ampliada
-versao-forge: 0.4.1
+versao-forge: 0.4.2
 ---
 
 # Statblock Forge — documentação
@@ -16,7 +16,7 @@ versao-forge: 0.4.1
 Este manual explica como criar Templates reutilizáveis, organizar statblocks no Canvas, configurar Fields, montar fórmulas e usar os recursos avançados do **Statblock Forge for Atlas VTT**. As notas são destinadas a um Vault do Obsidian e utilizam Markdown, frontmatter YAML, wikilinks e callouts.
 
 > [!info] Escopo desta edição
-> A edição acompanha o código do Forge **0.4.1**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 34 notas no idioma escolhido: este índice e 33 notas de assunto, organizadas em quatro partes.
+> A edição acompanha o código do Forge **0.4.2**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 34 notas no idioma escolhido: este índice e 33 notas de assunto, organizadas em quatro partes.
 
 ## Roteiro recomendado
 
@@ -107,7 +107,7 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 
 ## Escopo, versão e idioma
 
-- Base: Statblock Forge **v0.4.1**.
+- Base: Statblock Forge **v0.4.2**.
 - Requisito mínimo declarado no manifesto: Obsidian **1.8.7**.
 - O plugin é marcado como desktop-only.
 - Os nomes dos controles aparecem em inglês quando esse é o texto da interface; Português (Brasil) está disponível nas configurações.

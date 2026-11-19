@@ -704,31 +704,13 @@ function preserveInlineFieldFormatting(control: HTMLElement, display: HTMLElemen
   // its current value is empty or only a few characters long.
   if (control instanceof HTMLInputElement) {
     const bounds = display.getBoundingClientRect();
-    if (bounds.width > 0) {
-      control.setCssProps({ ['box-sizing']: 'border-box' });
-      control.setCssProps({ ['width']: `${bounds.width}px` });
-      control.setCssProps({ ['min-width']: '0' });
-      control.setCssProps({ ['max-width']: '100%' });
-      // Keep border thickness for geometry but hide the editor's own chrome;
-      // the editing outline belongs to the containing block.
-      control.setCssProps({ ['border-style']: 'solid' });
-      control.setCssProps({ ['border-color']: 'transparent' });
-    }
+    // Static editor geometry and chrome are defined by the matching CSS class.
+    // Only the measured dimensions vary with the currently rendered Field.
+    control.classList.add('is-inline-measured');
+    if (bounds.width > 0) control.setCssStyles({ width: `${bounds.width}px` });
     // Single-line controls have a browser-defined intrinsic height. Match the
     // rendered value's line box so the typed glyphs start on the same baseline.
-    if (bounds.height > 0) control.setCssProps({ ['height']: `${bounds.height}px` });
-  } else if (control instanceof HTMLTextAreaElement) {
-    // Do not derive a multiline editor's width from the rendered text: for an
-    // empty Markdown Field that measurement can be tiny and make the textarea
-    // appear unusable. Keep a full-width editing surface instead.
-    control.setCssProps({ ['box-sizing']: 'border-box' });
-    control.setCssProps({ ['display']: 'block' });
-    control.setCssProps({ ['width']: '100%' });
-    control.setCssProps({ ['min-width']: '0' });
-    control.setCssProps({ ['max-width']: '100%' });
-    control.setCssProps({ ['white-space']: 'pre-wrap' });
-    control.setCssProps({ ['pointer-events']: 'auto' });
-    control.setCssProps({ ['user-select']: 'text' });
+    if (bounds.height > 0) control.setCssStyles({ height: `${bounds.height}px` });
   }
 }
 

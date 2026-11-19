@@ -1,3 +1,10 @@
+## 0.4.2 — Conformidade de estilos do editor inline
+
+### Fixed
+- Move static sizing, border, wrapping, and interaction styles for inline input/Markdown editors into CSS classes, leaving only measured input dimensions as runtime styles.
+- Keeps Ctrl+wheel Canvas zoom dynamic through Obsidian's `setCssStyles` helper.
+- Bumps package, manifest, Atlas sheet-provider, and bundled documentation versions to 0.4.2.
+
 ## 0.4.1 — API do Obsidian e metadados de publicação
 
 ### Obsidian API and source-safety cleanup

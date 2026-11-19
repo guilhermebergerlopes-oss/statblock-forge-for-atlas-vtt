@@ -1,6 +1,6 @@
 {
   "name": "statblock-forge",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A community extension for building tabletop RPG statblocks in Obsidian with Atlas VTT integration. Not made, endorsed, or supported by Atlas VTT or Atlas Online.",
   "license": "AGPL-3.0-only",
   "engines": {

@@ -4053,6 +4053,15 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   resize: vertical;
   max-width: 100%;
 }
+/* Static input geometry is CSS-owned; only its measured width and height
+   are supplied at runtime by preserveInlineFieldFormatting(). */
+.statblock-forge__statblock .atlas-sb-pane-editor input.is-inline-measured {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  border-style: solid;
+  border-color: transparent;
+}
 .statblock-forge__statblock textarea.statblock-forge__inline-field-editor.is-markdown:focus,
 .statblock-forge__statblock textarea.statblock-forge__inline-field-editor.is-markdown:focus-visible {
   border-color: var(--interactive-accent);
