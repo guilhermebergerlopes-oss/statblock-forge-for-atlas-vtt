@@ -3,6 +3,7 @@ export interface StatblockCardAction {
   label: string;
   icon?: string;
   disabled?: boolean;
+  title?: string;
   run: () => unknown;
 }
 
@@ -15,14 +16,16 @@ function iconFor(name: string | undefined): string {
   switch (name) {
     case 'refresh': return '↻';
     case 'edit': return '✎';
-    case 'publish': return '↗';
+    case 'publish':
+    case 'link': return '↗';
+    case 'unlink': return '⤫';
     default: return '•';
   }
 }
 
 /**
  * The card-level actions menu used by Atlas' StatblockCardMenu, adapted to the
- * Forge DOM renderer. It deliberately lives below the card, while its popup is
+ * Forge DOM renderer. It sits outside the rendered card, while its popup is
  * portalled to body so an Obsidian pane cannot clip it.
  */
 export function renderStatblockCardActionsMenu(options: StatblockCardActionsMenuOptions): HTMLElement {
@@ -133,6 +136,7 @@ export function renderStatblockCardActionsMenu(options: StatblockCardActionsMenu
       item.dataset.actionId = action.id;
       item.setAttribute('role', 'menuitem');
       item.disabled = Boolean(action.disabled);
+      if (action.title) item.title = action.title;
       const leading = document.createElement('span');
       leading.className = 'statblock-forge__table-menu-leading';
       const icon = document.createElement('span');

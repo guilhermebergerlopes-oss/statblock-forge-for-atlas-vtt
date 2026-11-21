@@ -22,5 +22,5 @@ test('token-link writes go through Atlas native TokenStatblockLinkService', () =
   assert.match(linkAdapter, /linkAtlasTokenWithoutRewritingStatblockArtwork/);
   assert.match(linkAdapter, /service\.unlinkToken\(imagePath, \{ updateStatblockAvatar: false/);
   assert.match(linkAdapter, /service\.linkTokenToStatblock\(imagePath, targetStatblockPath/);
-  assert.match(linkAdapter, /updateAtlasPlacedCharacterLinksForImage/);
+  assert.match(linkAdapter, /updateAtlasPlacedTokenLinksForImage/);
 });

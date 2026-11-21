@@ -18,6 +18,16 @@ const generatedStyles = [
     beginMarker: '/* BEGIN GENERATED FORGE TABLE FORMULA STYLES */',
     endMarker: '/* END GENERATED FORGE TABLE FORMULA STYLES */',
   },
+  {
+    sourcePath: 'src/styles/dm-screen.scss',
+    beginMarker: '/* BEGIN GENERATED FORGE DM SCREEN STYLES */',
+    endMarker: '/* END GENERATED FORGE DM SCREEN STYLES */',
+  },
+  {
+    sourcePath: 'src/styles/atlas-statblock-link.scss',
+    beginMarker: '/* BEGIN GENERATED FORGE ATLAS STATBLOCK LINK STYLES */',
+    endMarker: '/* END GENERATED FORGE ATLAS STATBLOCK LINK STYLES */',
+  },
 ];
 
 let stylesheet = await readFile(stylesheetPath, 'utf8');

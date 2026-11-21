@@ -2,6 +2,8 @@ import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
 import { getAtlasMapViewContexts, inspectAtlasRuntime } from './atlasRuntime.ts';
 import { isForgeNativeV2Statblock } from './atlasForgePreviewRenderer.ts';
+import { startForgeAtlasDMScreenBridge } from './forgeDMScreenBridge.ts';
+import { startForgeAtlasStatblockLinkDialogBridge } from './forgeStatblockLinkDialogBridge.ts';
 import type { AtlasDiceTokenRollContextLike } from './atlasDiceRuntime.ts';
 import {
   ForgeStatblockPreviewWindow,
@@ -165,8 +167,28 @@ export function installForgePreviewHooksForManager(
 /** Installs and owns direct Atlas preview hooks for all currently open and future map views. */
 export function startForgeAtlasPreviewBridge(app: App, plugin: StatblockForgePlugin): () => void {
   let disposed = false;
+  let stopDMScreenBridge: () => void = () => {};
+  let stopStatblockLinkDialogBridge: () => void = () => {};
+  try {
+    stopDMScreenBridge = startForgeAtlasDMScreenBridge(app, plugin);
+  } catch (error) {
+    // The optional DM Screen feed must not prevent token linking or native
+    // Ctrl-hover preview hooks from being installed on a supported Atlas map.
+    console.error('[Statblock Forge] Atlas DM Screen integration could not start:', error);
+  }
+  try {
+    stopStatblockLinkDialogBridge = startForgeAtlasStatblockLinkDialogBridge(app, plugin);
+  } catch (error) {
+    // The link-dialog decoration is optional; never disrupt Atlas' own linking flow.
+    console.error('[Statblock Forge] Atlas Link Statblock dialog integration could not start:', error);
+  }
   const patches = new Map<AtlasPreviewManager, () => void>();
   const eventRefs: EventRef[] = [];
+
+  // Atlas link-dialog discovery is owned by StatblockNotePanels, which is the
+  // always-started note lifecycle service. Keeping registration out of this
+  // optional preview bridge prevents duplicate scans and avoids a second set of
+  // callbacks racing the same frontmatter migration.
 
   const reconcile = (): void => {
     if (disposed) return;
@@ -200,6 +222,8 @@ export function startForgeAtlasPreviewBridge(app: App, plugin: StatblockForgePlu
     disposed = true;
     for (const patch of patches.values()) patch();
     patches.clear();
+    stopDMScreenBridge();
+    stopStatblockLinkDialogBridge();
     for (const ref of eventRefs) app.workspace.offref(ref);
     eventRefs.length = 0;
   };

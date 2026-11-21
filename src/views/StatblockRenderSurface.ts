@@ -54,9 +54,6 @@ function atlasTokenLinkInspectionMessage(
     case 'no-selection': return pt ? 'Selecione um ou mais tokens em uma cena do Atlas.' : 'Select one or more tokens in an Atlas scene.';
     case 'ambiguous-map': return pt ? 'Há seleções em mais de uma cena. Ative a cena desejada primeiro.' : 'More than one Atlas scene has a selection. Activate the intended scene first.';
     case 'no-token-image': return pt ? 'Os tokens selecionados não possuem uma imagem vinculável.' : 'The selected tokens do not have linkable artwork.';
-    case 'character-tokens-required': return pt
-      ? 'O Ctrl-hover do Atlas funciona com tokens Character. Coloque o token pela biblioteca do Atlas antes de vinculá-lo.'
-      : 'Atlas Ctrl-hover works with Character tokens. Place the token from the Atlas library before linking it.';
     case 'link-service-unavailable': return pt ? 'O serviço de vínculos do Atlas ainda não está disponível.' : 'Atlas token linking is not available yet.';
     case 'invalid-statblock': return pt ? 'A nota atual não é um statblock válido do Forge.' : 'The current note is not a valid Forge statblock.';
     case 'ready': return undefined;
@@ -78,6 +75,11 @@ function stableValue(value: unknown): unknown {
 
 function sameStoredValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
+}
+
+/** Reserved header Token-art keys supported by Forge templates, including legacy aliases. */
+function isTokenArtFieldKey(fieldKey: string): boolean {
+  return ['image', 'token-image', 'token'].includes(fieldKey);
 }
 
 /** Rest failures are transient UI feedback, never a permanent statblock status. */
@@ -270,22 +272,49 @@ export class StatblockRenderSurface {
     const cardMenuLabel = language === 'pt-BR' ? 'Opções do statblock' : 'Statblock options';
     const cardMenu = renderStatblockCardActionsMenu({
       label: cardMenuLabel,
-      actions: () => [
-        {
-          id: 'refresh',
-          label: language === 'pt-BR' ? 'Atualizar statblock' : 'Refresh statblock',
-          icon: 'refresh',
-          run: () => this.refresh(),
-        },
-        {
-          id: 'edit-values',
-          label: editPanel?.isConnected
-            ? (language === 'pt-BR' ? 'Fechar formulário de valores' : 'Close values form')
-            : (language === 'pt-BR' ? 'Editar todos os valores' : 'Edit all values'),
-          icon: 'edit',
-          run: toggleEditPanel,
-        },
-      ],
+      actions: () => {
+        const tokenLinkInspection = inspectSelectedAtlasTokenLinks(this.app, source.path);
+        const canLinkSelectedTokens = tokenLinkInspection.status === 'ready'
+          && tokenLinkInspection.targets.some((target) => !target.alreadyLinkedToTarget);
+        const canUnlinkSelectedTokens = tokenLinkInspection.status === 'ready'
+          && tokenLinkInspection.targets.some((target) => target.alreadyLinkedToTarget);
+        return [
+          {
+            id: 'refresh',
+            label: language === 'pt-BR' ? 'Atualizar statblock' : 'Refresh statblock',
+            icon: 'refresh',
+            run: () => this.refresh(),
+          },
+          {
+            id: 'edit-values',
+            label: editPanel?.isConnected
+              ? (language === 'pt-BR' ? 'Fechar formulário de valores' : 'Close values form')
+              : (language === 'pt-BR' ? 'Editar todos os valores' : 'Edit all values'),
+            icon: 'edit',
+            run: toggleEditPanel,
+          },
+          {
+            id: 'link-selected-atlas-tokens',
+            label: language === 'pt-BR'
+              ? `Vincular tokens selecionados${tokenLinkInspection.status === 'ready' ? ` (${tokenLinkInspection.targets.length})` : ''}`
+              : `Link selected Atlas tokens${tokenLinkInspection.status === 'ready' ? ` (${tokenLinkInspection.targets.length})` : ''}`,
+            icon: 'link',
+            disabled: false,
+            title: canLinkSelectedTokens
+              ? (language === 'pt-BR' ? 'Vincula os Tokens e Characters selecionados na cena ativa do Atlas a esta ficha.' : 'Link the selected Atlas Tokens and Characters in the active scene to this statblock.')
+              : atlasTokenLinkInspectionMessage(tokenLinkInspection, language) ?? '',
+            run: () => this.applySelectedAtlasTokenLinks(source.path, language, false),
+          },
+          ...(canUnlinkSelectedTokens ? [{
+            id: 'unlink-selected-atlas-tokens',
+            label: language === 'pt-BR'
+              ? `Desvincular tokens selecionados (${tokenLinkInspection.targets.filter((target) => target.alreadyLinkedToTarget).length})`
+              : `Unlink selected Atlas tokens (${tokenLinkInspection.targets.filter((target) => target.alreadyLinkedToTarget).length})`,
+            icon: 'unlink',
+            run: () => this.applySelectedAtlasTokenLinks(source.path, language, true),
+          }] : []),
+        ];
+      },
     });
     const statblockData = forgeRestDataWithResources(source.binding.data, source.raw);
     const renderData = withTemplateImagePreviewFallback(template, statblockData);
@@ -343,9 +372,11 @@ export class StatblockRenderSurface {
     card = renderedCard;
     // Keep the statblock surface focused on its content. Source metadata and
     // binding diagnostics are intentionally omitted from the rendered view.
-    // The overflow menu remains available below the card for secondary actions.
+    // Keep link and editing actions immediately visible above the sheet.
+    // The menu is not nested inside the rendered card, so Atlas styling and
+    // clipping cannot suppress its pointer interaction.
     const recoveryActions = this.renderRecoveryActions(template, source, language);
-    root.append(sheetWidthControl, renderedCard, cardMenu);
+    root.append(sheetWidthControl, cardMenu, renderedCard);
     if (recoveryActions) {
       const body = renderedCard.querySelector('.atlas-statblock-body');
       const header = body?.firstElementChild;
@@ -944,7 +975,7 @@ export class StatblockRenderSurface {
     const hasImage = typeof current === 'string' && current.trim().length > 0;
     const tokenName = typeof source.binding.data.name === 'string' && source.binding.data.name.trim()
       ? source.binding.data.name.trim() : source.basename;
-    const isNativeImageField = fieldKey === 'image'
+    const isNativeImageField = isTokenArtFieldKey(fieldKey)
       && template.fields.some((field) => field.key === fieldKey && field.type === 'image');
     const isForgeV2Note = sourceFile instanceof TFile && isNativeImageField
       && isForgeNativeV2StatblockNote(this.app, sourceFile.path);
@@ -1015,7 +1046,7 @@ export class StatblockRenderSurface {
           ? `Vincular tokens selecionados${inspection?.status === 'ready' ? ` (${inspection.targets.length})` : ''}`
           : `Link selected Atlas tokens${inspection?.status === 'ready' ? ` (${inspection.targets.length})` : ''}`,
         icon: 'link',
-        disabled: !hasUnlinkedSelection,
+        disabled: false,
         title: hasUnlinkedSelection
           ? (isPortuguese
             ? 'Vincula os tokens selecionados nesta cena à ficha atual. Um vínculo anterior será substituído conforme as regras do Atlas.'
@@ -1041,8 +1072,8 @@ export class StatblockRenderSurface {
       ...(isNativeImageField ? {
         hint: isForgeV2Note
           ? (isPortuguese
-            ? 'Escolha uma imagem local para Token art e crie um TokenAsset na biblioteca do Atlas. Também é possível vincular Characters já existentes.'
-            : 'Choose a local image for Token art and create an Atlas TokenAsset in the library. You can also link existing Characters.')
+            ? 'Escolha uma imagem local para Token art e crie um TokenAsset na biblioteca do Atlas. Para vincular Characters ou Tokens existentes, use também Opções do statblock acima da ficha.'
+            : 'Choose a local image for Token art and create an Atlas TokenAsset in the library. To link existing Characters or Tokens, you can also use Statblock options above the sheet.')
           : (isPortuguese
             ? 'Token art aceita tokens vinculados pelo Atlas. Selecione tokens em uma cena e use Vincular tokens selecionados; para imagens comuns, crie um Field do tipo Image.'
             : 'Token art accepts tokens linked through Atlas. Select tokens in a map and use Link selected Atlas tokens; create an Image Field for ordinary pictures.'),
@@ -1120,14 +1151,14 @@ export class StatblockRenderSurface {
         : 'This image is pinned by the template and cannot be replaced.');
       return;
     }
-    if (fieldKey === 'image' && !isForgeNativeV2StatblockNote(this.app, source.path)) {
+    if (isTokenArtFieldKey(fieldKey) && !isForgeNativeV2StatblockNote(this.app, source.path)) {
       this.showNotice(language === 'pt-BR'
         ? 'O campo Token art aceita imagens locais para fichas Forge v2 ou tokens vinculados pelo Atlas. Use um Field do tipo Image para imagens comuns.'
         : 'Token art accepts local images for Forge v2 statblocks or tokens linked through Atlas. Use an Image Field for ordinary pictures.');
       return;
     }
     const images = this.app.vault.getFiles().filter((file) => isSupportedVaultImagePath(file.path)
-      && (fieldKey !== 'image' || ATLAS_TOKEN_IMAGE_EXTENSIONS.has(file.extension.toLowerCase())));
+      && (!isTokenArtFieldKey(fieldKey) || ATLAS_TOKEN_IMAGE_EXTENSIONS.has(file.extension.toLowerCase())));
     if (images.length === 0) {
       this.showNotice(language === 'pt-BR' ? 'Nenhuma imagem compatível foi encontrada no Vault.' : 'No supported image files were found in the Vault.');
       return;

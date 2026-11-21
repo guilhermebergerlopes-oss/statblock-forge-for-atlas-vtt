@@ -24,7 +24,8 @@ test('TokenAsset creation stores a managed copy and asks Atlas to refresh its as
 });
 
 test('Token art picker is available only for Forge v2 notes and filters to Atlas-supported image formats', () => {
-  assert.match(surface, /fieldKey === 'image' && !isForgeNativeV2StatblockNote/);
+  assert.match(surface, /isTokenArtFieldKey\(fieldKey\) && !isForgeNativeV2StatblockNote/);
+  assert.match(surface, /\['image', 'token-image', 'token'\]\.includes\(fieldKey\)/);
   assert.match(surface, /ATLAS_TOKEN_IMAGE_EXTENSIONS\.has\(file\.extension\.toLowerCase\(\)\)/);
   assert.match(creation, /'png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp'/);
 });

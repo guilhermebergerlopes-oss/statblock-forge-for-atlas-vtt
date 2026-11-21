@@ -12,6 +12,7 @@ import { attachForgeStatblockDiceRolling } from '../render/statblockDiceLinks.ts
 import { normalizeForgeLanguage } from '../i18n/localization.ts';
 import { FORGE_STATBLOCK_SHEET_WIDTH_KEY, resolveForgeSheetWidth } from '../templates/sheetWidth.ts';
 import type { AtlasDiceTokenRollContextLike } from './atlasDiceRuntime.ts';
+import { forgePickerDetail, forgePickerScalar, type ForgeStatblockPickerEntry } from './forgeStatblockPickerModel.ts';
 
 
 interface ForgePreviewRenderContext {
@@ -23,6 +24,8 @@ interface ForgePreviewRenderContext {
   readonly sceneId: string;
   readonly variant: 'full' | 'preview' | 'feed';
   readonly token?: { readonly tokenId: string; readonly name: string; readonly imagePath: string };
+  /** The Link Statblock dialog previews the statblock as it will appear for the selected Token. */
+  readonly preferTokenImage?: boolean;
   readonly signal: AbortSignal;
 }
 
@@ -76,6 +79,36 @@ async function resolveForgeSource(app: App, plugin: StatblockForgePlugin, source
   };
 }
 
+/**
+ * Read the Forge-native notes which Atlas lists in its Link Statblock dialog.
+ * The Atlas list renders frontmatter `name` (or the file basename), then its
+ * conventional size/type/rating details; mirror that metadata so the DOM
+ * bridge can add Forge badges without relying on React internals or row order.
+ */
+export async function readForgeStatblockPickerEntries(
+  app: App,
+  plugin: StatblockForgePlugin,
+): Promise<ForgeStatblockPickerEntry[]> {
+  const files = app.vault.getMarkdownFiles().filter((file) => readForgeTemplateLink(app, file)?.version === 2);
+  // Atlas builds its Link Statblock rows from the note frontmatter, not from
+  // the resolved Forge data snapshot. Match that same source exactly: the
+  // snapshot can contain normalized/formula values which are not displayed by
+  // Atlas' statblockNoteEntries parser and therefore caused the Forge badge to
+  // miss otherwise valid rows.
+  const entries = files.map((file): ForgeStatblockPickerEntry => {
+    const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
+    const fields: JsonRecord = frontmatter && typeof frontmatter === 'object'
+      ? { ...(frontmatter as Record<string, unknown>) }
+      : {};
+    return {
+      path: file.path,
+      name: forgePickerScalar(fields.name) ?? file.basename,
+      detail: forgePickerDetail({ path: file.path, fields }),
+    };
+  });
+  return entries.sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): ForgePreviewRenderer {
   const resolveDefinition = async (sourceId: string): Promise<ForgeResolvedSource | null> => resolveForgeSource(app, plugin, sourceId);
   const renderer: ForgePreviewRenderer = {
@@ -114,6 +147,10 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
           'statblock-forge__atlas-preview-mount',
           renderContext.variant === 'preview',
         );
+        renderContext.container.classList.toggle(
+          'statblock-forge__atlas-feed-mount',
+          renderContext.variant === 'feed',
+        );
         const resolved = await resolveDefinition(sourceId);
         if (disposed || renderContext.signal.aborted || sequence !== drawSequence) return;
         if (!resolved) {
@@ -125,9 +162,12 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
         }
 
         const data = { ...resolved.data };
-        // Token art is a fallback only; explicit Forge image values remain authoritative.
+        // Atlas hover/feed previews keep explicit Forge art; the link dialog can preview the selected Token's art.
         const imageField = headerFieldForPart(resolved.template.fields, 'image');
-        if (imageField && renderContext.token?.imagePath && !data[imageField.key]) data[imageField.key] = renderContext.token.imagePath;
+        if (imageField && renderContext.token?.imagePath
+          && (renderContext.preferTokenImage === true || !data[imageField.key])) {
+          data[imageField.key] = renderContext.token.imagePath;
+        }
 
         markdownComponent = new Component();
         markdownComponent.load();
@@ -200,7 +240,11 @@ export interface ForgeAtlasPreviewRenderOptions {
   readonly originContext?: AtlasDiceTokenRollContextLike;
   readonly renderId: string;
   readonly token?: { readonly tokenId: string; readonly name: string; readonly imagePath: string };
+  /** The Link Statblock dialog previews the statblock as it will appear for the selected Token. */
+  readonly preferTokenImage?: boolean;
   readonly signal: AbortSignal;
+  /** Render surface: Atlas hover preview or DM Screen feed. */
+  readonly variant?: 'preview' | 'feed';
 }
 
 export interface ForgeAtlasPreviewRenderSession {
@@ -224,8 +268,9 @@ export async function renderForgeStatblockPreview(
     sceneId: options.sceneId,
     ...(options.viewId ? { atlasViewId: options.viewId } : {}),
     ...(options.originContext ? { atlasOriginContext: options.originContext } : {}),
-    variant: 'preview',
+    variant: options.variant ?? 'preview',
     ...(options.token ? { token: options.token } : {}),
+    ...(options.preferTokenImage ? { preferTokenImage: true } : {}),
     signal: options.signal,
   };
   const handle = await renderer.render(options.sourcePath, activeContext);

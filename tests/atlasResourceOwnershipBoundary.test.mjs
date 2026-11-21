@@ -73,7 +73,7 @@ test('Forge emits a v2 note link that Atlas can resolve without assigning Resour
   assert.match(note, /^mana: 12$/m);
   assert.doesNotMatch(note, /undeclaredResource/);
   assert.doesNotMatch(note, /^atlas-template:/m);
-  assert.doesNotMatch(note, /^statblock: true$/m);
+  assert.match(note, /^statblock: true$/m);
 });
 
 test('Forge does not claim a public Atlas API for live token or Resource state', () => {

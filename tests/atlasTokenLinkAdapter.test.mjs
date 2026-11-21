@@ -154,7 +154,7 @@ test('inspects selected tokens, deduplicates shared artwork, and reads current a
   assert.equal(inspection.status, 'ready');
   assert.equal(inspection.selectedTokenCount, 3);
   assert.equal(inspection.targets.length, 1);
-  assert.equal(inspection.skippedNonCharacterCount, 1);
+  assert.equal(inspection.skippedUnlinkableTokenCount, 1);
   assert.equal(inspection.targets[0].imagePath, 'Tokens/Wolf.webp');
   assert.equal(inspection.targets[0].alreadyLinkedToTarget, false);
   assert.equal(inspection.mapPath, 'Maps/Forest.atlasmap');
@@ -171,10 +171,10 @@ test('uses Atlas link service for selected-token linking without rewriting Forge
   assert.equal(app.workspace.activeLeaf.view.atlasStore.getState().objects.tokens.wolf.statblockPath, TARGET);
 });
 
-test('linking updates every open map Character spawned from the shared artwork', async () => {
+test('linking updates generic Tokens and Characters on every open map using shared artwork', async () => {
   const { app } = makeAtlasApp({
     extraSelections: [{
-      tokens: { wolfCopy: { kind: 'character', assetId: 'wolf-asset', imagePath: 'Tokens/Wolf.webp', name: 'Wolf copy' } },
+      tokens: { wolfCopy: { kind: 'token', assetId: 'wolf-asset', imagePath: 'Tokens/Wolf.webp' } },
       selectedIds: [],
     }],
   });
@@ -234,15 +234,22 @@ test('accepts legacy Forge v1 only when the matching Atlas template marker is pr
 });
 
 
-test('refuses to promise Ctrl-hover for generic Atlas tokens that are not Characters', () => {
-  const { app } = makeAtlasApp({
-    tokens: { marker: { kind: 'token', assetId: 'wolf-asset', imagePath: 'Tokens/Wolf.webp', name: 'Marker' } },
+test('allows a selected generic Atlas Token to link to a Forge statblock', async () => {
+  const { app, calls } = makeAtlasApp({
+    tokens: { marker: { kind: 'token', assetId: 'wolf-asset', imagePath: 'Tokens/Wolf.webp' } },
     selectedIds: ['marker'],
   });
   const inspection = inspectSelectedAtlasTokenLinks(app, TARGET);
-  assert.equal(inspection.status, 'character-tokens-required');
-  assert.equal(inspection.skippedNonCharacterCount, 1);
-  assert.match(inspection.message, /Character/);
+  assert.equal(inspection.status, 'ready');
+  assert.equal(inspection.targets.length, 1);
+  assert.equal(inspection.skippedUnlinkableTokenCount, 0);
+  const result = await linkSelectedAtlasTokensToStatblock(app, TARGET, { notice: false });
+  assert.deepEqual(result, { status: 'linked', changedCount: 1, skippedCount: 0, mapPath: 'Maps/Forest.atlasmap' });
+  assert.deepEqual(calls.link[0], {
+    imagePath: 'Tokens/Wolf.webp', path: TARGET,
+    options: { updateStatblockAvatar: false, notice: false },
+  });
+  assert.equal(app.workspace.activeLeaf.view.atlasStore.getState().objects.tokens.marker.statblockPath, TARGET);
 });
 
 
@@ -294,6 +301,21 @@ test('unlinking an instance-only link clears only that placed Character and pres
   assert.equal(token.resources, undefined);
   assert.equal(token.difficulty, undefined);
   assert.equal(token.name, undefined);
+  assert.equal(assetList[0].statblockPath, 'Bestiary/Shared-Wolf.md');
+  assert.equal(calls.unlink.length, 0);
+});
+
+test('unlinks a generic Token instance override without removing a separate shared TokenAsset link', async () => {
+  const { app, calls, assetList } = makeAtlasApp({
+    tokens: {
+      marker: { kind: 'token', assetId: 'wolf-asset', imagePath: 'Tokens/Wolf.webp', statblockPath: TARGET },
+    },
+    assets: [makeTokenAsset({ statblockPath: 'Bestiary/Shared-Wolf.md' })],
+    selectedIds: ['marker'],
+  });
+  const result = await unlinkSelectedAtlasTokensFromStatblock(app, TARGET, { notify: false, notice: false });
+  assert.deepEqual(result, { status: 'unlinked', changedCount: 1, skippedCount: 0, mapPath: 'Maps/Forest.atlasmap' });
+  assert.equal(app.workspace.activeLeaf.view.atlasStore.getState().objects.tokens.marker.statblockPath, undefined);
   assert.equal(assetList[0].statblockPath, 'Bestiary/Shared-Wolf.md');
   assert.equal(calls.unlink.length, 0);
 });

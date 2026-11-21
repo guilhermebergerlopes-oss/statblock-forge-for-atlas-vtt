@@ -29,7 +29,7 @@ test('direct preview reuses the Forge renderer, Fields, dice links, and source r
   assert.match(renderer, /attachForgeStatblockDiceRolling\(/);
   assert.match(renderer, /atlasRollContext: \{ viewId: renderContext\.atlasViewId/);
   assert.match(renderer, /renderForgeStatblockPreview\(/);
-  assert.match(renderer, /variant: 'preview'/);
+  assert.match(renderer, /variant: options\.variant \?\? 'preview'/);
   assert.match(renderer, /signal: options\.signal/);
   assert.match(renderer, /handle\.update\(activeContext\)/);
 });

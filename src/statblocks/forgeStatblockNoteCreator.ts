@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 import { cloneJson, headerFieldForPart, isRecord, slugify, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
-import { createForgeStatblockTemplateLink, FORGE_STATBLOCK_LINK_KEY, type ForgeStatblockTemplateLink } from './forgeTemplateLink.ts';
+import { createForgeStatblockTemplateLink, FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY, FORGE_STATBLOCK_LINK_KEY, type ForgeStatblockTemplateLink } from './forgeTemplateLink.ts';
 
 export interface CreateForgeStatblockNoteRequest {
   app: App;
@@ -90,7 +90,7 @@ export async function createForgeStatblockNoteFromTemplate(
   const fields: JsonRecord = {};
   for (const field of template.fields) {
     const normalizedKey = field.key.trim().toLowerCase();
-    if (!normalizedKey || normalizedKey === FORGE_STATBLOCK_LINK_KEY) {
+    if (!normalizedKey || normalizedKey === FORGE_STATBLOCK_LINK_KEY || normalizedKey === FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY) {
       throw new Error(`O campo "${field.key}" não pode ser usado em uma ficha Forge.`);
     }
     if (seen.has(normalizedKey)) throw new Error(`A chave "${field.key}" aparece mais de uma vez no template.`);
@@ -115,6 +115,9 @@ export async function createForgeStatblockNoteFromTemplate(
   });
   const note = serializeForgeFrontmatter({
     ...fields,
+    // Atlas' Link Statblock dialog indexes statblock:true notes. This marker is
+    // only for discovery; the Forge v2 backlink and renderer remain authoritative.
+    [FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY]: true,
     [FORGE_STATBLOCK_LINK_KEY]: forgeLink,
   });
 

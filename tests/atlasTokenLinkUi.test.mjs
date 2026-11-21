@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const surface = readFileSync(new URL('../src/views/StatblockRenderSurface.ts', import.meta.url), 'utf8');
 const linkAdapter = readFileSync(new URL('../src/atlas/atlasTokenLinkAdapter.ts', import.meta.url), 'utf8');
 
-test('Token art actions expose direct link and unlink actions for selected Atlas Characters', () => {
+test('Token art actions expose direct link and unlink actions for selected Atlas Tokens and Characters', () => {
   assert.match(surface, /inspectSelectedAtlasTokenLinks\(this\.app, sourceFile\.path\)/);
   assert.match(surface, /id: 'link-selected-atlas-tokens'/);
   assert.match(surface, /id: 'unlink-selected-atlas-tokens'/);
@@ -29,5 +29,6 @@ test('Forge v2 notes create TokenAssets directly instead of using the Atlas-nati
   assert.match(surface, /id: 'create-forge-token-asset'/);
   assert.match(surface, /createAtlasTokenAssetFromForgeImage\(sourceFile\.path, tokenName, current, language\)/);
   assert.doesNotMatch(surface, /createForgeTokenAssetFromStatblock/);
-  assert.match(surface, /if \(fieldKey === 'image' && !isForgeNativeV2StatblockNote/);
+  assert.match(surface, /if \(isTokenArtFieldKey\(fieldKey\) && !isForgeNativeV2StatblockNote/);
+  assert.match(surface, /\['image', 'token-image', 'token'\]\.includes\(fieldKey\)/);
 });

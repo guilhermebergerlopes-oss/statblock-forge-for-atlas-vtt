@@ -43,7 +43,6 @@ export type AtlasTokenLinkInspectionStatus =
   | 'no-selection'
   | 'ambiguous-map'
   | 'no-token-image'
-  | 'character-tokens-required'
   | 'ambiguous-image-assets'
   | 'link-service-unavailable'
   | 'invalid-statblock';
@@ -68,7 +67,7 @@ export interface AtlasTokenLinkInspection {
   readonly selectedTokenCount: number;
   readonly targets: readonly AtlasSelectedTokenLinkTarget[];
   readonly linkedToTargetCount: number;
-  readonly skippedNonCharacterCount: number;
+  readonly skippedUnlinkableTokenCount: number;
   readonly message?: string;
   /** Internal runtime references are returned only to the immediate action caller. */
   readonly context?: AtlasTokenAdapterContext;
@@ -77,7 +76,7 @@ export interface AtlasTokenLinkInspection {
 
 export type AtlasTokenLinkActionResult =
   | { readonly status: 'linked' | 'unlinked'; readonly changedCount: number; readonly skippedCount: number; readonly mapPath: string | null }
-  | { readonly status: 'atlas-not-open' | 'no-selection' | 'ambiguous-map' | 'no-token-image' | 'character-tokens-required' | 'ambiguous-image-assets' | 'link-service-unavailable' | 'invalid-statblock'; readonly changedCount: 0; readonly skippedCount: number; readonly message: string };
+  | { readonly status: 'atlas-not-open' | 'no-selection' | 'ambiguous-map' | 'no-token-image' | 'ambiguous-image-assets' | 'link-service-unavailable' | 'invalid-statblock'; readonly changedCount: 0; readonly skippedCount: number; readonly message: string };
 
 interface UnknownRecord {
   readonly [key: string]: unknown;
@@ -235,7 +234,7 @@ export function inspectSelectedAtlasTokenLinks(
   if (invalid) {
     return {
       status: 'invalid-statblock', mapPath: null, targetStatblockPath, selectedTokenCount: 0,
-      targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0, message: 'O destino não é uma nota de statblock válida do Forge.',
+      targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0, message: 'O destino não é uma nota de statblock válida do Forge.',
     };
   }
 
@@ -243,7 +242,7 @@ export function inspectSelectedAtlasTokenLinks(
   if (contexts.length === 0) {
     return {
       status: 'atlas-not-open', mapPath: null, targetStatblockPath, selectedTokenCount: 0,
-      targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0, message: 'Abra uma cena do Atlas e selecione pelo menos um token.',
+      targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0, message: 'Abra uma cena do Atlas e selecione pelo menos um token.',
     };
   }
 
@@ -251,20 +250,20 @@ export function inspectSelectedAtlasTokenLinks(
   if (selected.status === 'unavailable') {
     return {
       status: 'atlas-not-open', mapPath: null, targetStatblockPath, selectedTokenCount: 0,
-      targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0, message: 'Não há uma cena do Atlas disponível.',
+      targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0, message: 'Não há uma cena do Atlas disponível.',
     };
   }
   if (selected.status === 'ambiguous') {
     return {
       status: 'ambiguous-map', mapPath: null, targetStatblockPath, selectedTokenCount: 0,
-      targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0,
+      targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0,
       message: 'Há seleções em mais de uma cena do Atlas. Ative a cena desejada para escolher os tokens.',
     };
   }
   if (selected.status === 'none') {
     return {
       status: 'no-selection', mapPath: null, targetStatblockPath, selectedTokenCount: 0,
-      targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0, message: 'Selecione um ou mais tokens em uma cena do Atlas.',
+      targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0, message: 'Selecione um ou mais tokens em uma cena do Atlas.',
     };
   }
 
@@ -272,7 +271,7 @@ export function inspectSelectedAtlasTokenLinks(
   if (!service) {
     return {
       status: 'link-service-unavailable', mapPath: selected.state.mapPath, targetStatblockPath,
-      selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedNonCharacterCount: 0,
+      selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount: 0,
       message: 'O serviço interno de vínculos de tokens do Atlas ainda não está disponível. Aguarde o mapa terminar de carregar.',
     };
   }
@@ -289,24 +288,26 @@ export function inspectSelectedAtlasTokenLinks(
   }
 
   const deduplicated = new Map<string, AtlasSelectedTokenLinkTarget>();
-  const characterTokens = selected.state.selectedTokens.filter((token) => token.kind === 'character');
-  const skippedNonCharacterCount = selected.state.selectedTokens.length - characterTokens.length;
-  if (characterTokens.length === 0) {
+  // Atlas' native TokenStatblockLinkService links TokenAssets by image path;
+  // both generic map Tokens and Character tokens are valid link targets.
+  // Tokens without artwork cannot be represented by that service.
+  const linkableTokens = selected.state.selectedTokens.filter((token) => Boolean(token.imagePath));
+  const skippedUnlinkableTokenCount = selected.state.selectedTokens.length - linkableTokens.length;
+  if (linkableTokens.length === 0) {
     return {
-      status: 'character-tokens-required', mapPath: selected.state.mapPath, targetStatblockPath,
-      selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedNonCharacterCount,
-      message: 'O Ctrl-hover do Atlas é emitido para tokens do tipo Character. Coloque o token pela biblioteca do Atlas antes de vinculá-lo.',
+      status: 'no-token-image', mapPath: selected.state.mapPath, targetStatblockPath,
+      selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount,
+      message: 'Os tokens selecionados não possuem uma imagem que possa ser vinculada.',
     };
   }
-  for (const token of characterTokens) {
-    if (!token.imagePath) continue;
+  for (const token of linkableTokens) {
     // Atlas' native link service addresses a TokenAsset by image path rather
     // than asset ID. If duplicate assets share that path, the target is not
     // unambiguous and a write could update a different library record.
     if (assets.filter((asset) => asset.imagePath === token.imagePath).length > 1) {
       return {
         status: 'ambiguous-image-assets', mapPath: selected.state.mapPath, targetStatblockPath,
-        selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedNonCharacterCount,
+        selectedTokenCount: selected.state.selectedTokens.length, targets: [], linkedToTargetCount: 0, skippedUnlinkableTokenCount,
         message: `Mais de um TokenAsset usa a imagem ${token.imagePath}. Resolva os duplicados na biblioteca do Atlas antes de alterar o vínculo.`,
       };
     }
@@ -349,7 +350,7 @@ export function inspectSelectedAtlasTokenLinks(
   if (targets.length === 0) {
     return {
       status: 'no-token-image', mapPath: selected.state.mapPath, targetStatblockPath,
-      selectedTokenCount: selected.state.selectedTokens.length, targets, linkedToTargetCount: 0, skippedNonCharacterCount,
+      selectedTokenCount: selected.state.selectedTokens.length, targets, linkedToTargetCount: 0, skippedUnlinkableTokenCount,
       message: 'Os tokens selecionados não possuem uma imagem que possa ser vinculada.',
     };
   }
@@ -361,18 +362,17 @@ export function inspectSelectedAtlasTokenLinks(
     selectedTokenCount: selected.state.selectedTokens.length,
     targets,
     linkedToTargetCount: targets.filter((target) => target.alreadyLinkedToTarget).length,
-    skippedNonCharacterCount,
+    skippedUnlinkableTokenCount,
     context: selected.context,
     linkService: service,
   };
 }
 
-/** Writes a Forge v2 path into placed Atlas Character instances. Atlas' native
- * link service cannot resolve Forge v2 notes for its open-map sync callback,
- * although it does update the library asset and closed map files. This fills
- * that narrow gap through the same Zustand action Atlas uses for token edits.
+/** Writes a Forge v2 path into placed Atlas generic Token and Character instances.
+ * Atlas' native link service updates library assets and persisted map files;
+ * this fills the open-map store gap through Atlas' own Zustand action.
  */
-export function updateAtlasPlacedCharacterLinks(
+export function updateAtlasPlacedTokenLinks(
   context: AtlasTokenAdapterContext,
   tokenIds: readonly string[],
   statblockPath: string | undefined,
@@ -399,7 +399,7 @@ export function updateAtlasPlacedCharacterLinks(
 }
 
 /** Clears only selected instance-level statblock overrides, leaving their shared TokenAsset link intact. */
-export function clearAtlasPlacedCharacterStatblockOverrides(
+export function clearAtlasPlacedTokenStatblockOverrides(
   context: AtlasTokenAdapterContext,
   tokenIds: readonly string[],
 ): boolean {
@@ -429,11 +429,11 @@ export function clearAtlasPlacedCharacterStatblockOverrides(
   }
 }
 
-/** Updates every open-map Character instance spawned from the linked artwork. Atlas' native
- * map-file writer handles closed maps; this handles all currently mounted map stores because
+/** Updates every open-map Token or Character instance spawned from the linked artwork.
+ * Atlas' native map-file writer handles persisted maps; this handles mounted stores because
  * its statblock resolver cannot yet read Forge v2 note content.
  */
-export function updateAtlasPlacedCharacterLinksForImage(
+export function updateAtlasPlacedTokenLinksForImage(
   app: App,
   imagePath: string,
   statblockPath: string | undefined,
@@ -442,9 +442,9 @@ export function updateAtlasPlacedCharacterLinksForImage(
   for (const context of getAtlasTokenAdapterContexts(app)) {
     const snapshot = readAtlasTokenStateFromContext(context);
     const tokenIds = snapshot.tokens
-      .filter((token) => token.kind === 'character' && token.imagePath === imagePath)
+      .filter((token) => token.imagePath === imagePath)
       .map((token) => token.id);
-    if (tokenIds.length > 0 && !updateAtlasPlacedCharacterLinks(context, tokenIds, statblockPath)) success = false;
+    if (tokenIds.length > 0 && !updateAtlasPlacedTokenLinks(context, tokenIds, statblockPath)) success = false;
   }
   return success;
 }
@@ -504,13 +504,13 @@ export async function linkSelectedAtlasTokensToStatblock(
     return {
       status: inspection.status,
       changedCount: 0,
-      skippedCount: inspection.skippedNonCharacterCount ?? 0,
+      skippedCount: inspection.skippedUnlinkableTokenCount ?? 0,
       message: inspection.message ?? 'Não foi possível acessar os tokens selecionados.',
     };
   }
 
   let changedCount = 0;
-  let skippedCount = inspection.skippedNonCharacterCount;
+  let skippedCount = inspection.skippedUnlinkableTokenCount;
   for (const target of inspection.targets) {
     if (target.assetLinkedToTarget) {
       skippedCount += 1;
@@ -525,7 +525,7 @@ export async function linkSelectedAtlasTokensToStatblock(
       );
       if (linked) {
         changedCount += 1;
-        if (!updateAtlasPlacedCharacterLinksForImage(app, target.imagePath, targetStatblockPath)) skippedCount += 1;
+        if (!updateAtlasPlacedTokenLinksForImage(app, target.imagePath, targetStatblockPath)) skippedCount += 1;
       } else skippedCount += 1;
     } catch (error) {
       console.error('[Statblock Forge] Atlas token link failed:', error);
@@ -547,13 +547,13 @@ export async function unlinkSelectedAtlasTokensFromStatblock(
     return {
       status: inspection.status,
       changedCount: 0,
-      skippedCount: inspection.skippedNonCharacterCount ?? 0,
+      skippedCount: inspection.skippedUnlinkableTokenCount ?? 0,
       message: inspection.message ?? 'Não foi possível acessar os tokens selecionados.',
     };
   }
 
   let changedCount = 0;
-  let skippedCount = inspection.skippedNonCharacterCount;
+  let skippedCount = inspection.skippedUnlinkableTokenCount;
   for (const target of inspection.targets) {
     try {
       if (target.assetLinkedToTarget) {
@@ -565,17 +565,19 @@ export async function unlinkSelectedAtlasTokensFromStatblock(
             notice: options.notice ?? true,
           },
         );
-        if (unlinked) changedCount += 1;
-        else skippedCount += 1;
+        if (unlinked) {
+          changedCount += 1;
+          if (!updateAtlasPlacedTokenLinksForImage(app, target.imagePath, undefined)) skippedCount += 1;
+        } else skippedCount += 1;
         continue;
       }
 
       // An instance-only link must not call unlinkToken(): that Atlas service
       // operates on the shared TokenAsset and would detach every map copy.
-      // Clear only the selected Character instances using Atlas' own store action
+      // Clear only the selected Token/Character instances using Atlas' own store action
       // and the same statblock-derived fields as STATBLOCK_UNLINK_UPDATES.
       if (target.instanceTokenIdsLinkedToTarget.length > 0) {
-        if (clearAtlasPlacedCharacterStatblockOverrides(inspection.context!, target.instanceTokenIdsLinkedToTarget)) changedCount += 1;
+        if (clearAtlasPlacedTokenStatblockOverrides(inspection.context!, target.instanceTokenIdsLinkedToTarget)) changedCount += 1;
         else skippedCount += 1;
         continue;
       }

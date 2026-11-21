@@ -327,30 +327,25 @@
   min-height: 0;
   pointer-events: none;
 }
-
-.statblock-forge__custom-border-frame::before,
-.statblock-forge__custom-border-frame::after {
+.statblock-forge__custom-border-frame::before, .statblock-forge__custom-border-frame::after {
   position: absolute;
   inset: 0;
-  content: '';
+  content: "";
   clip-path: var(--forge-custom-border-shape);
 }
-
 .statblock-forge__custom-border-frame::before {
   background: var(--forge-custom-border-color, var(--forge-theme-border, var(--background-modifier-border)));
 }
-
 .statblock-forge__custom-border-frame::after {
   inset: var(--forge-custom-border-width, 1px);
   background: var(--forge-custom-border-surface, var(--forge-theme-surface, var(--background-primary)));
 }
 
-.statblock-forge__preview-block.has-forge-border-frame > :not(.statblock-forge__custom-border-frame):not(.statblock-forge__resize-handle):not(.statblock-forge__section-select-handle):not(.statblock-forge__row-select-handle) {
+.statblock-forge__preview-block.has-forge-border-frame > :not(.statblock-forge__custom-border-frame):not(.statblock-forge__resize-handle) {
   position: relative;
   z-index: 1;
 }
 
-/* Keep image artwork inside the inset surface of geometric custom borders. */
 .statblock-forge__preview-block.is-image.has-forge-border-frame > .statblock-forge__preview-image.is-portrait {
   position: absolute;
   inset: var(--forge-custom-border-width, 1px);
@@ -363,61 +358,60 @@
   clip-path: var(--forge-custom-border-shape);
 }
 
-.statblock-forge__preview-block[data-border-preset='oval'] {
+.statblock-forge__preview-block[data-border-preset=oval] {
   --forge-custom-border-shape: ellipse(50% 50% at 50% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='diamond'] {
+.statblock-forge__preview-block[data-border-preset=diamond] {
   --forge-custom-border-shape: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='regular-hexagon'] {
+.statblock-forge__preview-block[data-border-preset=regular-hexagon] {
   --forge-custom-border-shape: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-up'] {
+.statblock-forge__preview-block[data-border-preset=triangle-up] {
   --forge-custom-border-shape: polygon(50% 0%, 100% 100%, 0% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-right'] {
+.statblock-forge__preview-block[data-border-preset=triangle-right] {
   --forge-custom-border-shape: polygon(0% 0%, 100% 50%, 0% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-down'] {
+.statblock-forge__preview-block[data-border-preset=triangle-down] {
   --forge-custom-border-shape: polygon(0% 0%, 100% 0%, 50% 100%);
 }
 
-.statblock-forge__preview-block[data-border-preset='triangle-left'] {
+.statblock-forge__preview-block[data-border-preset=triangle-left] {
   --forge-custom-border-shape: polygon(100% 0%, 100% 100%, 0% 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='pointed'] {
+.statblock-forge__preview-block[data-border-preset=pointed] {
   --forge-custom-border-shape: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
 }
 
-.statblock-forge__preview-block[data-border-preset='angular'] {
+.statblock-forge__preview-block[data-border-preset=angular] {
   --forge-custom-border-shape: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
 }
 
-.statblock-forge__preview-block[data-border-preset='hexagonal'] {
+.statblock-forge__preview-block[data-border-preset=hexagonal] {
   --forge-custom-border-shape: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
 }
 
-.statblock-forge__preview-block[data-border-preset='shield'] {
+.statblock-forge__preview-block[data-border-preset=shield] {
   --forge-custom-border-shape: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
 }
+
 .statblock-forge__token-header-frame {
   position: relative;
   isolation: isolate;
   overflow: visible;
 }
-
 .statblock-forge__token-header-frame > .statblock-forge__preview-image {
   position: relative;
   z-index: 1;
 }
 
-/* Token art fills the complete inner surface of an enabled token border. */
 .atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border {
   aspect-ratio: 1;
 }
@@ -470,6 +464,7 @@
   object-fit: cover;
   border-radius: 0;
 }
+
 .statblock-forge__token-border-frame {
   position: absolute;
   z-index: 0;
@@ -481,79 +476,233 @@
   box-sizing: border-box;
 }
 
-.statblock-forge__token-header-frame[data-token-border-preset='double'] .statblock-forge__token-border-frame {
+.statblock-forge__token-header-frame[data-token-border-preset=double] .statblock-forge__token-border-frame {
   border-style: double;
 }
 
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='oval'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: ellipse(50% 50% at 50% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='diamond'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='regular-hexagon'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-up'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-right'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0% 0%, 100% 50%, 0% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-down'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='triangle-left'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(100% 0%, 100% 100%, 0% 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='pointed'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='angular'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='hexagonal'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset='shield'] .statblock-forge__image-socket-frame { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame,
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame {
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=oval] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: ellipse(50% 50% at 50% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=diamond] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=regular-hexagon] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-up] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-right] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-down] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=triangle-left] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=pointed] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=angular] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=hexagonal] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.atlas-sb-header > .atlas-sb-item.statblock-forge__token-header-frame.has-forge-token-border[data-token-border-preset=shield] .statblock-forge__image-socket-frame {
+  border-radius: 0;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=oval] .statblock-forge__token-border-frame {
   border: 0;
   border-radius: 0;
   background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: ellipse(50% 50% at 50% 50%);
 }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame { clip-path: ellipse(50% 50% at 50% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame { clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame { clip-path: polygon(0% 0%, 100% 50%, 0% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame { clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame { clip-path: polygon(100% 0%, 100% 100%, 0% 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame { clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%); }
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame { clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%); }
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px); }
-.statblock-forge__token-header-frame[data-token-border-preset='oval'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='diamond'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='regular-hexagon'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-up'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-right'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-down'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='triangle-left'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='pointed'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='angular'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='hexagonal'] .statblock-forge__token-border-frame::after,
-.statblock-forge__token-header-frame[data-token-border-preset='shield'] .statblock-forge__token-border-frame::after {
+.statblock-forge__token-header-frame[data-token-border-preset=oval] .statblock-forge__token-border-frame::after {
   position: absolute;
   inset: var(--forge-token-border-width, 2px);
-  content: '';
+  content: "";
   background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
-  clip-path: inherit;
+  clip-path: ellipse(50% 50% at 50% 50%);
 }
-/* Image-field framing controls (source: border-presets.scss). */
+
+.statblock-forge__token-header-frame[data-token-border-preset=diamond] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=diamond] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=regular-hexagon] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=regular-hexagon] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-up] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-up] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-right] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-right] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-down] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-down] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-left] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=triangle-left] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(100% 0%, 100% 100%, 0% 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=pointed] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=pointed] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 50% 100%, 0 82%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=angular] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=angular] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=hexagonal] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=hexagonal] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(25% 6.69872981%, 75% 6.69872981%, 100% 50%, 75% 93.30127019%, 25% 93.30127019%, 0 50%);
+}
+
+.statblock-forge__token-header-frame[data-token-border-preset=shield] .statblock-forge__token-border-frame {
+  border: 0;
+  border-radius: 0;
+  background: var(--forge-token-border-color, var(--forge-theme-accent, var(--interactive-accent)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+.statblock-forge__token-header-frame[data-token-border-preset=shield] .statblock-forge__token-border-frame::after {
+  position: absolute;
+  inset: var(--forge-token-border-width, 2px);
+  content: "";
+  background: var(--forge-token-inner, var(--forge-theme-bg, var(--background-primary)));
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 72%, 50% 100%, 0 72%, 0 10px);
+}
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-frame {
   width: 100%;
   height: 100%;
-  min-height: 2.8rem;
-  max-height: 8rem;
-  overflow: auto;
+  min-height: 7rem;
   aspect-ratio: auto;
   overflow: hidden;
 }
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-frame.has-image {
   border: 0;
   border-radius: inherit;
   background: transparent;
 }
+
 .statblock-forge__preview-image.is-portrait .statblock-forge__image-socket-art {
   width: 100%;
   height: 100%;
@@ -561,17 +710,29 @@
   max-height: none;
   object-fit: cover;
 }
-.statblock-forge__preview-image.is-token .statblock-forge__image-socket-frame { overflow: hidden; }
+
+.statblock-forge__preview-image.is-token .statblock-forge__image-socket-frame {
+  overflow: hidden;
+}
+
 .statblock-forge__preview-image.is-token .statblock-forge__image-socket-art {
   object-fit: cover;
 }
+
 .statblock-forge__preview-image.is-framing-interactive.is-image-zoomed .statblock-forge__image-socket {
   cursor: grab;
   touch-action: none;
 }
-.statblock-forge__preview-image.is-framing-interactive.is-image-dragging .statblock-forge__image-socket { cursor: grabbing; }
-.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket-art { user-select: none; -webkit-user-drag: none; }
-.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket:active { transform: none; }
+.statblock-forge__preview-image.is-framing-interactive.is-image-dragging .statblock-forge__image-socket {
+  cursor: grabbing;
+}
+.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket:active {
+  transform: none;
+}
+.statblock-forge__preview-image.is-framing-interactive .statblock-forge__image-socket-art {
+  user-select: none;
+  -webkit-user-drag: none;
+}
 
 .statblock-forge__image-framing-controls {
   display: flex;
@@ -580,12 +741,20 @@
   margin-top: 0.65rem;
   min-width: 0;
 }
-.statblock-forge__image-framing-controls .statblock-forge__hint { margin: 0; }
-.statblock-forge__image-framing-heading { display: flex; flex-direction: column; gap: 0.15rem; }
+.statblock-forge__image-framing-controls .statblock-forge__hint {
+  margin: 0;
+}
+
+.statblock-forge__image-framing-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
 .statblock-forge__image-framing-preview {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16/10;
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
@@ -598,8 +767,13 @@
   user-select: none;
   outline-offset: 2px;
 }
-.statblock-forge__image-framing-preview.is-dragging { cursor: grabbing; }
-.statblock-forge__image-framing-preview:focus-visible { outline: 2px solid var(--interactive-accent); }
+.statblock-forge__image-framing-preview.is-dragging {
+  cursor: grabbing;
+}
+.statblock-forge__image-framing-preview:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+}
+
 .statblock-forge__image-framing-preview-image {
   position: absolute;
   inset: 0;
@@ -611,15 +785,60 @@
   object-fit: cover;
   pointer-events: none;
 }
-.statblock-forge__image-framing-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 1rem; color: var(--text-muted); text-align: center; font-size: var(--font-smaller); }
-.statblock-forge__image-framing-axis-controls { display: grid; gap: 0.55rem; min-width: 0; }
-.statblock-forge__image-framing-slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.3rem 0.65rem; min-width: 0; }
-.statblock-forge__image-framing-slider > span:first-child { font-size: var(--font-small); }
-.statblock-forge__image-framing-slider input[type='range'] { grid-column: 1 / -1; width: 100%; min-width: 0; margin: 0; accent-color: var(--interactive-accent); }
-.statblock-forge__image-framing-output { color: var(--text-muted); font-size: var(--font-smallest); font-variant-numeric: tabular-nums; }
-.statblock-forge__image-framing-precise { border-top: 1px solid var(--background-modifier-border); padding-top: 0.45rem; }
-.statblock-forge__image-framing-precise > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-small); }
-.statblock-forge__image-framing-precise > .statblock-forge__image-framing-slider { margin-top: 0.55rem; }
+
+.statblock-forge__image-framing-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: var(--font-smaller);
+}
+
+.statblock-forge__image-framing-axis-controls {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.statblock-forge__image-framing-slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.3rem 0.65rem;
+  min-width: 0;
+}
+.statblock-forge__image-framing-slider > span:first-child {
+  font-size: var(--font-small);
+}
+.statblock-forge__image-framing-slider input[type=range] {
+  grid-column: 1/-1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--interactive-accent);
+}
+
+.statblock-forge__image-framing-output {
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-variant-numeric: tabular-nums;
+}
+
+.statblock-forge__image-framing-precise {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 0.45rem;
+}
+.statblock-forge__image-framing-precise > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+.statblock-forge__image-framing-precise > .statblock-forge__image-framing-slider {
+  margin-top: 0.55rem;
+}
 /* END GENERATED FORGE BORDER PRESETS */
 
 .statblock-forge__statblock-create-modal {
@@ -5238,11 +5457,10 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   justify-content: flex-end;
   min-height: 2rem;
   margin-top: 0.15rem;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity var(--anim-duration-fast, 120ms) ease;
 }
-.statblock-forge__render-view:is(:hover, :focus-within) .statblock-forge__card-actions-row,
 .statblock-forge__card-actions-row:has([aria-expanded="true"]) {
   opacity: 1;
   pointer-events: auto;
@@ -5544,7 +5762,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   min-width: 0;
   margin: 0;
   font-size: var(--font-ui-small);
-  font-weight: var(--font-semibold);
+  font-weight: 600;
 }
 .statblock-forge__rest-panel-close {
   width: 1.8rem;
@@ -5587,7 +5805,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   justify-content: space-between;
   gap: 0.65rem;
 }
-.statblock-forge__rest-choice-step-head h4 { margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
+.statblock-forge__rest-choice-step-head h4 { margin: 0; font-size: var(--font-ui-small); font-weight: 600; }
 .statblock-forge__rest-choice-progress {
   flex: 0 0 auto;
   color: var(--text-muted);
@@ -5697,7 +5915,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   background: var(--background-primary-alt);
 }
 .statblock-forge__rest-spends[hidden] { display: none; }
-.statblock-forge__rest-spends-heading { margin: 0; font-size: var(--font-ui-small); font-weight: var(--font-semibold); }
+.statblock-forge__rest-spends-heading { margin: 0; font-size: var(--font-ui-small); font-weight: 600; }
 .statblock-forge__rest-spends-list { display: grid; gap: 0.3rem; }
 .statblock-forge__rest-spend-row,
 .statblock-forge__rest-spend-stepper { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
@@ -5724,7 +5942,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   border-left-width: 3px;
   border-radius: var(--radius-m);
   background: var(--background-secondary);
-  font-weight: var(--font-semibold);
+  font-weight: 600;
 }
 .statblock-forge__rest-result-status.is-saved { border-left-color: var(--text-success); }
 .statblock-forge__rest-result-status.is-warning { border-left-color: var(--text-warning); }
@@ -5744,7 +5962,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__rest-result-heading {
   margin: 0;
   font-size: var(--font-ui-small);
-  font-weight: var(--font-semibold);
+  font-weight: 600;
 }
 .statblock-forge__rest-result-list { display: grid; gap: 0.25rem; }
 .statblock-forge__rest-result-row {
@@ -5784,7 +6002,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.statblock-forge__rest-result-transition { font-weight: var(--font-semibold); }
+.statblock-forge__rest-result-transition { font-weight: 600; }
 .statblock-forge__rest-result-max { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .statblock-forge__rest-result-roll {
   max-width: 55%;
@@ -5828,7 +6046,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__save-label {
   color: var(--text-normal);
   font-size: var(--font-ui-small);
-  font-weight: var(--font-semibold);
+  font-weight: 600;
 }
 .statblock-forge__save-name {
   width: 100%;
@@ -6970,7 +7188,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   gap: 0.35rem;
   min-width: 0;
 }
-.statblock-forge__atlas-markdown-field-label { font-weight: var(--font-semibold); }
+.statblock-forge__atlas-markdown-field-label { font-weight: 600; }
 .statblock-forge__atlas-markdown-field-input {
   box-sizing: border-box;
   display: block;
@@ -8066,7 +8284,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__dice-roll-die-value {
   color: var(--forge-die-colour, var(--text-normal));
   font-size: 1.15rem;
-  font-weight: var(--font-semibold);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .statblock-forge__dice-roll-die-label {
@@ -8096,7 +8314,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 }
 .statblock-forge__dice-roll-total.is-high-crit strong { color: var(--text-success); }
 .statblock-forge__dice-roll-total.is-low-crit strong { color: var(--text-error); }
-.statblock-forge__dice-roll-crit { font-weight: var(--font-semibold); }
+.statblock-forge__dice-roll-crit { font-weight: 600; }
 .statblock-forge__dice-roll-crit.is-high { color: var(--text-success); }
 .statblock-forge__dice-roll-crit.is-low { color: var(--text-error); }
 .statblock-forge__dice-roll-modifiers {
@@ -8260,7 +8478,6 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
  * Sass-only directives). The build embeds the compiled result in styles.css,
  * because Obsidian loads CSS files and does not load SCSS source files.
  */
-
 /* Atlas' inline value field: no separate form-control box around the value. */
 .statblock-forge__statblock .statblock-forge__selection-atlas {
   box-sizing: border-box;
@@ -8486,7 +8703,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   border: var(--menu-border-width, 1px) solid var(--menu-border-color, var(--background-modifier-border));
   border-radius: var(--radius-l, 16px);
   background: var(--menu-background, var(--background-secondary));
-  box-shadow: var(--menu-shadow, var(--shadow-s, 0 4px 16px rgb(0 0 0 / 18%)));
+  box-shadow: var(--menu-shadow, var(--shadow-s, 0 4px 16px rgba(0, 0, 0, 0.18)));
   color: var(--text-normal);
   font-style: normal;
   font-weight: var(--font-normal, 400);
@@ -8515,7 +8732,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   background-color: var(--background-modifier-hover);
 }
 
-.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option[aria-selected='true'] {
+.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option[aria-selected=true] {
   color: var(--text-normal);
 }
 
@@ -8535,10 +8752,241 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
 }
-.statblock-forge__table-formula-editors > summary { cursor: pointer; font-weight: var(--font-medium); }
-.statblock-forge__table-formula-editors .statblock-forge__control { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
-.statblock-forge__table-formula-editors textarea { width: 100%; min-height: 3.5rem; resize: vertical; font-family: var(--font-monospace); }
+
+.statblock-forge__table-formula-editors > summary {
+  cursor: pointer;
+  font-weight: var(--font-medium);
+}
+
+.statblock-forge__table-formula-editors .statblock-forge__control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.statblock-forge__table-formula-editors textarea {
+  width: 100%;
+  min-height: 3.5rem;
+  resize: vertical;
+  font-family: var(--font-monospace);
+}
+
 .statblock-forge__preview-table-formula-row > th,
-.statblock-forge__preview-table-formula-row > td { border-top: 1px solid var(--background-modifier-border); background: var(--background-secondary); font-weight: var(--font-semibold); }
-.statblock-forge__preview-table-formula-value { font-weight: var(--font-semibold); }
+.statblock-forge__preview-table-formula-row > td {
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  font-weight: var(--font-semibold);
+}
+
+.statblock-forge__preview-table-formula-value {
+  font-weight: var(--font-semibold);
+}
 /* END GENERATED FORGE TABLE FORMULA STYLES */
+
+/* BEGIN GENERATED FORGE DM SCREEN STYLES */
+/* Generated from src/styles/dm-screen.scss. Do not edit this block directly. */
+/* Forge-native statblocks inside Atlas' DM Screen statblock pane. Keep Atlas'
+   navigation and scroll container, but give Forge cards the same readable feed
+   width as Atlas statblock feeds and preserve each Template's own theme. */
+.statblock-forge__dm-screen-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3, 12px);
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--size-4-4, 16px);
+  padding: var(--size-4-3, 12px) 0 var(--size-4-4, 16px);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.statblock-forge__dm-screen-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2, 8px);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold, 600);
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.statblock-forge__dm-screen-heading-label {
+  min-width: 0;
+}
+
+.statblock-forge__dm-screen-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+  color: var(--text-accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+}
+
+.statblock-forge__dm-screen-scope-host:not([hidden]) {
+  margin-top: calc(var(--size-4-1, 4px) * -1);
+}
+
+.statblock-forge__dm-screen-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  align-items: start;
+  justify-content: start;
+  gap: var(--size-4-3, 12px);
+  width: 100%;
+  min-width: 0;
+}
+
+.statblock-forge__dm-screen-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2, 8px);
+  width: 100%;
+  min-width: 0;
+  max-width: 540px;
+  justify-self: start;
+  overflow: visible;
+}
+
+.statblock-forge__dm-screen-render {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.statblock-forge__dm-screen-render.statblock-forge__atlas-feed-mount > .statblock-forge__final-card {
+  box-sizing: border-box;
+  width: min(var(--statblock-forge-sheet-width, 560px), 100%);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.statblock-forge__dm-screen-token-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  padding: 0 var(--size-4-2, 8px);
+  color: var(--text-faint);
+  font-size: var(--font-smaller);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.statblock-forge__dm-screen-token-caption {
+  color: var(--text-muted);
+  font-size: var(--font-smaller);
+}
+
+.statblock-forge__dm-screen-token-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.statblock-forge__dm-screen-token-list[hidden],
+.statblock-forge__dm-screen-empty[hidden] {
+  display: none !important;
+}
+
+.statblock-forge__dm-screen-empty {
+  margin: 0;
+  padding: var(--size-4-2, 8px) 0;
+  color: var(--text-faint);
+  font-size: var(--font-smaller);
+  line-height: 1.45;
+}
+
+@media (max-width: 600px) {
+  .statblock-forge__dm-screen-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .statblock-forge__dm-screen-card {
+    max-width: 100%;
+  }
+}
+.statblock-forge__dm-screen-feed[hidden] {
+  display: none !important;
+}
+
+/* A native Atlas feed item keeps its own wrapper and menu, but its original
+   statblock is hidden while the Forge renderer is mounted beside it. */
+.atlas-dm-statblock-menu > .atlas-linked-statblock[hidden],
+.atlas-dm-statblock-menu > .atlas-fantasy-statblock[hidden] {
+  display: none !important;
+}
+/* END GENERATED FORGE DM SCREEN STYLES */
+
+
+.statblock-forge__dm-screen-empty {
+  margin: 0;
+  padding: var(--size-4-2, 8px) 0;
+  color: var(--text-faint);
+  font-size: var(--font-smaller);
+  line-height: 1.45;
+}
+.statblock-forge__dm-screen-empty[hidden] {
+  display: none;
+}
+
+/* BEGIN GENERATED FORGE ATLAS STATBLOCK LINK STYLES */
+/* Generated from src/styles/atlas-statblock-link.scss. Do not edit this block directly. */
+.statblock-forge__atlas-picker-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-inline: 6px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+  color: var(--text-accent);
+  font-size: var(--font-smaller);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.statblock-forge__atlas-link-native-hidden {
+  display: none !important;
+}
+
+.statblock-forge__atlas-link-preview {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.statblock-forge__atlas-link-preview > .statblock-forge__final-card {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+/* END GENERATED FORGE ATLAS STATBLOCK LINK STYLES */

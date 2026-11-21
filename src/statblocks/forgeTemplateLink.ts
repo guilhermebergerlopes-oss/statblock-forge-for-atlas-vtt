@@ -74,6 +74,28 @@ export function forgeStatblockTemplateLinkFromFrontmatter(frontmatter: unknown):
   return parseForgeStatblockTemplateLink(frontmatter[FORGE_STATBLOCK_LINK_KEY]);
 }
 
+/** Atlas' Link Statblock dialog discovers notes with `statblock: true`. Forge v2 keeps
+ * its own namespaced template link and uses this boolean only as a discovery marker;
+ * it does not claim an Atlas template or change the Forge renderer. */
+export const FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY = 'statblock' as const;
+
+export type ForgeAtlasStatblockDiscoveryResult = 'registered' | 'already-registered' | 'not-forge-v2' | 'conflict';
+
+/** Adds Atlas' standard statblock discovery marker without overwriting user data. */
+export function ensureForgeStatblockIsDiscoverableByAtlas(
+  frontmatter: Record<string, unknown>,
+): ForgeAtlasStatblockDiscoveryResult {
+  const link = forgeStatblockTemplateLinkFromFrontmatter(frontmatter);
+  if (link?.version !== 2) return 'not-forge-v2';
+
+  const marker = frontmatter[FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY];
+  if (marker === true || marker === 'true') return 'already-registered';
+  if (Object.prototype.hasOwnProperty.call(frontmatter, FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY)) return 'conflict';
+
+  frontmatter[FORGE_ATLAS_STATBLOCK_DISCOVERY_KEY] = true;
+  return 'registered';
+}
+
 /** Update only the YAML backlink path after a uniquely identified Forge template was moved. */
 export function refreshForgeStatblockTemplateLinkPath(
   frontmatter: Record<string, unknown>,

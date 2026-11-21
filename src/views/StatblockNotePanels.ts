@@ -1,5 +1,6 @@
 import { MarkdownView, TFile, type App, type WorkspaceLeaf } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
+import { registerExistingForgeStatblocksInAtlasPicker, registerForgeStatblockNoteInAtlasPicker } from '../atlas/forgeAtlasStatblockRegistration.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from '../atlas/forgeTemplateLinkResolver.ts';
 import type { JsonRecord } from '../templates/forgeTemplate.ts';
 import { StatblockRenderSurface } from './StatblockRenderSurface.ts';
@@ -106,7 +107,10 @@ export class StatblockNotePanels {
     const layout = this.app.workspace.on('layout-change', refresh);
     const active = this.app.workspace.on('active-leaf-change', refresh);
     const opened = this.app.workspace.on('file-open', refresh);
-    const metadata = this.app.metadataCache.on('changed', (file) => refresh(file.path));
+    const metadata = this.app.metadataCache.on('changed', (file) => {
+      this.registerStatblockForAtlasPicker(file);
+      refresh(file.path);
+    });
     const renamed = this.app.vault.on('rename', refresh);
     const deleted = this.app.vault.on('delete', refresh);
     this.stops.push(
@@ -117,7 +121,42 @@ export class StatblockNotePanels {
       () => this.app.vault.offref(renamed),
       () => this.app.vault.offref(deleted),
     );
-    this.app.workspace.onLayoutReady(refresh);
+    const registerExisting = (): void => {
+      if (!this.started) return;
+      // Atlas' native Link Statblock dialog discovers notes with `statblock: true`.
+      // Migrate pre-marker Forge v2 notes from the always-started note-panel service,
+      // rather than relying on the optional Ctrl-hover preview bridge to be active.
+      void registerExistingForgeStatblocksInAtlasPicker(this.app).then((summary) => {
+        if (summary.registered > 0) {
+          console.info(`[Statblock Forge] Registered ${summary.registered} existing Forge statblock(s) in Atlas' Link Statblock list.`);
+        }
+        for (const path of summary.conflicts) {
+          console.warn(`[Statblock Forge] Could not add "${path}" to Atlas' Link Statblock list because it already has a different \`statblock\` value. The existing value was preserved.`);
+        }
+        for (const failure of summary.failed) {
+          console.error(`[Statblock Forge] Could not register "${failure.path}" in Atlas' Link Statblock list: ${failure.message}`);
+        }
+      }).catch((error: unknown) => {
+        console.error('[Statblock Forge] Could not scan existing Forge statblocks for Atlas link discovery:', error);
+      });
+      refresh();
+    };
+    // `resolved` covers large Vaults where the initial metadata scan can finish
+    // after workspace layout readiness. The registration helper coalesces both calls.
+    const resolved = this.app.metadataCache.on('resolved', registerExisting);
+    this.stops.push(() => this.app.metadataCache.offref(resolved));
+    this.app.workspace.onLayoutReady(registerExisting);
+  }
+
+  private registerStatblockForAtlasPicker(file: TFile): void {
+    if (!this.started || file.extension.toLowerCase() !== 'md') return;
+    void registerForgeStatblockNoteInAtlasPicker(this.app, file).then((result) => {
+      if (result === 'conflict') {
+        console.warn(`[Statblock Forge] Could not add "${file.path}" to Atlas' Link Statblock list because it already has a different \`statblock\` value. The existing value was preserved.`);
+      }
+    }).catch((error: unknown) => {
+      console.error(`[Statblock Forge] Could not register "${file.path}" in Atlas' Link Statblock list:`, error);
+    });
   }
 
   async stop(): Promise<void> {

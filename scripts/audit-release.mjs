@@ -47,9 +47,9 @@ export function auditForgeRelease(root = ROOT) {
 
   if (packageJson.name !== 'statblock-forge') errors.push(`Unexpected package name: ${packageJson.name}`);
   if (manifest.id !== 'statblock-forge') errors.push(`Unexpected manifest ID: ${manifest.id}`);
-  if (packageJson.version !== '0.5.1' || manifest.version !== '0.5.1' || lock.version !== '0.5.1'
-    || lock.packages?.['']?.version !== '0.5.1') {
-    errors.push('package.json, manifest.json, and package-lock.json must all remain at version 0.5.1.');
+  if (packageJson.version !== '0.5.2' || manifest.version !== '0.5.2' || lock.version !== '0.5.2'
+    || lock.packages?.['']?.version !== '0.5.2') {
+    errors.push('package.json, manifest.json, and package-lock.json must all be at version 0.5.2.');
   }
 
   const productionFiles = [

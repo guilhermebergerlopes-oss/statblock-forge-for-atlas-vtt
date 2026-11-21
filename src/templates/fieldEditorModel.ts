@@ -71,7 +71,7 @@ export interface FieldValidationIssue {
 }
 
 const FIELD_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
-const RESERVED_FIELD_KEYS = new Set(['tags', 'statblock-forge', '__forgeconditions', '__forgeconditionvalues', '__proto__', 'prototype', 'constructor']);
+const RESERVED_FIELD_KEYS = new Set(['tags', 'statblock', 'statblock-forge', '__forgeconditions', '__forgeconditionvalues', '__proto__', 'prototype', 'constructor']);
 const HEADER_MEANINGS = new Set(['rating', 'creature-type', 'hit-points', 'description', 'display-name']);
 
 function addDefaultSample(template: ForgeTemplate, key: string, value: unknown): void {
