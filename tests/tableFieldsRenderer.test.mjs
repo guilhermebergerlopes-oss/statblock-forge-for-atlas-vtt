@@ -16,7 +16,7 @@ test('Table preview renders only its ordered child Fields through one renderer',
   assert.match(renderer, /if \(showColumnLabels \|\| showRowLabels \|\| editableRows\)/);
   assert.match(renderer, /if \(showRowLabels\) \{/);
   assert.match(renderer, /if \(showColumnLabels\) childFields\.forEach/);
-  assert.match(renderer, /if \(showColumnLabels\) actionsHeading\.textContent/);
+  assert.match(renderer, /actionsHeading\.setAttribute\('aria-label', language === 'pt-BR' \? 'Ações da linha' : 'Row actions'\)/);
   assert.match(renderer, /labelCell\.textContent = label \|\|/);
   assert.match(renderer, /if \(onEdit\) \{/);
   assert.match(renderer, /statblock-forge__table-row-label-editor/);
@@ -103,13 +103,48 @@ test('Table roll links use the normal visible Field value instead of a separate 
   assert.match(model, /rollableBonusFormula\(value, rollable\)/);
 });
 
+test('Table delete-row controls use a compact intrinsic-width action column', async () => {
+  const [renderer, styles] = await Promise.all([
+    readFile(rendererUrl, 'utf8'),
+    readFile(stylesUrl, 'utf8'),
+  ]);
+  assert.match(renderer, /actionsHeading\.setAttribute\('aria-label', language === 'pt-BR' \? 'Ações da linha' : 'Row actions'\)/);
+  assert.doesNotMatch(renderer, /actionsHeading\.textContent = .*Actions/);
+  assert.match(styles, /\.statblock-forge__preview-table-row-actions-heading,\s*\.statblock-forge__preview-table-row-actions-cell \{ width: 2\.1rem; min-width: 2\.1rem; max-width: 2\.1rem; white-space: nowrap; \}/);
+  assert.match(styles, /\.statblock-forge__preview-table-row-actions-cell > \.statblock-forge__inline-scores-table-action \{ width: 1\.65rem; min-width: 1\.65rem; min-height: 1\.65rem; padding: 0; line-height: 1; \}/);
+});
+
 test('Table uses dedicated styles and no longer carries Pair-cell UI styles', async () => {
   const styles = await readFile(stylesUrl, 'utf8');
-  assert.match(styles, /\.statblock-forge__preview-table-grid \{ table-layout: auto; \}/);
+  assert.match(styles, /\.statblock-forge__preview-table-grid \{ table-layout: fixed; \}/);
   assert.match(styles, /\.statblock-forge__preview-table-row-label/);
   assert.doesNotMatch(styles, /table-pair-cell|preview-pairs-grid/);
 });
 
+
+
+test('Table data columns receive identical measured widths and only delete actions stay compact', async () => {
+  const [renderer, styles] = await Promise.all([
+    readFile(rendererUrl, 'utf8'),
+    readFile(stylesUrl, 'utf8'),
+  ]);
+  assert.match(renderer, /const equalColumnCount = childFields\.length \+ \(showRowLabels \? 1 : 0\)/);
+  assert.match(renderer, /const minimumDataColumnWidthRem = 9/);
+  assert.match(renderer, /const availableWidth = Math\.max\(0, wrapper\.clientWidth - horizontalPadding\)/);
+  assert.match(renderer, /const dataColumnWidthPx = Math\.max\([\s\S]*minimumDataColumnWidthPx,[\s\S]*\(availableWidth - actionsWidthPx\) \/ equalColumnCount/);
+  assert.match(renderer, /table\.style\.width = `\$\{tableWidthPx\}px`/);
+  assert.match(renderer, /column\.style\.width = `\$\{dataColumnWidthPx\}px`/);
+  assert.match(renderer, /cell\.style\.width = `\$\{dataColumnWidthPx\}px`/);
+  assert.match(renderer, /data-table-data-column/);
+  assert.match(renderer, /new ResizeObserver/);
+  assert.match(renderer, /resizeObserver\.observe\(wrapper\)/);
+  assert.match(renderer, /statblock-forge__preview-table-cell--\$\{field\.type\}/);
+  assert.match(styles, /\.statblock-forge__preview-table-row-label,\s*\.statblock-forge__preview-table-row-label-heading \{ min-width: 0; width: auto;/);
+  assert.match(styles, /\.statblock-forge__preview-table-cell \{ min-width: 0; \}/);
+  assert.ok(styles.includes('.statblock-forge__preview-table-cell--number .statblock-forge__preview-numeric-field-value'));
+  assert.ok(styles.includes('overflow-wrap: anywhere;'));
+  assert.match(styles, /\.statblock-forge__preview-table-row-actions-column \{ width: 2\.1rem; \}/);
+});
 
 test('Table row labels are read-only in statblocks and manually-added rows can be deleted', async () => {
   const fs = await import('node:fs/promises');
@@ -138,7 +173,7 @@ test('Column-label visibility suppresses both the Table header and nested native
   ]);
   assert.match(renderer, /is-column-labels-hidden/);
   assert.match(renderer, /if \(showColumnLabels\) childFields\.forEach/);
-  assert.match(renderer, /if \(showColumnLabels\) actionsHeading\.textContent/);
+  assert.match(renderer, /actionsHeading\.setAttribute\('aria-label', language === 'pt-BR' \? 'Ações da linha' : 'Row actions'\)/);
   assert.match(styles, /statblock-forge__preview-table-grid\.is-column-labels-hidden/);
   assert.match(styles, /statblock-forge__preview-block-heading/);
   assert.match(styles, /atlas-sb-label/);

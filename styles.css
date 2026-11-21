@@ -1328,9 +1328,23 @@
 .statblock-forge__preview-score-table th { color: var(--text-muted); font-weight: 650; }
 .statblock-forge__preview-score-table > thead > tr > th { border-top: 1px solid var(--background-modifier-border); background: var(--background-secondary); color: var(--text-normal); }
 
-.statblock-forge__preview-table-grid { table-layout: auto; }
-.statblock-forge__preview-table-row-label { min-width: 5.5rem; white-space: nowrap; }
-.statblock-forge__preview-table-row-label-heading { min-width: 5.5rem; }
+.statblock-forge__preview-table-grid { table-layout: fixed; }
+/* Data columns, including Row Labels, share one width. The delete-action
+   column is the only fixed-width exception. */
+.statblock-forge__preview-table-row-label-column { width: auto; }
+.statblock-forge__preview-table-row-label,
+.statblock-forge__preview-table-row-label-heading { min-width: 0; width: auto; overflow-wrap: anywhere; }
+.statblock-forge__preview-table-cell { min-width: 0; }
+.statblock-forge__preview-table-cell--number .statblock-forge__preview-numeric-field-value,
+.statblock-forge__preview-table-cell--rating .statblock-forge__preview-numeric-field-value,
+.statblock-forge__preview-table-cell--number .statblock-forge__table-row-cell-value,
+.statblock-forge__preview-table-cell--rating .statblock-forge__table-row-cell-value { overflow-wrap: anywhere; }
+.statblock-forge__preview-table-row-actions-column { width: 2.1rem; }
+.statblock-forge__preview-table-row-actions-heading,
+.statblock-forge__preview-table-row-actions-cell { width: 2.1rem; min-width: 2.1rem; max-width: 2.1rem; white-space: nowrap; }
+.statblock-forge__preview-table-row-actions-heading { padding-inline: 0.2rem !important; }
+.statblock-forge__preview-table-row-actions-cell { padding-inline: 0.2rem !important; }
+.statblock-forge__preview-table-row-actions-cell > .statblock-forge__inline-scores-table-action { width: 1.65rem; min-width: 1.65rem; min-height: 1.65rem; padding: 0; line-height: 1; }
 .statblock-forge__table-row-label-editor {
   width: 100%;
   min-width: 4.5rem;
@@ -8296,7 +8310,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 
 /* Unified Table preview: both native-grid and Field-backed Tables render as
    the same HTML grid. Inputs are confined to their existing cells. */
-.statblock-forge__preview-score-table.is-editable { table-layout: auto; }
+.statblock-forge__preview-score-table.is-editable.statblock-forge__preview-table-grid { table-layout: fixed; }
 .statblock-forge__table-sample-cell-editor {
   display: block;
   width: 100%;

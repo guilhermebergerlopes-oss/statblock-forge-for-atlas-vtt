@@ -68,6 +68,8 @@ import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
 export const FORGE_STATBLOCK_SOURCE_DATA_CHANGED_EVENT = 'forge:statblock-source-data-changed';
 
+const forgeTableColumnResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
 export interface StatblockRenderOptions {
   /** Obsidian application instance used by the native Markdown renderer. */
   app: App;
@@ -2478,9 +2480,6 @@ function renderTableFields(
     return wrapper;
   }
 
-  const showColumnLabels = block.showColumnLabels !== false;
-  const showRowLabels = block.showRowLabels === true;
-  const editableRows = editable && block.allowRowAdd === true;
   const language = runtime?.language ?? 'en';
   const rowLabelHeader = language === 'pt-BR' ? 'Linha' : 'Row';
   const addRowLabel = language === 'pt-BR' ? '＋ Adicionar linha' : '＋ Add row';
@@ -2507,6 +2506,60 @@ function renderTableFields(
     if (JSON.stringify(previous) !== JSON.stringify(next)) await runtime.setBaseValue(storageFieldKey, next);
   };
 
+  const showColumnLabels = block.showColumnLabels !== false;
+  const showRowLabels = block.showRowLabels === true;
+  const editableRows = editable && block.allowRowAdd === true;
+  const equalColumnCount = childFields.length + (showRowLabels ? 1 : 0);
+  const actionsWidthRem = editableRows ? 2.1 : 0;
+  const minimumDataColumnWidthRem = 9;
+
+  // Resolve the equal data-column width against the Table's actual rendered
+  // container width. This avoids relying on percentage widths on <col>, which
+  // can be distributed differently when the host (Atlas/Obsidian) applies its
+  // own table styles or when the Canvas block is resized.
+  const updateTableColumnWidths = (): void => {
+    if (equalColumnCount === 0 || !wrapper.isConnected) return;
+    const table = wrapper.querySelector<HTMLTableElement>(':scope > .statblock-forge__preview-score-table');
+    if (!table) return;
+    const wrapperStyle = getComputedStyle(wrapper);
+    const horizontalPadding = (Number.parseFloat(wrapperStyle.paddingLeft) || 0)
+      + (Number.parseFloat(wrapperStyle.paddingRight) || 0);
+    const availableWidth = Math.max(0, wrapper.clientWidth - horizontalPadding);
+    if (availableWidth <= 0) return;
+
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const actionsWidthPx = actionsWidthRem * rootFontSize;
+    const minimumDataColumnWidthPx = minimumDataColumnWidthRem * rootFontSize;
+    const dataColumnWidthPx = Math.max(
+      minimumDataColumnWidthPx,
+      (availableWidth - actionsWidthPx) / equalColumnCount,
+    );
+    const tableWidthPx = dataColumnWidthPx * equalColumnCount + actionsWidthPx;
+
+    table.style.width = `${tableWidthPx}px`;
+    table.style.minWidth = `${tableWidthPx}px`;
+    table.style.maxWidth = 'none';
+    table.style.tableLayout = 'fixed';
+
+    table.querySelectorAll<HTMLTableColElement>('col[data-table-data-column]').forEach((column) => {
+      column.style.width = `${dataColumnWidthPx}px`;
+    });
+    table.querySelectorAll<HTMLElement>('[data-table-data-column]').forEach((cell) => {
+      cell.style.width = `${dataColumnWidthPx}px`;
+      cell.style.minWidth = '0';
+      cell.style.maxWidth = 'none';
+      cell.style.boxSizing = 'border-box';
+    });
+    table.querySelectorAll<HTMLElement>(
+      '.statblock-forge__preview-table-row-actions-column, .statblock-forge__preview-table-row-actions-heading, .statblock-forge__preview-table-row-actions-cell',
+    ).forEach((actionTrack) => {
+      actionTrack.style.width = `${actionsWidthPx}px`;
+      actionTrack.style.minWidth = `${actionsWidthPx}px`;
+      actionTrack.style.maxWidth = `${actionsWidthPx}px`;
+      actionTrack.style.boxSizing = 'border-box';
+    });
+  };
+
   const draw = (): void => {
     wrapper.replaceChildren();
     const table = element('table', `statblock-forge__preview-score-table statblock-forge__preview-table-grid${editable ? ' is-editable' : ''}${showColumnLabels ? '' : ' is-column-labels-hidden'}`);
@@ -2518,6 +2571,30 @@ function renderTableFields(
       Math.max(count, counterRows(valueOf(current, field.key), field)?.length ?? 0), 0);
     const rowCount = Math.min(FORGE_TABLE_MAX_ROWS, Math.max(1 + stored.extraRows.length, counterRowCount));
 
+    // Keep percentage widths as a no-JS fallback. Once this wrapper is mounted,
+    // updateTableColumnWidths assigns the exact same pixel width to every data
+    // column and every corresponding cell, recalculating after container resize.
+    const columnGroup = element('colgroup');
+    let dataColumnIndex = 0;
+    if (showRowLabels) {
+      const rowLabelColumn = element('col', 'statblock-forge__preview-table-row-label-column') as HTMLTableColElement;
+      rowLabelColumn.dataset.tableDataColumn = String(dataColumnIndex++);
+      rowLabelColumn.style.width = equalColumnCount > 0 ? `${100 / equalColumnCount}%` : '';
+      columnGroup.append(rowLabelColumn);
+    }
+    childFields.forEach((field) => {
+      const column = element('col', `statblock-forge__preview-table-column statblock-forge__preview-table-column--${field.type}`) as HTMLTableColElement;
+      column.dataset.tableDataColumn = String(dataColumnIndex++);
+      column.style.width = equalColumnCount > 0 ? `${100 / equalColumnCount}%` : '';
+      columnGroup.append(column);
+    });
+    if (editableRows) {
+      const actionsColumn = element('col', 'statblock-forge__preview-table-row-actions-column');
+      actionsColumn.style.width = `${actionsWidthRem}rem`;
+      columnGroup.append(actionsColumn);
+    }
+    table.append(columnGroup);
+
     if (showColumnLabels || showRowLabels || editableRows) {
       const head = element('thead');
       const header = element('tr');
@@ -2525,22 +2602,24 @@ function renderTableFields(
         // The row-label column remains structurally present, but its header
         // follows the same visibility setting as every other column label.
         const th = element('th', 'statblock-forge__preview-table-row-label-heading', showColumnLabels ? rowLabelHeader : '');
+        th.dataset.tableDataColumn = '0';
         th.scope = 'col';
         if (!showColumnLabels) th.setAttribute('aria-label', rowLabelHeader);
         header.append(th);
       }
-      if (showColumnLabels) childFields.forEach((field) => {
+      if (showColumnLabels) childFields.forEach((field, fieldIndex) => {
         const th = element('th', 'statblock-forge__preview-table-column-label', field.label.trim() || field.key);
         th.dataset.tableColumnLabel = field.key;
+        th.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
         th.scope = 'col';
         header.append(th);
       });
       if (editableRows) {
         const actionsHeading = element('th', 'statblock-forge__preview-table-row-actions-heading');
         actionsHeading.scope = 'col';
-        // The action column keeps its structural header cell for alignment,
-        // but its visible heading follows the Table's column-label setting.
-        if (showColumnLabels) actionsHeading.textContent = language === 'pt-BR' ? 'Ações' : 'Actions';
+        // Keep a semantic heading without visible text so the delete control
+        // does not force a wide, full-word action column in the Table.
+        actionsHeading.setAttribute('aria-label', language === 'pt-BR' ? 'Ações da linha' : 'Row actions');
         header.append(actionsHeading);
       }
       head.append(header);
@@ -2552,6 +2631,7 @@ function renderTableFields(
       const row = element('tr');
       if (showRowLabels) {
         const labelCell = element('th', 'statblock-forge__preview-table-row-label');
+        labelCell.dataset.tableDataColumn = '0';
         labelCell.scope = 'row';
         const storedLabel = forgeTableRowLabel(current[storageFieldKey], rowIndex);
         const counterLabel = counterFields
@@ -2579,8 +2659,9 @@ function renderTableFields(
         }
         row.append(labelCell);
       }
-      childFields.forEach((field) => {
-        const cell = element('td');
+      childFields.forEach((field, fieldIndex) => {
+        const cell = element('td', `statblock-forge__preview-table-cell statblock-forge__preview-table-cell--${field.type}`);
+        cell.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
         // Counter Fields are row-oriented collections: their Nth configured
         // Counter is rendered on Table row N and keeps its own shared Field value.
         const isCounterField = field.type === 'counters';
@@ -2628,6 +2709,7 @@ function renderTableFields(
     }
     table.append(body);
     wrapper.append(table);
+    updateTableColumnWidths();
 
     if (editableRows) {
       const actions = element('div', 'statblock-forge__table-row-actions');
@@ -2647,6 +2729,25 @@ function renderTableFields(
   };
 
   draw();
+  if (typeof ResizeObserver !== 'undefined' && equalColumnCount > 0) {
+    forgeTableColumnResizeObservers.get(wrapper)?.disconnect();
+    const resizeObserver = new ResizeObserver(() => {
+      if (!wrapper.isConnected) {
+        // The returned wrapper is initially detached; keep observing until it
+        // has been mounted at least once. Disconnect only after a mounted Table
+        // is later removed from the document.
+        if (wrapper.dataset.tableLayoutMounted === 'true') {
+          resizeObserver.disconnect();
+          forgeTableColumnResizeObservers.delete(wrapper);
+        }
+        return;
+      }
+      wrapper.dataset.tableLayoutMounted = 'true';
+      updateTableColumnWidths();
+    });
+    forgeTableColumnResizeObservers.set(wrapper, resizeObserver);
+    resizeObserver.observe(wrapper);
+  }
   return wrapper;
 }
 
