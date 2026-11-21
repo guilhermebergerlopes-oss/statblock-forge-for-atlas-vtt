@@ -41,7 +41,23 @@ export function renderCounterPresets(
     const name = inputText(String(row.name ?? ''), 'Counter name (optional)');
     const max = numberInput(typeof row.max === 'number' ? row.max : 1, 0, 99);
     const regain = inputText(typeof row.regain === 'string' ? row.regain : '', 'Formula');
-    name.addEventListener('change', () => { row.name = name.value; });
+    let nameCommitted = false;
+    const commitName = (): void => {
+      if (nameCommitted) return;
+      const nextName = name.value;
+      if (row.name === nextName) return;
+      nameCommitted = true;
+      field.counterRows = rows.map((item, at) => at === index ? { ...item, name: nextName } : item);
+      context.render();
+    };
+    name.addEventListener('change', commitName);
+    name.addEventListener('blur', commitName);
+    name.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        name.blur();
+      }
+    });
     max.addEventListener('change', () => {
       row.max = Math.max(0, Number(max.value) || 0);
       if (shouldEnableCounterNumericValues(rows)) field.showCounterValue = true;

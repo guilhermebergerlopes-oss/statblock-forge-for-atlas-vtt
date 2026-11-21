@@ -121,11 +121,7 @@ export function whenEmptyFallbackSourceFieldKeys(block: ForgeBlock, fields: read
       break;
     case 'scores':
       addKey(keys, block.field);
-      if (Array.isArray(block.columns)) {
-        for (const column of block.columns) {
-          if (column && typeof column === 'object') addKey(keys, (column as JsonRecord).field);
-        }
-      }
+      if (Array.isArray(block.fields)) block.fields.forEach((key) => addFieldValueSources(keys, key, fields));
       break;
     case 'entries':
       addKey(keys, block.field);

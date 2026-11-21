@@ -14,47 +14,45 @@ export interface ComponentHelpEntry {
 
 export const COMPONENT_HELP: Record<ComponentHelpGroup, Record<string, ComponentHelpEntry>> = {
   fields: {
-    value: { label: 'Value', description: { en: 'Creates a single-value Field. Choose Text, Number, Rating, Dice or Choice in Properties; dragging it to the Canvas creates a Stat block.', 'pt-BR': 'Cria um Field de valor único. Escolha Text, Number, Rating, Dice ou Choice em Properties; ao arrastá-lo para o Canvas, um bloco Stat é criado.' }, example: 'stat' },
-    metric: { label: 'Metric', description: { en: 'Creates numeric Fields that can be displayed together in a compact metric grid; it does not create a progress bar. Dragging it to the Canvas creates a Metric block.', 'pt-BR': 'Cria Fields numéricos que podem ser exibidos juntos em uma grade compacta de métricas; não cria uma barra de progresso. Ao arrastá-lo para o Canvas, um bloco Metric é criado.' }, example: 'metric' },
-    collections: { label: 'Collections', description: { en: 'Groups structured Fields such as Entries, Lists, Pairs and Spells. Choose the specific data type in Properties; dragging a Field to the Canvas creates its matching block.', 'pt-BR': 'Agrupa Fields estruturados, como Entries, Lists, Pairs e Spells. Escolha o tipo específico de dado em Properties; ao arrastar o Field para o Canvas, o bloco correspondente é criado.' }, example: 'entries' },
-    table: { label: 'Table', description: { en: 'Creates a Tabular Data Field with reusable rows, columns and cell values; dragging it to the Canvas creates a Table block.', 'pt-BR': 'Cria um Field de dados tabulares com linhas, colunas e valores reutilizáveis; ao arrastá-lo para o Canvas, um bloco Table é criado.' }, example: 'scores' },
-    resources: { label: 'Resources', description: { en: 'Groups resource Fields such as Counters and Checkboxes. Choose the specific data type in Properties; dragging a Field to the Canvas creates its matching block.', 'pt-BR': 'Agrupa Fields de recursos, como Counters e Checkboxes. Escolha o tipo específico de dado em Properties; ao arrastar o Field para o Canvas, o bloco correspondente é criado.' }, example: 'counters' },
-    text: { label: 'Text', description: { en: 'Creates a Markdown Field for descriptions, notes or other written content; dragging it to the Canvas creates a Text block.', 'pt-BR': 'Cria um Field Markdown para descrições, anotações e outros conteúdos escritos; ao arrastá-lo para o Canvas, um bloco Text é criado.' }, example: 'text' },
+    values: { label: 'Values', description: { en: 'Groups numeric and roll-related Fields: Number, Rating, Dice and Counter. Number, Rating and Dice can be used in formulas and Metrics; Counter stores tracked uses and recovery settings.', 'pt-BR': 'Agrupa Fields numéricos e de rolagem: Number, Rating, Dice e Counter. Number, Rating e Dice podem ser usados em fórmulas e Metrics; Counter armazena usos rastreáveis e configurações de recuperação.' }, example: 'stat' },
+    text: { label: 'Text', description: { en: 'Groups short in-line text and longer Markdown content. Choose In-line for compact labels/values or Markdown for formatted descriptions.', 'pt-BR': 'Agrupa textos curtos em linha e conteúdos Markdown mais longos. Escolha In-line para rótulos/valores compactos ou Markdown para descrições formatadas.' }, example: 'text' },
+    choice: { label: 'Choice', description: { en: 'Groups boolean Checkboxes and Selection Fields. Checkboxes Fields allow one selected option by default, or multiple when enabled per Field; Selection stores a value chosen from predefined options and exposes each selected option as a boolean formula reference (1 when selected, 0 otherwise).', 'pt-BR': 'Agrupa Fields Checkboxes e Selection. Fields Checkboxes permitem uma opção marcada por padrão ou várias quando Escolhas múltiplas está ativado naquele Field; Selection armazena um valor escolhido entre opções predefinidas e disponibiliza cada opção como referência booleana em fórmulas (1 quando selecionada, 0 caso contrário).' }, example: 'checkboxes' },
     image: { label: 'Image', description: { en: 'Creates an Image Field that stores a Vault image reference; dragging it to the Canvas creates an Image block.', 'pt-BR': 'Cria um Field Image que armazena a referência de uma imagem do Vault; ao arrastá-lo para o Canvas, um bloco Image é criado.' }, example: 'image' },
+    collections: { label: 'Collections', description: { en: 'Groups structured data Fields: List, Entries, Pairs and Groups. Choose the data structure in Properties; dragging the Field to the Canvas creates its matching presentation.', 'pt-BR': 'Agrupa Fields de dados estruturados: List, Entries, Pairs e Groups. Escolha a estrutura em Properties; ao arrastar o Field para o Canvas, sua apresentação correspondente é criada.' }, example: 'entries' },
   },
   fieldTypes: {
-    text: { label: 'Text', description: { en: 'Stores a short, plain-text value such as a name or a short label.', 'pt-BR': 'Armazena um valor de texto simples, como um nome ou rótulo curto.' }, example: 'text' },
+    text: { label: 'In-line', description: { en: 'Stores a short, plain-text value such as a name or a compact label.', 'pt-BR': 'Armazena um valor de texto simples e curto, como um nome ou rótulo compacto.' }, example: 'text' },
     markdown: { label: 'Markdown', description: { en: 'Stores longer formatted text with paragraphs, links and Markdown styling.', 'pt-BR': 'Armazena textos mais longos e formatados, com parágrafos, links e Markdown.' }, example: 'text' },
     number: { label: 'Number', description: { en: 'Stores a numeric value that can be used in calculations, metrics or resource tracks.', 'pt-BR': 'Armazena um valor numérico que pode ser usado em cálculos, métricas ou trilhas de recursos.' }, example: 'stat' },
     rating: { label: 'Rating', description: { en: 'Stores a rating or level-like numeric value, often used for attributes or proficiency.', 'pt-BR': 'Armazena um valor numérico de grau ou nível, frequentemente usado para atributos ou proficiência.' }, example: 'stat' },
     dice: { label: 'Dice', description: { en: 'Stores a dice expression such as 1d20+5 or 2d6.', 'pt-BR': 'Armazena uma expressão de dados, como 1d20+5 ou 2d6.' }, example: 'dice' },
-    choice: { label: 'Choice', description: { en: 'Stores one selected value from a predefined list of options.', 'pt-BR': 'Armazena um valor escolhido em uma lista de opções predefinidas.' }, example: 'choice' },
+    choice: { label: 'Selection', description: { en: 'Stores one selected value from a predefined list of options.', 'pt-BR': 'Armazena um valor escolhido em uma lista de opções predefinidas.' }, example: 'choice' },
     list: { label: 'List', description: { en: 'Stores multiple values that can be displayed as a list or tags.', 'pt-BR': 'Armazena vários valores que podem ser exibidos como lista ou etiquetas.' }, example: 'tags' },
-    scores: { label: 'Tabular Data', description: { en: 'Stores structured rows, columns and calculated values. A Table block can display this Field; the data remains stored here.', 'pt-BR': 'Armazena linhas, colunas e valores calculados. Um bloco Table pode exibir este Field; os dados continuam armazenados aqui.' }, example: 'scores' },
+    scores: { label: 'Table storage (internal)', description: { en: 'Native Atlas storage used internally by a Forge Table Container. It is not added as a standalone Field in new Forge templates.', 'pt-BR': 'Armazenamento nativo do Atlas usado internamente por um Container Table do Forge. Não é adicionado como Field independente em novos templates do Forge.' }, example: 'scores' },
     entries: { label: 'Entries / Abilities', description: { en: 'Stores named entries with descriptions and optional Ability Parts.', 'pt-BR': 'Armazena entradas com nomes, descrições e Ability Parts opcionais.' }, example: 'entries' },
     pairs: { label: 'Pairs', description: { en: 'Stores related label-and-value pairs.', 'pt-BR': 'Armazena pares de informações relacionadas em rótulo e valor.' }, example: 'pairs' },
     image: { label: 'Image', description: { en: 'Stores a reference to an image in the Obsidian Vault.', 'pt-BR': 'Armazena uma referência a uma imagem no Vault do Obsidian.' }, example: 'image' },
-    spells: { label: 'Spells', description: { en: 'Stores spellcasting groups, usage labels (such as At will or 1/day), and comma-separated spell names in Atlas format.', 'pt-BR': 'Armazena grupos de conjuração, indicações de uso (como À vontade ou 1/dia) e nomes de magias separados por vírgula, no formato do Atlas.' }, example: 'spells' },
-    counters: { label: 'Counters', description: { en: 'Stores resource counters with current and maximum values.', 'pt-BR': 'Armazena contadores de recursos com valores atuais e máximos.' }, example: 'counters' },
+    spells: { label: 'Groups', description: { en: 'Stores grouped values. Each group contains named categories and their values.', 'pt-BR': 'Armazena valores agrupados. Cada grupo contém categorias nomeadas e seus valores.' }, example: 'spells' },
+    counters: { label: 'Counter', description: { en: 'Stores resource counters with current and maximum values.', 'pt-BR': 'Armazena contadores de recursos com valores atuais e máximos.' }, example: 'counters' },
     checkboxes: { label: 'Checkboxes', description: { en: 'Stores a keyed boolean for every configured option.', 'pt-BR': 'Armazena um valor booleano com key própria para cada opção configurada.' }, example: 'checkboxes' },
   },
   blocks: {
-    heading: { label: 'Heading', description: { en: 'Adds a static heading, or choose an optional Text Field to display it as a formatted title. Both use the same insertion option.', 'pt-BR': 'Adiciona um título fixo ou permite escolher um Field Text opcional para exibi-lo como título formatado. As duas opções usam a mesma opção de inserção.' }, example: 'heading' },
-    title: { label: 'Title', description: { en: 'Displays a Text Field as a formatted title, with a configurable heading level.', 'pt-BR': 'Exibe um Field Text como título formatado, com nível de cabeçalho configurável.' }, example: 'title' },
-    collections: { label: 'Collections', description: { en: 'Displays a collection Field using its matching layout: Lists become Tags, while Entries, Pairs and Spells keep their specialized presentation. Choose the Field and Forge selects the correct renderer.', 'pt-BR': 'Exibe um Field de coleção no formato correspondente: Lists se tornam Tags, enquanto Entries, Pairs e Spells mantêm suas apresentações próprias. Escolha o Field e o Forge seleciona o bloco correto.' }, example: 'entries' },
+    heading: { label: 'Heading', description: { en: 'Adds a static heading, or choose an optional In-line Field to display it as a formatted title. Both use the same insertion option.', 'pt-BR': 'Adiciona um título fixo ou permite escolher um Field In-line opcional para exibi-lo como título formatado. As duas opções usam a mesma opção de inserção.' }, example: 'heading' },
+    title: { label: 'Title', description: { en: 'Displays an In-line Field as a formatted title, with a configurable heading level.', 'pt-BR': 'Exibe um Field In-line como título formatado, com nível de cabeçalho configurável.' }, example: 'title' },
+    collections: { label: 'Collections', description: { en: 'Displays a collection Field using its matching layout: Lists become Tags, while Entries, Pairs and Groups keep their specialized presentation. Choose the Field and Forge selects the correct renderer.', 'pt-BR': 'Exibe um Field de coleção no formato correspondente: Lists se tornam Tags, enquanto Entries, Pairs e Groups mantêm suas apresentações próprias. Escolha o Field e o Forge seleciona o bloco correto.' }, example: 'entries' },
     resources: { label: 'Resources', description: { en: 'Displays a resource Field using its matching layout: Counters or Checkboxes. Choose the Field and Forge selects the correct renderer.', 'pt-BR': 'Exibe um Field de recurso no formato correspondente: Counters ou Checkboxes. Escolha o Field e o Forge seleciona o bloco correto.' }, example: 'counters' },
     divider: { label: 'Divider', description: { en: 'Adds a thin separator. Choose horizontal or vertical orientation; vertical dividers are useful between blocks in a Row.', 'pt-BR': 'Adiciona um separador fino. Escolha a orientação horizontal ou vertical; divisores verticais são úteis entre blocos em uma Row.' }, example: 'divider' },
     'vertical-divider': { label: 'Vertical divider', description: { en: 'Adds a thin vertical visual separator, useful between blocks in a Row. This is Forge-only; Atlas supports horizontal dividers.', 'pt-BR': 'Adiciona uma linha vertical fina para separar blocos, especialmente dentro de uma Row. É um recurso exclusivo do Forge; o Atlas suporta apenas divisores horizontais.' }, example: 'vertical-divider' },
     text: { label: 'Text', description: { en: 'Displays written content in a text area, suitable for descriptions or notes.', 'pt-BR': 'Exibe conteúdo escrito em uma área de texto, ideal para descrições e anotações.' }, example: 'text' },
     line: { label: 'Line', description: { en: 'Places up to four compatible scalar Fields side by side in a compact line.', 'pt-BR': 'Exibe até quatro Fields escalares compatíveis lado a lado em uma linha compacta.' }, example: 'line' },
     stat: { label: 'Stat', description: { en: 'Displays one Field as a labeled value, such as HP, Armor or Level.', 'pt-BR': 'Exibe um Field como valor identificado, por exemplo PV, Armadura ou Nível.' }, example: 'stat' },
-    metric: { label: 'Metric', description: { en: 'Displays numeric Fields together in a compact grid of labeled values.', 'pt-BR': 'Exibe Fields numéricos juntos em uma grade compacta de valores identificados.' }, example: 'metric' },
+    metric: { label: 'Metric', description: { en: 'A Container for compatible scalar Fields (In-line, Number, Rating, Dice and Selection). Drop Fields into it on the Canvas or add them in Properties.', 'pt-BR': 'Um Container para Fields escalares compatíveis (In-line, Number, Rating, Dice e Selection). Arraste Fields para dentro dele no Canvas ou adicione-os em Properties.' }, example: 'metric' },
     tags: { label: 'Tags', description: { en: 'Displays a list of values as chips or a compact tag list.', 'pt-BR': 'Exibe uma lista de valores como etiquetas ou chips compactos.' }, example: 'tags' },
-    scores: { label: 'Table', description: { en: 'Displays a Tabular Data Field as a visual table or compact list. This block controls presentation; it does not store a separate copy of the data.', 'pt-BR': 'Exibe um Field de dados tabulares como tabela visual ou lista compacta. Este bloco controla a apresentação; ele não armazena uma cópia separada dos dados.' }, example: 'scores' },
+    scores: { label: 'Table', description: { en: 'A data Container that accepts multiple Field types. Each Pairs Field creates a row, and each named pair becomes a column; other Fields fill column slots.', 'pt-BR': 'Um Container de dados que aceita vários tipos de Field. Cada Field Pairs cria uma linha e cada par nomeado vira uma coluna; outros Fields preenchem slots de coluna.' }, example: 'scores' },
     entries: { label: 'Entries / Abilities', description: { en: 'Displays named entries with descriptions and optional Ability Parts.', 'pt-BR': 'Exibe entradas com nomes, descrições e Ability Parts opcionais.' }, example: 'entries' },
     pairs: { label: 'Pairs', description: { en: 'Displays related values as label-and-value pairs.', 'pt-BR': 'Exibe informações relacionadas em pares de rótulo e valor.' }, example: 'pairs' },
     image: { label: 'Image', description: { en: 'Displays an image referenced by an Image Field.', 'pt-BR': 'Exibe uma imagem referenciada por um Field Image.' }, example: 'image' },
-    spells: { label: 'Spells', description: { en: 'Displays spellcasting groups as a line list or as tabs for each usage/level.', 'pt-BR': 'Exibe grupos de conjuração como lista em linhas ou abas separadas por uso/nível.' }, example: 'spells' },
+    spells: { label: 'Groups', description: { en: 'Displays grouped values as a line list or as tabs for each category.', 'pt-BR': 'Exibe valores agrupados como lista em linhas ou abas separadas por categoria.' }, example: 'spells' },
     counters: { label: 'Counters', description: { en: 'Displays current and maximum uses with pips or other counter indicators.', 'pt-BR': 'Exibe usos atuais e máximos com pontos ou outros indicadores de contador.' }, example: 'counters' },
     checkboxes: { label: 'Checkboxes', description: { en: 'Displays named boolean options from a reusable Checkboxes Field.', 'pt-BR': 'Exibe opções booleanas nomeadas de um Field Checkboxes reutilizável.' }, example: 'checkboxes' },
     track: { label: 'Track', description: { en: 'Displays a progression track using boxes or a gauge.', 'pt-BR': 'Exibe uma trilha de progresso usando caixas ou uma barra.' }, example: 'track' },
@@ -63,23 +61,23 @@ export const COMPONENT_HELP: Record<ComponentHelpGroup, Record<string, Component
     section: { label: 'Section', description: { en: 'Groups related blocks in a section. It can have its own heading and nested layout.', 'pt-BR': 'Agrupa blocos relacionados em uma seção. Pode ter título próprio e layout interno.' }, example: 'section' },
     row: { label: 'Row', description: { en: 'Arranges child blocks horizontally, sharing the available width.', 'pt-BR': 'Organiza os blocos filhos horizontalmente, distribuindo a largura disponível.' }, example: 'row' },
     tabs: { label: 'Tabs container', description: { en: 'Creates a tab strip. Each child Section becomes an individual tab.', 'pt-BR': 'Cria uma faixa de abas. Cada Section filha se torna uma aba independente.' }, example: 'tabs' },
+    metric: { label: 'Metric', description: { en: 'Groups compatible scalar Fields into one compact value grid. Drop a compatible Field into the Metric or add it in Properties.', 'pt-BR': 'Agrupa Fields escalares compatíveis em uma grade compacta de valores. Arraste um Field compatível para o Metric ou adicione-o em Properties.' }, example: 'metric' },
+    table: { label: 'Table', description: { en: 'Accepts multiple Field types. Each Pairs Field creates one row, and each named pair becomes a column; other Fields can fill column slots.', 'pt-BR': 'Aceita vários tipos de Field. Cada Field Pairs cria uma linha e cada par nomeado vira uma coluna; outros Fields podem preencher slots de coluna.' }, example: 'scores' },
   },
 };
 
 
 const FIELD_CATEGORY_EXAMPLES: Record<string, ComponentHelpExampleSpec[]> = {
-  value: [{ kind: 'stat', variant: 0 }, { kind: 'stat', variant: 1 }, { kind: 'stat', variant: 5 }],
-  metric: [{ kind: 'metric', variant: 0 }, { kind: 'metric', variant: 1 }, { kind: 'metric', variant: 2 }],
+  values: [
+    { kind: 'stat', variant: 0 }, { kind: 'stat', variant: 1 }, { kind: 'counters', variant: 0 },
+  ],
+  text: [{ kind: 'text', variant: 0 }, { kind: 'text', variant: 1 }, { kind: 'line', variant: 1 }],
+  choice: [{ kind: 'checkboxes', variant: 0 }, { kind: 'choice', variant: 0 }],
+  image: [{ kind: 'image', variant: 0 }, { kind: 'image', variant: 1 }, { kind: 'image', variant: 2 }],
   collections: [
-    { kind: 'entries', variant: 0 }, { kind: 'tags', variant: 0 },
+    { kind: 'tags', variant: 0 }, { kind: 'entries', variant: 0 },
     { kind: 'pairs', variant: 0 }, { kind: 'spells', variant: 0 },
   ],
-  table: [{ kind: 'scores', variant: 0 }, { kind: 'scores', variant: 1 }, { kind: 'scores', variant: 2 }],
-  resources: [
-    { kind: 'counters', variant: 0 }, { kind: 'counters', variant: 1 }, { kind: 'checkboxes', variant: 0 },
-  ],
-  text: [{ kind: 'text', variant: 0 }, { kind: 'text', variant: 1 }, { kind: 'text', variant: 2 }],
-  image: [{ kind: 'image', variant: 0 }, { kind: 'image', variant: 1 }, { kind: 'image', variant: 2 }],
 };
 
 const BLOCK_EXAMPLES: Record<string, ComponentHelpExampleSpec[]> = {
@@ -553,25 +551,24 @@ export function renderComponentHelpExample(kind: ExampleKind, themeId: string, l
     case 'spells': {
       if (variant % 3 === 0) {
         const spells = make('div', 'statblock-forge__preview-spells');
-        appendSpellExample(spells, pt ? 'Conjuração inata' : 'Innate Spellcasting', [
-          [pt ? 'À vontade' : 'At will', pt ? 'Luz' : 'Light'],
-          [pt ? '1/dia' : '1/day', pt ? 'Curar ferimentos (2d8)' : 'Cure wounds (2d8)'],
+        appendSpellExample(spells, pt ? 'Habilidades ofensivas' : 'Offensive abilities', [
+          [pt ? 'Geral' : 'General', pt ? 'Ataque rápido' : 'Quick strike'],
+          [pt ? '1/dia' : '1/day', pt ? 'Investida' : 'Charge'],
         ]);
         block.append(spells);
       } else if (variant % 3 === 1) {
         const spells = make('div', 'statblock-forge__preview-spells');
-        appendSpellExample(spells, pt ? 'Conjurador de 5º nível' : '5th-level spellcaster', [
-          [pt ? 'Truques' : 'Cantrips', pt ? 'Raio de fogo' : 'Fire bolt'],
-          [pt ? '1º círculo' : '1st level', pt ? 'Mísseis mágicos' : 'Magic missile'],
-          [pt ? '2º círculo' : '2nd level', pt ? 'Invisibilidade' : 'Invisibility'],
+        appendSpellExample(spells, pt ? 'Habilidades especiais' : 'Special abilities', [
+          [pt ? 'Passiva' : 'Passive', pt ? 'Visão aguçada' : 'Keen sight'],
+          [pt ? 'Ativação' : 'Activation', pt ? 'Movimento veloz' : 'Swift movement'],
         ]);
         block.append(spells);
       } else {
         const spells = make('div', 'statblock-forge__preview-spells');
-        appendSpellExample(spells, pt ? 'Magias preparadas' : 'Prepared Spells', [
-          [pt ? '1º círculo' : '1st level', pt ? 'Detectar magia' : 'Detect magic'],
-          [pt ? '1º círculo' : '1st level', pt ? 'Onda trovejante (3d8)' : 'Thunderwave (3d8)'],
-          [pt ? '2º círculo' : '2nd level', pt ? 'Passo nebuloso' : 'Misty step'],
+        appendSpellExample(spells, pt ? 'Habilidades defensivas' : 'Defensive abilities', [
+          [pt ? 'Sempre' : 'Always', pt ? 'Resistência ao fogo' : 'Fire resistance'],
+          [pt ? 'Reação' : 'Reaction', pt ? 'Escudo protetor' : 'Protective shield'],
+          [pt ? '1/dia' : '1/day', pt ? 'Retirada rápida' : 'Rapid retreat'],
         ], true);
         block.append(spells);
       }

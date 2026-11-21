@@ -96,7 +96,7 @@ The Field name in the palette can be dragged onto a Grid, block, or container:
 - If the Field is not represented in the layout yet, Forge creates the block corresponding to the Field type/category.
 - If the Field is already represented, Forge moves the existing block. It does not create a second independent representation of the same Field.
 - The Field and its key remain the same. The gesture changes where it is presented; it does not create a new data property.
-- A presentation category stored in the layout can select a specialized representation, such as **Metric**, **Table**, **Entries**, **Counters**, **Text**, or **Image**, instead of the type's default block.
+- **Metric** and **Table** are data Containers created with **Add Container**. Drag compatible Fields inside them to add those Fields as children: Metric accepts scalar Fields; Table accepts compatible Fields; Pairs remains a standalone Collection. The Table's `scores` Field is managed internally and should not be added to the palette as an ordinary Field.
 
 ### Drop a Field directly onto Tabs
 

@@ -1,8 +1,9 @@
 ---
-title: Statblock Forge — Checkboxes and Boolean References
+title: Statblock Forge — Checkboxes, Selection, and Boolean References
 aliases:
   - Boolean Fields
   - Boolean options
+  - Selection as Boolean
 tags:
   - statblock-forge
   - documentation/advanced-features
@@ -10,11 +11,17 @@ tags:
 part: 4
 ---
 
-# Checkboxes and Boolean References
+# Checkboxes, Selection, and Boolean References
 
-A **Checkboxes** Field stores multiple independent options, each with a boolean state: checked (`true`) or unchecked (`false`). These options can be read by Number/Rating formulas and other contexts that use the shared numeric expression evaluator.
+A **Checkboxes** Field stores boolean options: checked (`true`) or unchecked (`false`). Each set has its own **Multiple choices** setting. New Fields start with it disabled, allowing only one checked option at a time. Enable it to allow several checked options in the same set. The setting is per Field, so other Checkboxes sets can have their own selections without interfering.
 
-Use Checkboxes for on/off characteristics: flying, swimming, shielded, darkvision, a stance, or equipment bonuses. Do not use a Checkbox when the data needs more than two states; Choice, Number, or another Field may be more appropriate.
+Use Checkboxes for on/off characteristics: flying, swimming, shielded, darkvision, a stance, or equipment bonuses. Do not use a Checkbox when the data needs more than two states; Selection, Number, or another Field may be more appropriate.
+
+## Single and multiple choices
+
+In the Field inspector, enable **Multiple choices** to allow more than one checked option in that set. When disabled, checking an option unchecks the other options in the same Field. Unchecking the selected option leaves the set with no selection. Other Checkboxes Fields are never affected.
+
+Older templates without this setting open in multiple-choice mode to preserve their previous behavior. Newly created Checkboxes Fields start in single-choice mode. When multiple choices are disabled on a set whose sample already has several checked options, only the first configured option remains checked.
 
 ## Create and configure options
 
@@ -102,17 +109,52 @@ strength + traits.flying * 2 + defenses.armored
 
 Each option contributes `0` or `1` independently.
 
+
+## Selection as a boolean
+
+A **Selection** Field can also be used as a boolean formula input. Each configured option can be referenced individually: the currently selected option evaluates to `1`; the other options in that Field evaluate to `0`. When no option is selected, all options evaluate to `0`. The Field itself, without an option suffix, evaluates to `1` when it contains any selection and `0` when it is empty.
+
+An option reference uses the Field key, a dot, and a key derived from the option label. Forge generates this key automatically: it lowercases the label, removes accents, and replaces spaces and punctuation with `_`. For example:
+
+| Field | Configured option | Formula reference |
+|---|---|---|
+| `stance` | `Aggressive` | `stance.aggressive` |
+| `stance` | `Defensive` | `stance.defensive` |
+| `stance` | `Night Vision` | `stance.night_vision` |
+
+Use `@` or braces as with other formula references:
+
+```text
+@stance.aggressive
+{stance.night_vision}
+attack + stance.aggressive * 2
+```
+
+Each option reference always returns `1` or `0`. This works with both single-choice Selection and Selection with **Pick several** enabled: in multiple-choice mode, every selected option independently evaluates to `1`.
+
+If different labels produce the same key, Forge adds a numeric suffix (`_2`, `_3`, ...). Avoid identical labels: because the native Value stores the option text, two options with exactly the same label cannot be distinguished. Since keys are derived from labels, renaming an option may change its formula reference; review formulas that use the option after changing its label. Custom values allowed by **Allow other values** make the Field itself evaluate to `1`, but do not create an option reference until they are added to the configured list.
+
+### Example — stance bonus
+
+With `stance = Aggressive` and `attack = 4`:
+
+```text
+attack + stance.aggressive * 2
+```
+
+The result is `6`. If the stance is `Defensive` or no option is selected, the result is `4`.
+
 ## Where boolean references work
 
-Boolean options can be used in contexts that call `evaluatePreviewFormula()`:
+Checkboxes and Selection references are resolved by the same formula evaluator. They are available in:
 
-| Context | Use |
+| Context | Application |
 |---|---|
-| **Number/Rating Formula** | A numeric Field formula can reference `traits.flying`. See [[25 - Formulas in Number and Rating]]. |
-| **Metric slot Formula** | A formula written directly on a Metric slot can reference Checkboxes options and updates when the option changes. |
-| **Scores: derived column** | A derived column using the shared expression evaluator can reference boolean options and the corresponding cell's `value`. |
+| **Number/Rating Formula** | A numeric Field formula can reference Checkboxes and Selection options. |
+| **Metric slot Formula** | A Metric slot formula can reference both categories and updates when one of those Fields changes. |
+| **Scores: derived column** | A derived column can reference both categories and the current cell's `value`. |
 
-The **Checkboxes** block is where the user checks/unchecks options; it is not itself a calculation block. Calculation takes place in another context that references the option.
+Rest formulas and Dice Formulas continue to use their own grammars and do not automatically receive these boolean references.
 
 ## Sheet Values and Samples
 

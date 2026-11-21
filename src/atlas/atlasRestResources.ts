@@ -1,13 +1,15 @@
 import type { App } from 'obsidian';
-import type { ForgeField, ForgeTemplate, JsonRecord } from '../templates/forgeTemplate.ts';
+import type { ForgeTemplate, JsonRecord } from '../templates/forgeTemplate.ts';
+import { getAtlasMapViewContexts } from './atlasRuntime.ts';
+import {
+  atlasResourceReadsForgeField,
+  atlasRoleTemplateIdsForCollection,
+  effectiveAtlasCollectionResources,
+  type AtlasCollectionResourceDefinition,
+} from './atlasResourceCatalog.ts';
 
-export interface AtlasCollectionResourceDefinition {
-  key: string;
-  name: string;
-  field: string;
-  direction: 'drains' | 'fills' | 'static';
-  color?: string;
-}
+export { atlasResourceReadsForgeField, atlasResourceSharesForgeFieldKey, atlasRoleTemplateIdsForCollection } from './atlasResourceCatalog.ts';
+export type { AtlasCollectionResourceDefinition } from './atlasResourceCatalog.ts';
 
 export interface AtlasRestResourceSnapshot extends AtlasCollectionResourceDefinition {
   current: number;
@@ -133,18 +135,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function atlasResourceSharesForgeFieldKey(resource: AtlasCollectionResourceDefinition, field: ForgeField): boolean {
-  return resource.key === field.key;
-}
-
-function normalizedKey(value: string): string {
-  return value.toLowerCase().replace(/[\s_-]/g, '');
-}
-
-function hitPointAlias(value: string): boolean {
-  return ['hp', 'health', 'hitpoints'].includes(normalizedKey(value.replace(/:\s*$/, '')));
-}
-
 function validResourceValue(value: unknown): AtlasResourceValueLike | null {
   if (!isRecord(value)) return null;
   const current = value.current;
@@ -190,94 +180,10 @@ function partyEntry(state: AtlasTokenUpdateState, characterId: string, resourceK
   return null;
 }
 
-function collectionResources(settings: unknown): AtlasCollectionResourceDefinition[] {
-  if (!isRecord(settings) || !Array.isArray(settings.resources)) return [];
-  const seen = new Set<string>();
-  const resources: AtlasCollectionResourceDefinition[] = [];
-  for (const raw of settings.resources) {
-    if (!isRecord(raw) || typeof raw.key !== 'string' || !raw.key.trim()
-      || typeof raw.name !== 'string' || !raw.name.trim()
-      || typeof raw.field !== 'string' || !raw.field.trim()
-      || !['drains', 'fills', 'static'].includes(String(raw.direction))
-      || typeof raw.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(raw.color)
-      || seen.has(raw.key) || resources.length >= 6) continue;
-    seen.add(raw.key);
-    resources.push({
-      key: raw.key,
-      name: raw.name,
-      field: raw.field.trim(),
-      direction: raw.direction as AtlasCollectionResourceDefinition['direction'],
-      ...(typeof raw.color === 'string' ? { color: raw.color } : {}),
-    });
-  }
-  return resources;
-}
-
-const BUILTIN_PRESET_RESOURCES: Record<string, AtlasCollectionResourceDefinition[]> = {
-  'builtin:cairn': [
-    { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' },
-    { key: 'str', name: 'STR', field: 'stats.0', direction: 'drains', color: '#dc2626' },
-  ],
-  'builtin:daggerheart': [
-    { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' },
-    { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7' },
-  ],
-  'builtin:drawsteel': [
-    { key: 'hp', name: 'Stamina', field: 'stamina', direction: 'drains', color: '#22c55e' },
-  ],
-  'builtin:coc7e': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-  'builtin:cyberpunkred': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-  'builtin:dnd5e': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-  'builtin:ose': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-  'builtin:pathfinder2e': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-  'builtin:shadowdark': [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' }],
-};
-
-const BUILTIN_PRESET_ROLE_TEMPLATE_IDS: Record<string, string[]> = {
-  'builtin:cairn': ['builtin:cairn-creature'],
-  'builtin:daggerheart': ['builtin:generic-creature', 'builtin:generic-hazard'],
-  'builtin:drawsteel': ['builtin:draw-steel-monster'],
-  'builtin:coc7e': ['builtin:percentile-creature'],
-  'builtin:cyberpunkred': ['builtin:generic-npc'],
-  'builtin:dnd5e': ['builtin:5e-2024-monster'],
-  'builtin:ose': ['builtin:bx-creature'],
-  'builtin:pathfinder2e': ['builtin:d20-creature'],
-  'builtin:shadowdark': ['builtin:bx-creature'],
-};
-const GENERIC_ROLE_TEMPLATE_IDS = ['builtin:generic-creature', 'builtin:generic-npc'];
-
-/** Atlas falls back to the generic Creature/NPC roles when a preset declares none. */
-export function atlasRoleTemplateIdsForCollection(settings: unknown): string[] {
-  const roles = isRecord(settings) && Array.isArray(settings.statblockRoles) ? settings.statblockRoles : [];
-  if (roles.length > 0) {
-    return roles.flatMap((role) => isRecord(role) && typeof role.templateId === 'string' ? [role.templateId] : []);
-  }
-  const presetId = isRecord(settings) && typeof settings.systemPresetId === 'string' ? settings.systemPresetId : '';
-  return [...(BUILTIN_PRESET_ROLE_TEMPLATE_IDS[presetId] ?? GENERIC_ROLE_TEMPLATE_IDS)];
-}
-
-function effectiveCollectionResources(settings: unknown): AtlasCollectionResourceDefinition[] {
-  if (isRecord(settings) && Array.isArray(settings.resources)) return collectionResources(settings);
-  // Atlas legacyCollectionResources() falls back to HP when the preset is missing or unknown.
-  const presetId = isRecord(settings) && typeof settings.systemPresetId === 'string' ? settings.systemPresetId : '';
-  const resources = (BUILTIN_PRESET_RESOURCES[presetId] ?? [
-    { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e' },
-  ]).map((resource) => ({ ...resource }));
-  const widgets = isRecord(settings) && isRecord(settings.defaultWidgets) ? settings.defaultWidgets : {};
-  const stressBar = widgets.stressBar;
-  const kept = resources.filter((resource) => resource.key !== 'stress' || stressBar !== false);
-  if (stressBar === true && !kept.some((resource) => resource.key === 'stress')) {
-    kept.push({ key: 'stress', name: 'Secondary resource', field: 'stress', direction: 'fills', color: '#a855f7' });
-  }
-  return kept;
-}
-
 function serviceViews(app: App): Array<{ view: AtlasMapViewLike; service: AtlasAssetServiceLike; store: AtlasStoreLike; shown: boolean }> {
-  const workspace = app.workspace as unknown as { getLeavesOfType?: (type: string) => Array<{ view?: unknown }> };
-  if (typeof workspace.getLeavesOfType !== 'function') return [];
   const found: Array<{ view: AtlasMapViewLike; service: AtlasAssetServiceLike; store: AtlasStoreLike; shown: boolean }> = [];
-  for (const leaf of workspace.getLeavesOfType('atlas-vtt')) {
-    const view = leaf.view as AtlasMapViewLike | undefined;
+  for (const context of getAtlasMapViewContexts(app)) {
+    const view = context.view as AtlasMapViewLike | undefined;
     const manager = view?.serviceManager;
     const service = manager?.getAssetService?.();
     const store = manager?.getStore?.();
@@ -305,39 +211,58 @@ function characterAssetsForNote(assets: readonly AtlasTokenAssetLike[], notePath
     .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.id.localeCompare(b.id));
 }
 
-/**
- * Atlas-compatible field mapping: a collection Resource reads the field named by its dotted path's
- * first segment. Former field keys and the common HP aliases remain valid after a field rename.
- */
-export function atlasResourceReadsForgeField(resource: AtlasCollectionResourceDefinition, field: ForgeField): boolean {
-  const path = resource.field.trim();
-  const head = path.split('.')[0]?.trim() ?? '';
-  const keys = [field.key, ...(Array.isArray(field.formerKeys) ? field.formerKeys.filter((item): item is string => typeof item === 'string') : [])];
-  return keys.some((key) => normalizedKey(path) === normalizedKey(key)
-    || normalizedKey(head) === normalizedKey(key)
-    || (hitPointAlias(head) && (hitPointAlias(key) || field.meaning === 'hit-points')));
+export interface AtlasTemplateResourceMatch {
+  readonly collectionId: string;
+  readonly collectionName: string;
+  readonly resource: AtlasCollectionResourceDefinition;
+  readonly fieldKey: string;
+  readonly recoverable: boolean;
 }
 
-/** Collection Resource fields offered in the template Rest editor for collections that assign this template to a role. */
-export function atlasResourceFieldKeysForTemplate(app: App, template: ForgeTemplate): string[] {
+/**
+ * Reads the Resource definitions of collections whose Atlas statblock roles use
+ * this Template and identifies the Forge Field each definition reads. This is
+ * catalog-only: it never changes collection settings, token values, or notes.
+ */
+export function atlasResourceMatchesForTemplate(app: App, template: ForgeTemplate): AtlasTemplateResourceMatch[] {
   const views = serviceViews(app);
   const service = views[0]?.service;
-  const collections = service?.loadedCollections?.() ?? [];
-  const keys = new Set<string>();
+  if (!service) return [];
+  const collections = service.loadedCollections?.() ?? [];
+  const matches: AtlasTemplateResourceMatch[] = [];
+
   for (const collection of collections) {
-    const settings = isRecord(collection.settings) ? collection.settings : {};
-    // Atlas uses its own role list when non-empty; otherwise it inherits preset roles,
-    // falling back to the generic Creature/NPC roles when the preset is unknown or roleless.
-    const assignedTemplate = atlasRoleTemplateIdsForCollection(settings).includes(template.id);
-    if (!assignedTemplate) continue;
-    const resources = effectiveCollectionResources(settings);
-    for (const field of template.fields) {
-      if (resources.some((resource) => resource.direction !== 'static' && atlasResourceReadsForgeField(resource, field))) {
-        keys.add(field.key);
-      }
+    let loadedSettings: unknown;
+    try {
+      loadedSettings = service.getCollectionSettings?.(collection.id) ?? collection.settings;
+    } catch {
+      loadedSettings = collection.settings;
+    }
+    const settings = isRecord(loadedSettings) ? loadedSettings : {};
+    // Atlas uses explicit roles first, then the recorded preset, then generic Creature/NPC roles.
+    if (!atlasRoleTemplateIdsForCollection(settings).includes(template.id)) continue;
+
+    const resources = effectiveAtlasCollectionResources(settings);
+    for (const resource of resources) {
+      const field = template.fields.find((candidate) => atlasResourceReadsForgeField(resource, candidate));
+      if (!field) continue;
+      matches.push({
+        collectionId: collection.id,
+        collectionName: collection.name ?? collection.id,
+        resource,
+        fieldKey: field.key,
+        recoverable: resource.direction !== 'static',
+      });
     }
   }
-  return [...keys];
+  return matches;
+}
+
+/** Collection Resource Fields offered in the Template Rest editor. Static values are not spendable. */
+export function atlasResourceFieldKeysForTemplate(app: App, template: ForgeTemplate): string[] {
+  return [...new Set(atlasResourceMatchesForTemplate(app, template)
+    .filter((match) => match.recoverable)
+    .map((match) => match.fieldKey))];
 }
 
 /**
@@ -356,12 +281,12 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
   if (!character) return null;
   const characterIds = new Set(characterAssets.map((asset) => asset.id));
   const settings = first.service.getCollectionSettings?.(character.collection);
-  const definitions = effectiveCollectionResources(settings);
+  const definitions = effectiveAtlasCollectionResources(settings);
   if (definitions.length === 0) return null;
 
   const stores: AtlasResourceStoreTarget[] = [];
   const tokenValues = new Map<string, AtlasResourceValueLike>();
-  const tokenEntries = new Map<string, { store: AtlasStoreLike; tokenId: string; value: AtlasResourceValueLike | null; rawValue: unknown }[]>();
+  const tokenEntries = new Map<string, { store: AtlasStoreLike; tokenId: string; value: AtlasResourceValueLike | null; rawValue: unknown; overriddenMax: unknown }[]>();
   const partyValues = new Map<string, { store: AtlasStoreLike; key: string; value: AtlasResourceValueLike; maxByHand?: true; rawValue: unknown }[]>();
   for (const { store } of views) {
     const state = store.getState();
@@ -450,6 +375,7 @@ export function persistAtlasRestResourceChangesWithReceipt(
   if (pending.length === 0) return { updated: 0, receipt };
   const definitions = new Map(context.resources.map((resource) => [resource.key, resource]));
 
+  // Complete every stale-state and write-capability check before the first store mutation.
   for (const change of pending) {
     const definition = definitions.get(change.resourceKey);
     if (!definition || definition.current !== change.from || definition.max !== change.max) {
@@ -491,29 +417,38 @@ export function persistAtlasRestResourceChangesWithReceipt(
     }
   }
 
-  let updated = 0;
   const tokenChanges = pending.filter((change) => definitions.get(change.resourceKey)?.holder === 'token');
+  const partyChanges = pending.filter((change) => definitions.get(change.resourceKey)?.holder === 'party');
+  const tokenPlans: Array<{
+    state: AtlasTokenUpdateState;
+    updates: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }>;
+  }> = [];
+  const partyPlans: Array<{
+    store: AtlasStoreLike;
+    values: Record<string, { current: number; max: number; maxByHand?: true }>;
+  }> = [];
+
   if (tokenChanges.length > 0) {
     for (const target of context.stores) {
+      if (target.tokenIds.length === 0) continue;
       const state = target.store.getState();
+      if (typeof state.updateTokens !== 'function') {
+        throw new Error('Um mapa do Atlas não oferece updateTokens para salvar os Resources. Nenhuma alteração foi aplicada.');
+      }
       const tokens = state.objects?.tokens ?? {};
-      if (typeof state.updateTokens !== 'function') continue;
-      const updates: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }> = [];
+      const nextByToken = new Map<string, Record<string, AtlasResourceValueLike>>();
       for (const tokenId of target.tokenIds) {
         const token = tokens[tokenId];
-        if (!token) continue;
-        const nextResources = { ...(token.resources ?? {}) };
-        let changed = false;
+        if (!token) {
+          throw new Error(`O token Atlas "${tokenId}" mudou desde o cálculo do descanso. Reabra o descanso e tente novamente.`);
+        }
+        const nextResources: Record<string, AtlasResourceValueLike> = { ...(token.resources ?? {}) };
         for (const change of tokenChanges) {
           const before = token.resources?.[change.resourceKey];
-          // The recovery calculation uses the selected (first held token) value as its shared
-          // partial result. Preserve each form's own maximum, and map a full recovery to that
-          // form's own starting boundary. The receipt still records each prior value for rollback.
-          // A character's forms may hold different maxima. A full recovery reaches each form's
-          // own starting boundary; a partial recovery applies the shared absolute current and
-          // clamps it to that form's existing maximum. The source sync remains responsible for
-          // changing non-manual maxima when the Forge note/template changes.
-          const ownMax = token.resources?.[change.resourceKey]?.max ?? change.max;
+          const storedMax = before?.max;
+          const ownMax = typeof storedMax === 'number' && Number.isFinite(storedMax) && storedMax >= 0
+            ? storedMax
+            : change.max;
           const atStart = change.direction === 'down' ? change.to >= change.max : change.to <= 0;
           const current = atStart
             ? (change.direction === 'down' ? ownMax : 0)
@@ -526,43 +461,74 @@ export function persistAtlasRestResourceChangesWithReceipt(
             beforeOverriddenMax: cloneStoredValue(token.overriddenMax),
             afterOverriddenMax: cloneStoredValue(token.overriddenMax),
           });
-          changed = true;
         }
-        if (changed) updates.push({ id: tokenId, changes: { resources: nextResources } });
+        nextByToken.set(tokenId, nextResources);
       }
-      if (updates.length > 0) {
-        // Atlas updateTokens is a single store write, so all forms on this map share one history step.
-        state.updateTokens(updates);
-        updated += updates.length;
-      }
+      const updates = [...nextByToken].map(([id, resources]) => ({ id, changes: { resources } }));
+      if (updates.length > 0) tokenPlans.push({ state, updates });
+    }
+    if (receipt.tokenEntries.length === 0) {
+      throw new Error('Nenhum token do Atlas foi encontrado para salvar os Resources desta coleção.');
     }
   }
 
-  const partyChanges = pending.filter((change) => definitions.get(change.resourceKey)?.holder === 'party');
-  for (const change of partyChanges) {
-    const definition = definitions.get(change.resourceKey)!;
-    const entries = definition.partyEntries ?? [];
+  if (partyChanges.length > 0) {
     const byStore = new Map<AtlasStoreLike, Record<string, { current: number; max: number; maxByHand?: true }>>();
-    for (const entry of entries) {
-      if (typeof entry.store.setState !== 'function') continue;
-      const state = entry.store.getState();
-      const values = byStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
-      const ownMax = entry.max;
-      const after = {
-        current: Math.max(0, Math.min(ownMax, change.to)),
-        max: ownMax,
-        ...(entry.maxByHand && { maxByHand: true as const }),
-      };
-      const before = state.partyValues?.[entry.key];
-      values[entry.key] = after;
-      receipt.partyEntries.push({ store: entry.store, key: entry.key, before: cloneStoredValue(before), after: { ...after } });
-      byStore.set(entry.store, values);
+    for (const change of partyChanges) {
+      const definition = definitions.get(change.resourceKey)!;
+      for (const entry of definition.partyEntries ?? []) {
+        if (typeof entry.store.setState !== 'function') {
+          throw new Error('Um mapa do Atlas não oferece setState para salvar os Resources de campanha. Nenhuma alteração foi aplicada.');
+        }
+        const state = entry.store.getState();
+        const values = byStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
+        const after = {
+          current: Math.max(0, Math.min(entry.max, change.to)),
+          max: entry.max,
+          ...(entry.maxByHand && { maxByHand: true as const }),
+        };
+        const before = state.partyValues?.[entry.key];
+        values[entry.key] = after;
+        receipt.partyEntries.push({ store: entry.store, key: entry.key, before: cloneStoredValue(before), after: { ...after } });
+        byStore.set(entry.store, values);
+      }
     }
-    // PartySync persists each form's party value through Atlas' own campaign flow.
-    for (const [store, partyValues] of byStore) {
-      store.setState?.({ partyValues });
+    for (const [store, values] of byStore) {
+      if (typeof store.setState !== 'function') {
+        throw new Error('Um mapa do Atlas não oferece setState para salvar os Resources de campanha. Nenhuma alteração foi aplicada.');
+      }
+      partyPlans.push({ store, values });
+    }
+    if (receipt.partyEntries.length === 0) {
+      throw new Error('Nenhum valor de campanha do Atlas foi encontrado para salvar os Resources desta coleção.');
+    }
+  }
+
+  let updated = 0;
+  try {
+    // Atlas updateTokens groups all token copies in one map into one store write/history step.
+    for (const plan of tokenPlans) {
+      plan.state.updateTokens?.(plan.updates);
+      updated += plan.updates.length;
+    }
+    // PartySync owns campaign persistence; write each map store once with the complete value map.
+    for (const plan of partyPlans) {
+      plan.store.setState?.({ partyValues: plan.values });
       updated += 1;
     }
+  } catch (error) {
+    // A later map/store may fail after earlier ones have already accepted their writes.
+    // The receipt was fully prepared before mutation, so restore every changed entry while
+    // leaving entries that never changed untouched. Rollback itself refuses to overwrite
+    // values that no longer match either the pre-commit or committed snapshots.
+    try {
+      rollbackAtlasRestResourceChanges(receipt);
+    } catch (rollbackError) {
+      const first = error instanceof Error ? error.message : String(error);
+      const second = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(`${first} Além disso, não foi possível reverter as alterações parciais dos Resources Atlas: ${second}`);
+    }
+    throw error;
   }
 
   if (updated === 0) throw new Error('Nenhum token ou valor de campanha do Atlas foi encontrado para salvar os Resources desta coleção.');
@@ -579,46 +545,131 @@ export function persistAtlasRestResourceChanges(
 
 /** Restores exactly the values written by one commit, but refuses to overwrite intervening edits. */
 export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollbackReceipt): void {
+  const tokenEntriesToRestore: typeof receipt.tokenEntries = [];
+  const partyEntriesToRestore: typeof receipt.partyEntries = [];
+
+  // Preflight the entire receipt before making any compensation write. A value that is
+  // already at `before` is untouched (or already restored); a value at neither snapshot
+  // belongs to a later edit and prevents the rollback from overwriting it.
   for (const entry of receipt.tokenEntries) {
     const token = entry.store.getState().objects?.tokens?.[entry.tokenId];
-    if (!token || !sameStoredValue(token.resources?.[entry.resourceKey], entry.after)
-      || !sameStoredValue(token.overriddenMax, entry.afterOverriddenMax)) {
+    if (!token) {
+      throw new Error(`O token Atlas "${entry.tokenId}" não está mais disponível; o rollback foi interrompido para preservar o estado atual.`);
+    }
+    const current = token.resources?.[entry.resourceKey];
+    const override = token.overriddenMax;
+    const atBefore = sameStoredValue(current, entry.before)
+      && sameStoredValue(override, entry.beforeOverriddenMax);
+    const atAfter = sameStoredValue(current, entry.after)
+      && sameStoredValue(override, entry.afterOverriddenMax);
+    if (atBefore) continue;
+    if (!atAfter) {
       throw new Error(`O Resource Atlas "${entry.resourceKey}" mudou após a gravação; o rollback foi interrompido para preservar a alteração mais recente.`);
     }
+    tokenEntriesToRestore.push(entry);
   }
   for (const entry of receipt.partyEntries) {
     const raw = entry.store.getState().partyValues?.[entry.key];
+    if (sameStoredValue(raw, entry.before)) continue;
     if (!sameStoredValue(raw, entry.after)) {
       throw new Error('Um Resource de campanha do Atlas mudou após a gravação; o rollback foi interrompido para preservar a alteração mais recente.');
     }
+    partyEntriesToRestore.push(entry);
   }
 
+  const rollbackFailures: string[] = [];
   const tokenUpdatesByStore = new Map<AtlasStoreLike, Map<string, Record<string, AtlasResourceValueLike>>>();
-  for (const entry of receipt.tokenEntries) {
-    const state = entry.store.getState();
-    const token = state.objects?.tokens?.[entry.tokenId];
-    if (!token || typeof state.updateTokens !== 'function') continue;
-    const byToken = tokenUpdatesByStore.get(entry.store) ?? new Map<string, Record<string, AtlasResourceValueLike>>();
-    const resources = byToken.get(entry.tokenId) ?? { ...(token.resources ?? {}) };
-    if (entry.before === undefined) delete resources[entry.resourceKey];
-    else resources[entry.resourceKey] = cloneStoredValue(entry.before) as AtlasResourceValueLike;
-    byToken.set(entry.tokenId, resources);
-    tokenUpdatesByStore.set(entry.store, byToken);
+  for (const entry of tokenEntriesToRestore) {
+    try {
+      const state = entry.store.getState();
+      const token = state.objects?.tokens?.[entry.tokenId];
+      if (!token) {
+        rollbackFailures.push(`O token Atlas "${entry.tokenId}" deixou de existir durante o rollback.`);
+        continue;
+      }
+      const byToken = tokenUpdatesByStore.get(entry.store) ?? new Map<string, Record<string, AtlasResourceValueLike>>();
+      const resources = byToken.get(entry.tokenId) ?? { ...(token.resources ?? {}) };
+      if (entry.before === undefined) delete resources[entry.resourceKey];
+      else resources[entry.resourceKey] = cloneStoredValue(entry.before) as AtlasResourceValueLike;
+      byToken.set(entry.tokenId, resources);
+      tokenUpdatesByStore.set(entry.store, byToken);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      rollbackFailures.push(`Não foi possível preparar a restauração do token Atlas "${entry.tokenId}": ${detail}`);
+    }
   }
+
+  // A failing map must not prevent independent maps or PartySync stores from being
+  // compensated. Atlas store methods can throw after mutating, so verify the actual
+  // post-call state instead of treating every thrown error as a failed restoration.
   for (const [store, byToken] of tokenUpdatesByStore) {
-    const state = store.getState();
-    const updates = [...byToken].map(([id, resources]) => ({ id, changes: { resources } }));
-    state.updateTokens?.(updates);
+    let writeError: unknown = null;
+    try {
+      const state = store.getState();
+      if (typeof state.updateTokens !== 'function') throw new Error('updateTokens não está disponível');
+      const updates = [...byToken].map(([id, resources]) => ({ id, changes: { resources } }));
+      state.updateTokens(updates);
+    } catch (error) {
+      writeError = error;
+    }
+
+    try {
+      const state = store.getState();
+      const entries = tokenEntriesToRestore.filter((entry) => entry.store === store);
+      const restored = entries.every((entry) => {
+        const token = state.objects?.tokens?.[entry.tokenId];
+        return !!token
+          && sameStoredValue(token.resources?.[entry.resourceKey], entry.before)
+          && sameStoredValue(token.overriddenMax, entry.beforeOverriddenMax);
+      });
+      if (!restored) {
+        const detail = writeError instanceof Error ? `: ${writeError.message}` : '';
+        rollbackFailures.push(`Não foi possível restaurar todos os Resources de tokens de um mapa Atlas${detail}.`);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      rollbackFailures.push(`Não foi possível verificar a restauração dos Resources de um mapa Atlas: ${detail}`);
+    }
   }
 
   const partyValuesByStore = new Map<AtlasStoreLike, Record<string, { current: number; max: number; maxByHand?: true }>>();
-  for (const entry of receipt.partyEntries) {
-    const state = entry.store.getState();
-    if (typeof entry.store.setState !== 'function') continue;
-    const values = partyValuesByStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
-    if (entry.before === undefined) delete values[entry.key];
-    else values[entry.key] = cloneStoredValue(entry.before) as { current: number; max: number; maxByHand?: true };
-    partyValuesByStore.set(entry.store, values);
+  for (const entry of partyEntriesToRestore) {
+    try {
+      const state = entry.store.getState();
+      const values = partyValuesByStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
+      if (entry.before === undefined) delete values[entry.key];
+      else values[entry.key] = cloneStoredValue(entry.before) as { current: number; max: number; maxByHand?: true };
+      partyValuesByStore.set(entry.store, values);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      rollbackFailures.push(`Não foi possível preparar a restauração de um Resource de campanha do Atlas: ${detail}`);
+    }
   }
-  for (const [store, partyValues] of partyValuesByStore) store.setState?.({ partyValues });
+
+  for (const [store, partyValues] of partyValuesByStore) {
+    let writeError: unknown = null;
+    try {
+      if (typeof store.setState !== 'function') throw new Error('setState não está disponível');
+      store.setState({ partyValues });
+    } catch (error) {
+      writeError = error;
+    }
+
+    try {
+      const currentValues = store.getState().partyValues ?? {};
+      const entries = partyEntriesToRestore.filter((entry) => entry.store === store);
+      const restored = entries.every((entry) => sameStoredValue(currentValues[entry.key], entry.before));
+      if (!restored) {
+        const detail = writeError instanceof Error ? `: ${writeError.message}` : '';
+        rollbackFailures.push(`Não foi possível restaurar todos os Resources de campanha de um mapa Atlas${detail}.`);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      rollbackFailures.push(`Não foi possível verificar a restauração dos Resources de campanha do Atlas: ${detail}`);
+    }
+  }
+
+  if (rollbackFailures.length > 0) {
+    throw new Error(`O rollback dos Resources do Atlas foi parcial: ${rollbackFailures.join(' ')}`);
+  }
 }

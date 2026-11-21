@@ -3,6 +3,7 @@ import {
   collectBlockIds,
   createBlock,
   createForgeLayout,
+  registerTableStorageField,
   isRecord,
   type ForgeBlock,
   type ForgeLayoutDocument,
@@ -21,13 +22,13 @@ export const LAYOUT_BLOCK_TYPES = [
   { value: 'text', label: 'Text', requiresField: false },
   { value: 'line', label: 'Line', requiresField: false },
   { value: 'stat', label: 'Stat', requiresField: true },
-  { value: 'metric', label: 'Metric', requiresField: true },
+  { value: 'metric', label: 'Metric', requiresField: false },
   { value: 'tags', label: 'Tags', requiresField: true },
-  { value: 'scores', label: 'Table', requiresField: true },
+  { value: 'scores', label: 'Table', requiresField: false },
   { value: 'entries', label: 'Entries / Abilities', requiresField: true },
   { value: 'pairs', label: 'Pairs', requiresField: true },
   { value: 'image', label: 'Image', requiresField: true },
-  { value: 'spells', label: 'Spells', requiresField: true },
+  { value: 'spells', label: 'Groups', requiresField: true },
   { value: 'counters', label: 'Counters', requiresField: true },
   { value: 'checkboxes', label: 'Checkboxes', requiresField: true },
   { value: 'track', label: 'Track', requiresField: true },
@@ -122,7 +123,30 @@ export function addLayoutBlock(
   const definition = LAYOUT_BLOCK_TYPES.find((item) => item.value === type);
   if (!definition) throw new Error(`Tipo de bloco não suportado: ${String(type)}`);
 
-  const normalizedKey = typeof fieldKey === 'string' ? fieldKey.trim() : '';
+  let normalizedKey = typeof fieldKey === 'string' ? fieldKey.trim() : '';
+  if (type === 'scores') {
+    if (normalizedKey) {
+      const storage = template.fields.find((field) => field.key === normalizedKey);
+      if (!storage || storage.type !== 'scores' || storage.forgeInternal !== 'table-storage') {
+        throw new Error('Table is a Block and manages its own data; it cannot be linked to a user Field.');
+      }
+    } else {
+      const countBlocks = (items: readonly ForgeBlock[]): number => items.reduce((count, item) =>
+        count + (item.type === 'scores' ? 1 : 0) + (Array.isArray(item.blocks) ? countBlocks(item.blocks.filter(isRecord) as ForgeBlock[]) : 0), 0);
+      const storage = registerTableStorageField(template, `Table ${countBlocks(template.layout.blocks) + 1}`);
+      normalizedKey = storage.key;
+    }
+  }
+  if (normalizedKey && type !== 'scores') {
+    const linkedField = template.fields.find((field) => field.key === normalizedKey);
+    if (!linkedField) throw new Error('O campo selecionado não existe no template.');
+    if (linkedField.type === 'scores' || linkedField.forgeInternal === 'table-storage') {
+      throw new Error('O armazenamento interno da Table não pode ser vinculado a outro bloco.');
+    }
+  }
+  if (type === 'metric' && normalizedKey) {
+    throw new Error('Metric is a Block and cannot be linked to a user Field.');
+  }
   if (definition.requiresField && !normalizedKey) {
     throw new Error('Selecione um Template Field para este tipo de bloco.');
   }
@@ -132,13 +156,13 @@ export function addLayoutBlock(
   if (type === 'line' && normalizedKey) {
     const field = template.fields.find((item) => item.key === normalizedKey);
     if (!field || !['text', 'number', 'rating', 'dice', 'choice'].includes(field.type)) {
-      throw new Error('Line aceita apenas campos Text, Number, Rating, Dice e Choice.');
+      throw new Error('Line aceita apenas campos In-line, Number, Rating, Dice e Selection.');
     }
   }
   if (type === 'title' && normalizedKey) {
     const field = template.fields.find((item) => item.key === normalizedKey);
     if (!field || field.type !== 'text') {
-      throw new Error('Title aceita apenas campos do tipo Text.');
+      throw new Error('Title aceita apenas campos do tipo In-line.');
     }
   }
 
@@ -188,7 +212,11 @@ export function removeLayoutBlock(
   if (!location) return null;
   const [removed] = location.siblings.splice(location.index, 1);
   if (!removed) return null;
-  for (const id of descendantIds(removed)) delete layout.blocks[id];
+  const removedIds = new Set(descendantIds(removed));
+  for (const id of removedIds) delete layout.blocks[id];
+  if (Array.isArray(layout.containers)) {
+    layout.containers = layout.containers.filter((container) => !removedIds.has(container.blockId));
+  }
   return removed;
 }
 
@@ -213,14 +241,20 @@ export function moveLayoutBlock(template: ForgeTemplate, blockId: string, direct
   return true;
 }
 
+
+/** Whether a layout block has a user-editable Field binding. Containers and structural blocks own their data. */
+export function layoutBlockAllowsFieldBinding(block: ForgeBlock): boolean {
+  return !['heading', 'divider', 'vertical-divider', 'section', 'row', 'tabs', 'metric', 'scores', 'line'].includes(block.type);
+}
+
 export function bindLayoutBlock(template: ForgeTemplate, blockId: string, fieldKey: string | null): void {
   const block = findLayoutBlock(template, blockId);
   if (!block) throw new Error('Bloco não encontrado.');
-  if (['heading', 'divider', 'vertical-divider', 'section', 'row', 'tabs'].includes(block.type)) {
-    throw new Error('Este bloco estrutural não pode ser vinculado a um campo.');
+  if (!layoutBlockAllowsFieldBinding(block)) {
+    throw new Error('Este bloco não pode ser vinculado a um Field.');
   }
   if (fieldKey === null || fieldKey.trim() === '') {
-    if (block.type === 'title') throw new Error('Title precisa estar vinculado a um campo Text.');
+    if (block.type === 'title') throw new Error('Title precisa estar vinculado a um campo In-line.');
     delete block.field;
     return;
   }
@@ -228,8 +262,11 @@ export function bindLayoutBlock(template: ForgeTemplate, blockId: string, fieldK
   if (!field) {
     throw new Error('O campo selecionado não existe no template.');
   }
+  if (field.type === 'scores' || field.forgeInternal === 'table-storage') {
+    throw new Error('O armazenamento interno da Table não pode ser vinculado a outro bloco.');
+  }
   if (block.type === 'title' && field.type !== 'text') {
-    throw new Error('Title aceita apenas campos do tipo Text.');
+    throw new Error('Title aceita apenas campos do tipo In-line.');
   }
   block.field = fieldKey;
 }

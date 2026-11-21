@@ -1,5 +1,6 @@
 import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
 import { stripFieldCompendiumEntrySourceMetadata } from './fieldCompendiumUsageModel.ts';
+import { numberFieldAdvantageRollFormula } from './inlineNumericFieldEditorModel.ts';
 
 export type StatblockFieldEditorMode = 'number' | 'text' | 'multiline' | 'list' | 'json';
 
@@ -33,6 +34,7 @@ export function parseStatblockFieldEditorValue(
   if (mode === 'number') {
     const trimmed = rawValue.trim();
     if (!trimmed) return null;
+    if (numberFieldAdvantageRollFormula(trimmed)) return trimmed;
     const value = Number(trimmed);
     if (!Number.isFinite(value)) throw new Error(`O campo "${field.label || field.key}" precisa conter um número válido.`);
     return value;

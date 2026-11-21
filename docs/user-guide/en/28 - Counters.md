@@ -12,13 +12,13 @@ part: 4
 
 # Counters
 
-A **Counters** Field defines multiple named counter rows. Each row has a maximum, tracks how many uses have been spent, and can optionally define a recovery formula (`regain`). It is useful for charges, per-rest uses, special ammunition, limited activations, and finite-use abilities.
+A **Counter** Field defines multiple named counter rows. Each row has a maximum, tracks how many uses have been spent, and can optionally define a recovery formula (`regain`). It is useful for charges, per-rest uses, special ammunition, limited activations, and finite-use abilities.
 
 The Template defines row presets. Each statblock keeps its own usage state and its own assignments to Rest buttons.
 
-## Create a Counters Field
+## Create a Counter Field
 
-1. In the Template, add a Field in the **Counters** category.
+1. In the Template, add a Field in **Values** and select the **Counter** type.
 2. Select the Field in the Fields list.
 3. In the inspector, open **Counter rows**.
 4. Click **Adicionar Counter** (Add Counter).
@@ -66,8 +66,7 @@ This row has `2 / 3` uses remaining. `reset` may be added on the sheet when the 
 The **Counters** block arranges each counter in its own cell. The number of counters per visual row is a block property, **Counters per row**:
 
 - default: `2`;
-- minimum: `1`;
-- maximum: `6`.
+- enter any positive whole number; there is no configured maximum.
 
 The indicator depends on each row's `max`:
 
@@ -139,11 +138,11 @@ Assignment belongs to each statblock. The Template defines the presets `name`, `
 
 Rows are selected by the rule scope and `reset` assignments. See [[31 - Rest Rules and Formulas]].
 
-## A Counters Field is not a Resource
+## A Counter Field is not a Resource
 
 These concepts can look similar but use different models:
 
-| Counters Field | Resource |
+| Counter Field | Resource |
 |---|---|
 | Can group multiple named rows in one Field. | Represents a tracked value, often a Number Field or an Atlas collection Resource. |
 | Each row has `max`, `used`, and optional `regain`. | Uses a tracking direction (counts up/down), current value, and maximum. |
@@ -156,7 +155,7 @@ A Rest action can spend a Counter and recover a Resource, or spend a Resource an
 
 A **Counter inside an Ability Part** is a local usage control attached to one Entry/Ability part. It can appear as pips or checkboxes and has its own maximum (the part model supports values from 1 to 12).
 
-That counter belongs to that ability part. It is not a Counters Field, does not use the same list of rows, and does not use the Counters Field's `reset`/`regain` Rest assignment.
+That counter belongs to that ability part. It is not a Counter Field, does not use the same list of rows, and does not use the Counter Field's `reset`/`regain` Rest assignment.
 
 ## Template changes and existing sheets
 

@@ -88,7 +88,7 @@ Image blocks use `cover`: the frame is completely filled while preserving the im
 
 ## Token art is not an ordinary Image Field
 
-The reserved `image` Key represents header Token art and is handled through Atlas. On the header block, Forge offers actions to create a Token in Atlas or link an existing Token when the context meets the requirements. Do not use **Choose from Vault** for this Key. For an independent portrait, create an `Image` Field such as `portrait`.
+The reserved `image` Key represents header Token art. On a Forge v2 statblock, choose **Choose Token art** to select a local Vault image, then use **Create token in Atlas library** to register a native Atlas TokenAsset linked to the Forge note. Forge copies the image into Atlas' shared `atlas-vtt/assets` folder; the source note and original image are not rewritten. This creation is a one-time copy: changing the Forge note's Token art later does not update an already registered TokenAsset. The same menu can link existing Atlas **Character** tokens by selecting them in a scene and choosing **Link selected Atlas tokens**; **Unlink selected Atlas tokens** removes a shared link or clears a selected instance-only override. Generic map tokens are not offered for direct linking because Atlas' Ctrl-hover preview is emitted for Character tokens. Creating or linking TokenAssets requires an initialized Atlas map so Forge can access Atlas' AssetService. For an independent portrait that is not intended to become a token, create an ordinary `Image` Field such as `portrait`.
 
 ## See also
 

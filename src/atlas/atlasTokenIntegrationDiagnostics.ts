@@ -4,7 +4,7 @@ import {
   type AtlasTokenAdapterDiagnostic,
 } from './atlasTokenAdapter';
 import {
-  readAtlasTokenState,
+  readAtlasTokenStateFromContext,
   type AtlasTokenStateStatus,
 } from './atlasTokenStateReader';
 import {
@@ -73,7 +73,7 @@ export function getAtlasTokenIntegrationDiagnostics(
   }
 
   const maps = contexts.map((context, mapIndex): AtlasTokenMapIntegrationDiagnostic => {
-    const state = readAtlasTokenState(context.atlasStore);
+    const state = readAtlasTokenStateFromContext(context);
     const viewport = getAtlasTokenViewportAccess(context);
     const hitTest = screenPoint === undefined
       ? null

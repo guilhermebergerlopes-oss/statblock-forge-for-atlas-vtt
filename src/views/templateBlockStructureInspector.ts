@@ -12,6 +12,7 @@ import {
 import { templateFields } from '../templates/fieldEditorModel.ts';
 import {
   bindLayoutBlock,
+  layoutBlockAllowsFieldBinding,
   findLayoutBlock,
   findLayoutParentId,
 } from '../templates/layoutEditorModel.ts';
@@ -45,12 +46,12 @@ export function renderBlockStructureProperties(
       : templateFields(template);
   const fieldOptions = availableForBlock.map((field) => ({ value: field.key, label: field.label.trim() || field.key }));
 
-  if (!['heading', 'divider', 'vertical-divider', 'section', 'row', 'tabs', 'metric', 'line'].includes(block.type)) {
+  if (layoutBlockAllowsFieldBinding(block)) {
     const currentField = typeof block.field === 'string' ? block.field : '';
     const validCurrentField = fieldOptions.some((option) => option.value === currentField);
     const isTitle = block.type === 'title';
     const field = selectInput(isTitle && !validCurrentField ? '' : currentField, [
-      ...(isTitle ? [{ value: '', label: '(selecione um campo Text)' }] : [{ value: '', label: '(sem vínculo)' }]),
+      ...(isTitle ? [{ value: '', label: '(selecione um campo In-line)' }] : [{ value: '', label: '(sem vínculo)' }]),
       ...fieldOptions,
     ]);
     if (isTitle && fieldOptions.length === 0) field.disabled = true;

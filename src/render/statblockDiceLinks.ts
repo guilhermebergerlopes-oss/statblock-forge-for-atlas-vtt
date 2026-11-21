@@ -1,7 +1,11 @@
 import { Menu, Notice, type App } from 'obsidian';
 import type { ForgeTemplate } from '../templates/forgeTemplate.ts';
 import { loadForgeRestDiceSet, type ForgeRestDiceSet } from '../statblocks/restDiceRoller.ts';
-import { forgeStatblockDefaultRollFormula, forgeStatblockRollMenuSides, getForgeStatblockRollHistory, hasForgeStatblockRollHistory, repeatForgeStatblockRollFromHistory, rollForgeStatblockWithAtlasDiceTool } from '../statblocks/atlasRestDiceTool.ts';
+import { loadForgeAtlasCollectionDiceSet } from '../atlas/atlasCollectionDiceSet.ts';
+import { getAtlasDicePresetPinStates, resolveAtlasSavedRollCollection, supportsAtlasDicePresets, toggleAtlasDicePresetPin } from '../atlas/atlasSavedRolls.ts';
+import { ForgeDiceRollResultModal } from '../views/ForgeDiceRollResultModal.ts';
+import { SaveAtlasDicePresetModal } from '../views/SaveAtlasDicePresetModal.ts';
+import { forgeStatblockDefaultRollFormula, forgeStatblockRollMenuSides, getForgeStatblockRollHistory, hasForgeStatblockRollHistory, repeatForgeStatblockRollFromHistory, rollForgeStatblockWithAtlasDiceTool, type ForgeAtlasRollContext } from '../statblocks/atlasRestDiceTool.ts';
 import {
   formulaWithNextRollModifiers, isNextRollModifierQueued, pendingNextRollModifiers, restoreNextRollModifiers,
   takeNextRollModifiers, toggleNextRollModifier,
@@ -54,6 +58,8 @@ export interface ForgeStatblockDiceLinkOptions {
   statblockPath: string;
   statblockName: string;
   language: 'en' | 'pt-BR';
+  /** Exact originating map/token when the statblock is rendered by Atlas. */
+  atlasRollContext?: ForgeAtlasRollContext;
 }
 
 function isSkipped(text: Text): boolean {
@@ -116,6 +122,103 @@ function advantageFrom(event: MouseEvent | KeyboardEvent): 'advantage' | 'disadv
   return event.shiftKey ? 'advantage' : 'disadvantage';
 }
 
+async function openSaveAtlasRoll(
+  app: App,
+  statblockPath: string,
+  statblockName: string,
+  link: HTMLElement,
+  language: 'en' | 'pt-BR',
+  activeDiceSet?: ForgeRestDiceSet | null,
+): Promise<void> {
+  const formula = link.dataset.formula?.trim() ?? '';
+  if (!formula) return;
+  try {
+    const collection = await resolveAtlasSavedRollCollection(app, statblockPath);
+    if (!collection) {
+      new Notice(language === 'pt-BR'
+        ? 'Abra um mapa do Atlas 0.18.0 ou superior para salvar rolagens em uma coleção.'
+        : 'Open an Atlas 0.18.0 or newer map to save rolls to a collection.');
+      return;
+    }
+    const suggestedName = (abilityNameFor(link) || statblockName || formula).trim().slice(0, 40);
+    new SaveAtlasDicePresetModal(app, language, collection, formula, suggestedName, activeDiceSet).open();
+  } catch (error) {
+    new Notice(language === 'pt-BR'
+      ? `Não foi possível acessar as coleções do Atlas: ${error instanceof Error ? error.message : String(error)}`
+      : `Could not access Atlas collections: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function addSaveAtlasRollMenuItem(
+  menu: Menu,
+  app: App,
+  statblockPath: string,
+  statblockName: string,
+  link: HTMLElement,
+  language: 'en' | 'pt-BR',
+  activeDiceSet?: ForgeRestDiceSet | null,
+): void {
+  if (!supportsAtlasDicePresets(app)) return;
+  menu.addItem((item) => item
+    .setTitle(language === 'pt-BR' ? 'Salvar rolagem na coleção Atlas' : 'Save roll to Atlas collection')
+    .setIcon('bookmark-plus')
+    .onClick(() => { void openSaveAtlasRoll(app, statblockPath, statblockName, link, language, activeDiceSet); }));
+}
+
+function showMenuWithAtlasDiceRowItems(
+  menu: Menu,
+  app: App,
+  statblockPath: string,
+  formula: string,
+  link: HTMLElement,
+  at: { x: number; y: number },
+  language: 'en' | 'pt-BR',
+  activeDiceSet?: ForgeRestDiceSet | null,
+): void {
+  void (async () => {
+    try {
+      const collection = await resolveAtlasSavedRollCollection(app, statblockPath);
+      if (collection) {
+        const states = getAtlasDicePresetPinStates(collection, formula, activeDiceSet);
+        for (const state of states) {
+          menu.addItem((item) => item
+            .setTitle(language === 'pt-BR'
+              ? `${state.pinned ? 'Desafixar' : 'Fixar'} “${state.name}” ${state.pinned ? 'da' : 'na'} fileira de dados Atlas`
+              : `${state.pinned ? 'Unpin' : 'Pin'} “${state.name}” ${state.pinned ? 'from' : 'to'} Atlas dice row`)
+            .setIcon(state.pinned ? 'pin-off' : 'pin')
+            .onClick(() => {
+              void toggleAtlasDicePresetPin(collection, state.id).then((result) => {
+                if (result.ok) {
+                  new Notice(language === 'pt-BR'
+                    ? (result.pinned
+                      ? `“${result.presetName}” foi fixada na fileira de dados Atlas.`
+                      : `“${result.presetName}” foi removida da fileira de dados Atlas.`)
+                    : (result.pinned
+                      ? `“${result.presetName}” was pinned to the Atlas dice row.`
+                      : `“${result.presetName}” was unpinned from the Atlas dice row.`));
+                  return;
+                }
+                const message = result.reason === 'row-full'
+                  ? (language === 'pt-BR'
+                    ? 'A fileira de dados Atlas já está cheia. Remova uma posição no editor do Atlas antes de fixar outra rolagem.'
+                    : 'The Atlas dice row is full. Remove a slot in the Atlas editor before pinning another roll.')
+                  : (language === 'pt-BR'
+                    ? 'O Atlas não conseguiu atualizar a fileira de dados. Verifique se a coleção ainda está disponível.'
+                    : 'Atlas could not update the dice row. Check that the collection is still available.');
+                new Notice(message);
+              }).catch((error) => {
+                new Notice(language === 'pt-BR'
+                  ? `Não foi possível atualizar a fileira do Atlas: ${error instanceof Error ? error.message : String(error)}`
+                  : `Could not update the Atlas dice row: ${error instanceof Error ? error.message : String(error)}`);
+              });
+            }));
+        }
+      }
+    } catch { /* Keep the ordinary roll menu available when collection settings cannot be read. */ }
+    if (link.isConnected) menu.showAtPosition(at);
+  })();
+}
+
 function showStatblockRollHistory(
   app: App,
   statblockPath: string,
@@ -134,16 +237,20 @@ function showStatblockRollHistory(
       const time = new Date(entry.timestamp).toLocaleTimeString(language === 'pt-BR' ? 'pt-BR' : 'en', {
         hour: '2-digit', minute: '2-digit',
       });
+      const engineLabel = entry.engine === 'forge' ? (language === 'pt-BR' ? 'Forge' : 'Forge') : 'Atlas';
       historyMenu.addItem((item) => item
-        .setTitle(`${label}${entry.formula} = ${entry.total} · ${time}${entry.repeatable === false ? (language === 'pt-BR' ? ' · indisponível' : ' · unavailable') : ''}`)
+        .setTitle(`${label}${entry.formula} = ${entry.total} · ${time} · ${engineLabel}${entry.repeatable === false ? (language === 'pt-BR' ? ' · indisponível' : ' · unavailable') : ''}`)
         .setIcon('history')
         .setDisabled(entry.repeatable === false)
         .onClick(() => {
           const attempt = repeatForgeStatblockRollFromHistory(app, entry.id);
+          if (attempt.engine === 'forge' && attempt.details) {
+            new ForgeDiceRollResultModal(app, attempt.details, language).open();
+          }
           if (!attempt.available || !attempt.roll) {
             new Notice(language === 'pt-BR'
-              ? 'Não foi possível repetir esta rolagem. Verifique se o Atlas está ativo e atualizado.'
-              : 'Could not repeat this roll. Make sure Atlas is enabled and up to date.');
+              ? 'Não foi possível repetir esta rolagem. Verifique se o conjunto de dados original ainda está disponível.'
+              : 'Could not repeat this roll. Check whether its original Dice Set is still available.');
           }
         }));
     }
@@ -194,6 +301,11 @@ export function attachForgeStatblockDiceRolling(
     ).catch(() => null);
     return explicitSetPromise;
   };
+  let collectionSetPromise: Promise<ForgeRestDiceSet> | null = null;
+  const getCollectionSet = (): Promise<ForgeRestDiceSet> => {
+    collectionSetPromise ??= loadForgeAtlasCollectionDiceSet(options.app, options.statblockPath);
+    return collectionSetPromise;
+  };
 
   const statblockKey = options.statblockPath || `name:${options.statblockName}`;
   let addToNextRollKeyDown = false;
@@ -211,8 +323,10 @@ export function attachForgeStatblockDiceRolling(
     if (!formula) return;
     const queued = takeNextRollModifiers(options.app, statblockKey);
     try {
-      const set = await getExplicitSet();
-      const defaultRoll = queued.length > 0 ? forgeStatblockDefaultRollFormula(options.app, set, options.statblockPath) : null;
+      const [set, collectionSet] = await Promise.all([getExplicitSet(), getCollectionSet()]);
+      const defaultRoll = queued.length > 0
+        ? forgeStatblockDefaultRollFormula(options.app, set, options.statblockPath, options.atlasRollContext, collectionSet)
+        : null;
       const formulaToRoll = formulaWithNextRollModifiers(formula, queued, defaultRoll);
       if (!formulaToRoll) {
         restoreNextRollModifiers(options.app, statblockKey, queued);
@@ -223,19 +337,33 @@ export function attachForgeStatblockDiceRolling(
       }
       const attempt = rollForgeStatblockWithAtlasDiceTool(options.app, formulaToRoll, {
         statblockPath: options.statblockPath,
+        ...(options.atlasRollContext?.viewId ? { viewId: options.atlasRollContext.viewId } : {}),
+        ...(options.atlasRollContext?.tokenId ? { tokenId: options.atlasRollContext.tokenId } : {}),
+        ...(options.atlasRollContext?.tokenImagePath ? { tokenImagePath: options.atlasRollContext.tokenImagePath } : {}),
+        ...(options.atlasRollContext?.originContext ? { originContext: options.atlasRollContext.originContext } : {}),
         tokenName: options.statblockName,
         abilityName: abilityNameFor(link),
-      }, set, side);
+      }, set, side, collectionSet);
+      if (attempt.engine === 'forge' && attempt.details) {
+        new ForgeDiceRollResultModal(options.app, attempt.details, options.language).open();
+      }
       if (!attempt.available) {
         restoreNextRollModifiers(options.app, statblockKey, queued);
         new Notice(options.language === 'pt-BR'
-          ? 'O serviço de rolagem do Atlas não está disponível. Verifique se o Atlas VTT está ativo e atualizado.'
-          : 'Atlas dice rolling is unavailable. Make sure Atlas VTT is enabled and up to date.');
+          ? 'Não foi possível iniciar o sistema de rolagem. Verifique a configuração do conjunto de dados.'
+          : 'Could not start the dice roller. Check the active Dice Set configuration.');
       } else if (!attempt.roll) {
         restoreNextRollModifiers(options.app, statblockKey, queued);
+        const errorCode = attempt.error?.trim();
+        const detail = errorCode === 'advantage'
+          ? (options.language === 'pt-BR'
+            ? 'o Dice Set ativo não define uma regra aplicável para essa vantagem/desvantagem.'
+            : 'the active Dice Set does not define a rule for this advantage/disadvantage request.')
+          : errorCode;
+        const localRoll = attempt.engine === 'forge';
         new Notice(options.language === 'pt-BR'
-          ? 'O Atlas não conseguiu executar esta fórmula de dados.'
-          : 'Atlas could not roll this dice formula.');
+          ? (detail ? `A rolagem não foi executada: ${detail}` : (localRoll ? 'O Forge não conseguiu executar esta fórmula de dados.' : 'O Atlas não conseguiu executar esta fórmula de dados.'))
+          : (detail || (localRoll ? 'Forge could not roll this dice formula.' : 'Atlas could not roll this dice formula.')));
       }
     } catch (error) {
       restoreNextRollModifiers(options.app, statblockKey, queued);
@@ -285,12 +413,14 @@ export function attachForgeStatblockDiceRolling(
       ? { x: event.clientX, y: event.clientY }
       : { x: box.left, y: box.bottom };
     const label = abilityNameFor(link);
-    void getExplicitSet().then((set) => {
+    void Promise.all([getExplicitSet(), getCollectionSet()]).then(([set, collectionSet]) => {
       if (!link.isConnected) return;
       const queued = isNextRollModifierQueued(options.app, statblockKey, formula, label);
       const pending = pendingNextRollModifiers(options.app, statblockKey);
       const menu = new Menu();
+      const activeDiceSet = set ?? collectionSet;
       addStatblockRollHistoryItem(menu, options.app, options.statblockPath, at, options.language);
+      addSaveAtlasRollMenuItem(menu, options.app, options.statblockPath, options.statblockName, link, options.language, activeDiceSet);
       menu.addItem((item) => item
         .setTitle(options.language === 'pt-BR' ? 'Rolar' : 'Roll')
         .setIcon('dices')
@@ -303,9 +433,9 @@ export function attachForgeStatblockDiceRolling(
         .setIcon(queued ? 'minus-circle' : 'plus-circle')
         .onClick(() => toggleRollInNextRollQueue(options.app, statblockKey, formula, label, options.language)));
 
-      const defaultRoll = pending.length > 0 ? forgeStatblockDefaultRollFormula(options.app, set, options.statblockPath) : null;
+      const defaultRoll = pending.length > 0 ? forgeStatblockDefaultRollFormula(options.app, set, options.statblockPath, options.atlasRollContext, collectionSet) : null;
       const formulaForMenu = formulaWithNextRollModifiers(formula, pending, defaultRoll) ?? formula;
-      for (const side of forgeStatblockRollMenuSides(options.app, formulaForMenu, set, options.statblockPath)) {
+      for (const side of forgeStatblockRollMenuSides(options.app, formulaForMenu, set, options.statblockPath, options.atlasRollContext, collectionSet)) {
         const advantage = side === 'advantage';
         menu.addItem((item) => item
           .setTitle(options.language === 'pt-BR'
@@ -315,13 +445,14 @@ export function attachForgeStatblockDiceRolling(
           .onClick(() => { void roll(link, side); }));
       }
 
-      // Preserve the pointer location even though a custom Dice Set may need an async Vault read.
-      menu.showAtPosition(at);
+      // Wait for the matching collection presets so the menu can expose pin/unpin actions.
+      showMenuWithAtlasDiceRowItems(menu, options.app, options.statblockPath, formula, link, at, options.language, activeDiceSet);
     }).catch(() => {
       if (!link.isConnected) return;
       const queued = isNextRollModifierQueued(options.app, statblockKey, formula, label);
       const menu = new Menu();
       addStatblockRollHistoryItem(menu, options.app, options.statblockPath, at, options.language);
+      addSaveAtlasRollMenuItem(menu, options.app, options.statblockPath, options.statblockName, link, options.language, null);
       menu.addItem((item) => item
         .setTitle(options.language === 'pt-BR' ? 'Rolar' : 'Roll')
         .setIcon('dices')
@@ -332,7 +463,7 @@ export function attachForgeStatblockDiceRolling(
           : (queued ? 'Remove from next roll' : 'Add to next roll'))
         .setIcon(queued ? 'minus-circle' : 'plus-circle')
         .onClick(() => toggleRollInNextRollQueue(options.app, statblockKey, formula, label, options.language)));
-      menu.showAtPosition(at);
+      showMenuWithAtlasDiceRowItems(menu, options.app, options.statblockPath, formula, link, at, options.language, null);
     });
   };
 

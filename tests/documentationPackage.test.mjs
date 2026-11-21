@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   DEFAULT_DOCUMENTATION_FOLDER,
+  FORGE_DOCUMENTATION_FILES,
   DEFAULT_PT_BR_DOCUMENTATION_FOLDER,
   documentationFolderForLanguage,
   normalizeDocumentationFolder,
   writeForgeDocumentation,
 } from '../src/documentation/documentationPackage.ts';
+import { FORGE_DOCUMENTATION_FILES_EN } from '../src/documentation/documentationPackage.en.ts';
 
 function createVaultMock() {
   const folders = new Set();
@@ -81,4 +83,19 @@ test('does not overwrite a folder that conflicts with a documentation filename',
     writeForgeDocumentation(vault, folder, 'en'),
     /já existe como pasta/,
   );
+});
+
+test('downloadable Portuguese and English guides document Checkbox multiple choices and Selection boolean formulas', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name.includes('Checkboxes e referências'));
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name.includes('Checkboxes and Boolean'));
+  assert.ok(portuguese);
+  assert.ok(english);
+  assert.match(portuguese.content, /Escolhas únicas e múltiplas/);
+  assert.match(portuguese.content, /outros Fields Checkboxes nunca são afetados/i);
+  assert.match(english.content, /Single and multiple choices/);
+  assert.match(english.content, /Other Checkboxes Fields are never affected/);
+  assert.match(portuguese.content, /Selection como Booleano/);
+  assert.match(portuguese.content, /stance\.aggressive/);
+  assert.match(english.content, /Selection as a boolean/);
+  assert.match(english.content, /stance\.aggressive/);
 });

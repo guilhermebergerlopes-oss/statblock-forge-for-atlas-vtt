@@ -14,7 +14,7 @@ part: 3
 **Token border** styles the decorative rim around the Token art reserved in the statblock header. It is separate from the outer statblock frame and from frames applied to ordinary Image blocks.
 
 > [!important] Token art is not an ordinary Image Field
-> The reserved `image` Field is integrated with the Atlas Token workflow. It accepts a Token linked through Atlas, not an arbitrary image selected from the Vault. For portraits, illustrations, and maps, create a separate **Image** Field. See [[22 - Image Fields and Framing]].
+> The reserved `image` Field is integrated with the Atlas Token workflow. On a Forge v2 statblock, you can choose a local Vault image and create a native Atlas TokenAsset linked to the note. Forge copies the image into `atlas-vtt/assets`; it does not modify the source image or the statblock note. You can also link existing Atlas Characters. For portraits, illustrations, and maps that should not become tokens, create a separate **Image** Field. See [[22 - Image Fields and Framing]].
 
 ## Where to configure it
 
@@ -59,12 +59,13 @@ The Token frame does not:
 
 - select or replace the linked Token;
 - create a Token on the map;
-- convert an ordinary image into a Token;
+- convert an ordinary Image Field into a Token;
+- update an existing Atlas TokenAsset when the Forge note's Token art Value changes;
 - change framing on an ordinary `image` Field;
 - change the outer statblock frame;
 - change another block's individual appearance.
 
-To link an existing Token or create one from the note, use the Atlas Token actions available through the reserved Field workflow. The rim is presentation only.
+To create a TokenAsset from local art or link an existing Token, use the Atlas Token actions available through the reserved Field workflow. Changing the decorative rim does not change the underlying TokenAsset or its image. The rim is presentation only.
 
 ## Where the setting is stored
 

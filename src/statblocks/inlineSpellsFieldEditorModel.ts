@@ -1,21 +1,21 @@
 /**
- * Forge's structured editor for Atlas-compatible Spells Fields.
+ * Forge's structured editor for Atlas-compatible Groups Fields.
  *
- * Atlas stores a spellcasting group as a header string followed by one-key
- * records such as { "1st level (4 slots)": "shield, sleep" }. This adapter
+ * Atlas stores a group as a header string followed by one-key
+ * records such as { "1/day": "quick strike, retreat" }. This adapter
  * gives the editor a predictable group/level shape without inventing a new
  * serialized format or changing the native Atlas contract.
  */
 
 export interface InlineSpellLineDraft {
-  /** The usage or level label, e.g. "At will", "1st level", or "1/day each". */
+  /** The category or usage label, e.g. "Passive", "Reaction", or "1/day". */
   level: string;
-  /** One or more spell names, usually comma-separated. */
+  /** One or more values, usually comma-separated. */
   spells: string;
 }
 
 export interface InlineSpellGroupDraft {
-  /** Optional Atlas group header, e.g. "Innate Spellcasting". */
+  /** Optional group header, such as "Special abilities". */
   heading: string;
   lines: InlineSpellLineDraft[];
 }
@@ -24,15 +24,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function spellValueText(value: unknown, depth = 0): string {
+function groupValueText(value: unknown, depth = 0): string {
   if (value === undefined || value === null || depth >= 32) return '';
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) return value.map((item) => spellValueText(item, depth + 1)).filter(Boolean).join(', ');
+  if (Array.isArray(value)) return value.map((item) => groupValueText(item, depth + 1)).filter(Boolean).join(', ');
   if (isRecord(value)) {
     return Object.entries(value)
       .map(([key, item]) => {
-        const text = spellValueText(item, depth + 1);
+        const text = groupValueText(item, depth + 1);
         return text ? `${key}: ${text}` : key;
       })
       .filter(Boolean)
@@ -41,29 +41,29 @@ function spellValueText(value: unknown, depth = 0): string {
   return '';
 }
 
-function isAtlasSpellHeader(value: string): boolean {
+function isAtlasGroupHeader(value: string): boolean {
   const text = value.trim();
-  // This mirrors Atlas' public spellGroups convention: bare strings and
+  // This mirrors Atlas' public groups convention: bare strings and
   // strings ending in a colon are headers; strings with an internal colon
-  // are free-form spell lines.
+  // are free-form value rows.
   return text.endsWith(':') || !text.includes(':');
 }
 
-function asSpellEntries(value: unknown): unknown[] {
+function asGroupEntries(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (isRecord(value)) return Object.entries(value).map(([level, spells]) => ({ [level]: spells }));
   return value === undefined || value === null || value === '' ? [] : [value];
 }
 
-/** Read native Atlas spell data into the group/level editing model. */
+/** Read native Atlas group data into the group/level editing model. */
 export function inlineSpellGroupsDraftValue(value: unknown): InlineSpellGroupDraft[] {
   const groups: InlineSpellGroupDraft[] = [];
 
-  for (const entry of asSpellEntries(value)) {
+  for (const entry of asGroupEntries(value)) {
     if (typeof entry === 'string') {
       const text = entry.trim();
       if (!text) continue;
-      if (isAtlasSpellHeader(text)) {
+      if (isAtlasGroupHeader(text)) {
         groups.push({ heading: text.replace(/:$/, '').trim(), lines: [] });
       } else {
         if (groups.length === 0) groups.push({ heading: '', lines: [] });
@@ -73,7 +73,7 @@ export function inlineSpellGroupsDraftValue(value: unknown): InlineSpellGroupDra
     }
 
     if (!isRecord(entry)) {
-      const text = spellValueText(entry);
+      const text = groupValueText(entry);
       if (!text) continue;
       if (groups.length === 0) groups.push({ heading: '', lines: [] });
       groups[groups.length - 1]?.lines.push({ level: '', spells: text });
@@ -82,7 +82,7 @@ export function inlineSpellGroupsDraftValue(value: unknown): InlineSpellGroupDra
 
     const entries = Object.entries(entry);
     for (const [level, rawSpells] of entries) {
-      const spells = spellValueText(rawSpells);
+      const spells = groupValueText(rawSpells);
       if (!level.trim() || !spells) continue;
       if (groups.length === 0) groups.push({ heading: '', lines: [] });
       groups[groups.length - 1]?.lines.push({ level: level.trim(), spells });
@@ -93,13 +93,13 @@ export function inlineSpellGroupsDraftValue(value: unknown): InlineSpellGroupDra
 }
 
 /**
- * Serialize editor drafts back into Atlas' native Spells shape.
- * Empty rows are ignored; an unlabeled row is made "At will" so it can never
- * accidentally be interpreted as a new header by Atlas.
+ * Serialize editor drafts back into Atlas' native Groups-compatible shape.
+ * Empty rows are ignored; an unlabeled row receives a generic category so it can
+ * never accidentally be interpreted as a new header by Atlas.
  */
 export function serializeInlineSpellGroups(
   groups: readonly InlineSpellGroupDraft[],
-  defaultLevel = 'At will',
+  defaultLevel = 'General',
 ): unknown[] | undefined {
   const result: unknown[] = [];
   for (const group of groups) {
@@ -134,7 +134,7 @@ function valueText(value: unknown, depth = 0): string {
   return '';
 }
 
-/** Convert a Spells value to the old multiline draft representation. */
+/** Convert a legacy Groups value to the old multiline draft representation. */
 export function inlineSpellsFieldDraftValue(value: unknown): string {
   return valueText(value);
 }

@@ -1,9 +1,16 @@
 import { Notice, TFile, type App } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
-import { publishAtlasStatblock } from '../atlas/atlasStatblockPublisher.ts';
-import { projectForgeStatblockDataForAtlas } from '../atlas/atlasTemplateAdapter.ts';
+import { projectForgeStatblockDataForLegacyNote } from '../atlas/atlasTemplateAdapter.ts';
 import { assessAtlasTokenCreation } from '../atlas/atlasTokenWorkflow.ts';
+import {
+  ATLAS_TOKEN_IMAGE_EXTENSIONS, assessForgeTokenAssetCreation, createForgeTokenAssetFromImage,
+  forgeTokenAssetAssessmentMessage,
+} from '../atlas/atlasForgeTokenAssetCreation.ts';
+import {
+  inspectSelectedAtlasTokenLinks, isForgeNativeV2StatblockNote, linkSelectedAtlasTokensToStatblock, unlinkSelectedAtlasTokensFromStatblock,
+} from '../atlas/atlasTokenLinkAdapter.ts';
 import { applyPinnedTemplateImages, isSupportedVaultImagePath, pinnedTemplateImageValue } from '../templates/imageFieldModel.ts';
+import { isInternalTemplateField } from '../templates/fieldEditorModel.ts';
 import { createForgeLayout, headerFieldForPart, isRecord, parseForgeLayout, type ForgeLayoutDocument, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
 import { parseTemplateFileText } from '../templates/forgeFileFormat.ts';
 import { createLoadedStatblockSource, loadStatblockSource, type LoadedStatblockSource } from '../statblocks/statblockDataSources.ts';
@@ -24,6 +31,7 @@ import { restRequestValidationMessage, validateRestRequest } from '../statblocks
 import { FORGE_RESOURCE_VALUES_KEY, forgeRestDataWithResources, forgeTrackedResourceForField } from '../statblocks/forgeResourceValues.ts';
 import { loadForgeRestDiceSet, rollForgeRestFormula } from '../statblocks/restDiceRoller.ts';
 import { rollForgeRestWithAtlasDiceTool } from '../statblocks/atlasRestDiceTool.ts';
+import { runRestNotePersistenceWithAtlasRollback } from '../statblocks/restPersistenceTransaction.ts';
 import {
   atlasRestResourceContextForNote, persistAtlasRestResourceChangesWithReceipt, rollbackAtlasRestResourceChanges,
   type AtlasRestResourceContext, type AtlasRestResourceRollbackReceipt,
@@ -34,6 +42,26 @@ import { DEFAULT_FORGE_SHEET_WIDTH, FORGE_STATBLOCK_SHEET_WIDTH_KEY, MAX_FORGE_S
 import { routeStatblockWheel } from './statblockWheelNavigation.ts';
 import { preserveUnchangedFieldCompendiumEntrySources } from '../statblocks/fieldCompendiumUsageModel.ts';
 import { SourceMetadataRefreshGate } from './sourceMetadataRefreshGate.ts';
+
+function atlasTokenLinkInspectionMessage(
+  inspection: ReturnType<typeof inspectSelectedAtlasTokenLinks> | null,
+  language: 'en' | 'pt-BR',
+): string | undefined {
+  if (!inspection) return undefined;
+  const pt = language === 'pt-BR';
+  switch (inspection.status) {
+    case 'atlas-not-open': return pt ? 'Abra uma cena do Atlas para acessar os tokens.' : 'Open an Atlas scene to access its tokens.';
+    case 'no-selection': return pt ? 'Selecione um ou mais tokens em uma cena do Atlas.' : 'Select one or more tokens in an Atlas scene.';
+    case 'ambiguous-map': return pt ? 'Há seleções em mais de uma cena. Ative a cena desejada primeiro.' : 'More than one Atlas scene has a selection. Activate the intended scene first.';
+    case 'no-token-image': return pt ? 'Os tokens selecionados não possuem uma imagem vinculável.' : 'The selected tokens do not have linkable artwork.';
+    case 'character-tokens-required': return pt
+      ? 'O Ctrl-hover do Atlas funciona com tokens Character. Coloque o token pela biblioteca do Atlas antes de vinculá-lo.'
+      : 'Atlas Ctrl-hover works with Character tokens. Place the token from the Atlas library before linking it.';
+    case 'link-service-unavailable': return pt ? 'O serviço de vínculos do Atlas ainda não está disponível.' : 'Atlas token linking is not available yet.';
+    case 'invalid-statblock': return pt ? 'A nota atual não é um statblock válido do Forge.' : 'The current note is not a valid Forge statblock.';
+    case 'ready': return undefined;
+  }
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -256,12 +284,6 @@ export class StatblockRenderSurface {
             : (language === 'pt-BR' ? 'Editar todos os valores' : 'Edit all values'),
           icon: 'edit',
           run: toggleEditPanel,
-        },
-        {
-          id: 'publish-atlas',
-          label: language === 'pt-BR' ? 'Publicar para Atlas' : 'Publish to Atlas',
-          icon: 'publish',
-          run: () => this.publishToAtlas(),
         },
       ],
     });
@@ -520,7 +542,10 @@ export class StatblockRenderSurface {
     const atlasResourceContextState: { value: AtlasRestResourceContext | null } = { value: null };
     const atlasResourceCommit: { receipt: AtlasRestResourceRollbackReceipt | null } = { receipt: null };
 
-    const calculate = (record: JsonRecord): ReturnType<typeof calculateRestCounters> => {
+    const calculate = (
+      record: JsonRecord,
+      registerAtlasReceipt: (receipt: AtlasRestResourceRollbackReceipt) => void,
+    ): ReturnType<typeof calculateRestCounters> => {
       const currentSource = createLoadedStatblockSource({
         path: source.path, basename: source.basename, format: source.format, raw: record, template,
       });
@@ -547,7 +572,7 @@ export class StatblockRenderSurface {
           }, explicitDiceSet);
           if (atlasAttempt.available) {
             if (!atlasAttempt.roll) return null;
-            rolledFormulas.push({ formula: atlasAttempt.roll.formula, label, total: atlasAttempt.roll.total, engine: 'atlas' });
+            rolledFormulas.push({ formula: atlasAttempt.roll.formula, label, total: atlasAttempt.roll.total, engine: atlasAttempt.engine === 'forge' ? 'forge' : 'atlas' });
             return atlasAttempt.roll.total;
           }
 
@@ -569,6 +594,7 @@ export class StatblockRenderSurface {
         // cannot safely restore every token if the note write fails afterwards.
         const commit = persistAtlasRestResourceChangesWithReceipt(atlasResourceContext, atlasChanges);
         atlasResourceCommit.receipt = commit.receipt;
+        registerAtlasReceipt(commit.receipt);
         persisted = persisted || commit.updated > 0;
       }
       return calculated;
@@ -602,43 +628,36 @@ export class StatblockRenderSurface {
 
     // Keep this entire operation inside the same queue as inline field edits and other rests.
     // The calculation runs inside Obsidian's latest-file callback, not against a stale render snapshot.
+    // Atlas receipts are registered immediately after the runtime commit; if the Vault write then
+    // rejects, the transaction coordinator compensates the Atlas stores before propagating the error.
     this.savingFieldEdits = true;
     try {
-      if (source.format === 'markdown-frontmatter') {
-        await this.app.fileManager.processFrontMatter(sourceFile, (frontmatter) => {
-          if (!isRecord(frontmatter)) throw new Error('O frontmatter do statblock não contém um objeto válido.');
-          const calculated = calculate(frontmatter);
-          resultState.value = calculated;
-          const keys = changedRecoveryKeys(calculated, frontmatter);
-          writeChangedKeys(frontmatter, calculated, keys);
-          persisted = persisted || keys.length > 0;
-        });
-      } else {
-        await this.app.vault.process(sourceFile, (contents) => {
-          const parsed: unknown = JSON.parse(contents);
-          if (!isRecord(parsed)) throw new Error('O JSON do statblock não contém um objeto na raiz.');
-          const root = parsed;
-          const target = root.format === 'statblock-forge-data' && isRecord(root.data) ? root.data : root;
-          const calculated = calculate(target);
-          resultState.value = calculated;
-          const keys = changedRecoveryKeys(calculated, target);
-          if (keys.length === 0) return contents;
-          writeChangedKeys(target, calculated, keys);
-          persisted = true;
-          return `${JSON.stringify(root, null, 2)}\n`;
-        });
-      }
-    } catch (error) {
-      if (atlasResourceCommit.receipt) {
-        try {
-          rollbackAtlasRestResourceChanges(atlasResourceCommit.receipt);
-        } catch (rollbackError) {
-          const first = error instanceof Error ? error.message : String(error);
-          const second = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
-          throw new Error(`${first} Além disso, não foi possível reverter o Resource Atlas: ${second}`);
+      await runRestNotePersistenceWithAtlasRollback(async (registerAtlasReceipt) => {
+        if (source.format === 'markdown-frontmatter') {
+          await this.app.fileManager.processFrontMatter(sourceFile, (frontmatter) => {
+            if (!isRecord(frontmatter)) throw new Error('O frontmatter do statblock não contém um objeto válido.');
+            const calculated = calculate(frontmatter, registerAtlasReceipt);
+            resultState.value = calculated;
+            const keys = changedRecoveryKeys(calculated, frontmatter);
+            writeChangedKeys(frontmatter, calculated, keys);
+            persisted = persisted || keys.length > 0;
+          });
+        } else {
+          await this.app.vault.process(sourceFile, (contents) => {
+            const parsed: unknown = JSON.parse(contents);
+            if (!isRecord(parsed)) throw new Error('O JSON do statblock não contém um objeto na raiz.');
+            const root = parsed;
+            const target = root.format === 'statblock-forge-data' && isRecord(root.data) ? root.data : root;
+            const calculated = calculate(target, registerAtlasReceipt);
+            resultState.value = calculated;
+            const keys = changedRecoveryKeys(calculated, target);
+            if (keys.length === 0) return contents;
+            writeChangedKeys(target, calculated, keys);
+            persisted = true;
+            return `${JSON.stringify(root, null, 2)}\n`;
+          });
         }
-      }
-      throw error;
+      }, rollbackAtlasRestResourceChanges);
     } finally {
       this.savingFieldEdits = false;
     }
@@ -699,10 +718,10 @@ export class StatblockRenderSurface {
 
     const spendLabels = new Map(restCounterSpendOptions({
       template,
-      data: forgeRestDataWithResources(source.binding.data, source.raw),
+      data: result.data,
       button: rest,
       picks,
-      collectionResources: atlasRestResourceContextForNote(this.app, source.path)?.resources ?? [],
+      collectionResources: atlasResourceContextState.value?.resources ?? [],
     }).map((option) => [option.ref, option.label]));
     const displayedSpends: ForgeRestResultSpend[] = [...spends.entries()]
       .filter(([, count]) => Number.isFinite(count) && count > 0)
@@ -716,11 +735,22 @@ export class StatblockRenderSurface {
       else warningLabels.push(message);
     }
 
+    let refreshWarning: string | null = null;
     if (persisted) {
       this.initialSourceData = null;
       this.initialSourceFormat = null;
-      await this.refresh();
+      try {
+        await this.refresh();
+      } catch (error) {
+        // The Vault/Atlas writes have already succeeded. A view refresh failure must not turn
+        // a committed Rest into a misleading save failure or trigger compensation after commit.
+        const detail = error instanceof Error ? error.message : String(error);
+        refreshWarning = portuguese
+          ? `Os valores foram salvos, mas a ficha não pôde ser atualizada na tela: ${detail}`
+          : `Values were saved, but the statblock view could not be refreshed: ${detail}`;
+      }
     }
+    if (refreshWarning) warningLabels.push(refreshWarning);
 
     const hasChanges = result.changes.length > 0
       || result.resourceChanges.length > 0;
@@ -813,6 +843,7 @@ export class StatblockRenderSurface {
     form.noValidate = true;
     const editors: Array<{ field: ForgeTemplate['fields'][number]; mode: StatblockFieldEditorMode; control: HTMLInputElement | HTMLTextAreaElement }> = [];
     for (const field of template.fields) {
+      if (isInternalTemplateField(field)) continue;
       if (pinnedTemplateImageValue(template, this.layout, field.key) !== null) continue;
       // The native Atlas image field is a token link, not an ordinary image
       // value. Keep it out of the free-form value editor to prevent a pasted
@@ -825,8 +856,13 @@ export class StatblockRenderSurface {
         ? el('textarea', 'statblock-forge__field-editor-input')
         : el('input', 'statblock-forge__field-editor-input');
       if (control instanceof HTMLInputElement) {
-        control.type = mode === 'number' ? 'number' : 'text';
-        if (mode === 'number') control.step = 'any';
+        // Number Values may also contain a validated `adv`/`dis` dice expression.
+        // Keep a text input so the browser does not reject the alphabetic suffix.
+        control.type = 'text';
+        if (mode === 'number') {
+          control.inputMode = 'text';
+          control.spellcheck = false;
+        }
       } else {
         control.rows = mode === 'json' ? 7 : mode === 'list' ? 4 : 3;
         if (mode === 'json') control.spellcheck = false;
@@ -906,24 +942,34 @@ export class StatblockRenderSurface {
     const sourceFile = this.app.vault.getAbstractFileByPath(source.path);
     const current = source.binding.data[fieldKey];
     const hasImage = typeof current === 'string' && current.trim().length > 0;
+    const tokenName = typeof source.binding.data.name === 'string' && source.binding.data.name.trim()
+      ? source.binding.data.name.trim() : source.basename;
     const isNativeImageField = fieldKey === 'image'
       && template.fields.some((field) => field.key === fieldKey && field.type === 'image');
-    const assessment = sourceFile instanceof TFile && sourceFile.extension.toLowerCase() === 'md'
+    const isForgeV2Note = sourceFile instanceof TFile && isNativeImageField
+      && isForgeNativeV2StatblockNote(this.app, sourceFile.path);
+    const atlasTokenAssessment = !isForgeV2Note && sourceFile instanceof TFile && sourceFile.extension.toLowerCase() === 'md'
       ? assessAtlasTokenCreation(this.app, sourceFile, { ...source.raw, ...source.binding.data })
       : {
         status: 'not-statblock' as const,
         message: isPortuguese
-          ? 'A criação automática de token pelo Atlas exige o Field nativo "image" em uma nota Markdown.'
-          : 'Atlas automatic token creation requires the native "image" Field in a Markdown note.',
+          ? 'A criação pelo importador nativo exige um statblock Atlas publicado.'
+          : 'The native importer requires a published Atlas statblock.',
       };
 
     const actions: ImageSocketMenuAction[] = [];
-    // Ordinary Image fields accept Vault images. The reserved Token art field
-    // accepts only token links through Atlas, not a loose image file.
-    if (!isNativeImageField) {
+    const linkInspection = isNativeImageField && sourceFile instanceof TFile
+      ? inspectSelectedAtlasTokenLinks(this.app, sourceFile.path)
+      : null;
+    // Ordinary Image fields accept Vault images. Forge v2 Token art also accepts
+    // a local Vault image, which the next action can register as a native Atlas
+    // TokenAsset. Existing Atlas-published notes keep their native importer path.
+    if (!isNativeImageField || isForgeV2Note) {
       actions.push({
-        id: 'choose-image',
-        label: isPortuguese ? 'Escolher do Vault…' : 'Choose from Vault…',
+        id: isForgeV2Note ? 'choose-token-art' : 'choose-image',
+        label: isForgeV2Note
+          ? (isPortuguese ? 'Escolher arte do token…' : 'Choose Token art…')
+          : (isPortuguese ? 'Escolher do Vault…' : 'Choose from Vault…'),
         icon: 'image',
         run: () => this.openStatblockImagePicker(source, fieldKey, language),
       });
@@ -936,38 +982,130 @@ export class StatblockRenderSurface {
       run: () => { void this.clearStatblockImage(source, fieldKey); },
     });
     if (isNativeImageField) {
+      if (isForgeV2Note && sourceFile instanceof TFile) {
+        const forgeAssetAssessment = assessForgeTokenAssetCreation(this.app, sourceFile.path, current);
+        actions.push({
+          id: 'create-forge-token-asset',
+          label: isPortuguese ? 'Criar token na biblioteca do Atlas' : 'Create token in Atlas library',
+          icon: 'token',
+          disabled: forgeAssetAssessment.status !== 'ready',
+          title: forgeTokenAssetAssessmentMessage(forgeAssetAssessment, language),
+          run: () => { void this.createAtlasTokenAssetFromForgeImage(sourceFile.path, tokenName, current, language); },
+        });
+      } else {
+        actions.push({
+          id: 'create-token',
+          label: isPortuguese ? 'Criar token no Atlas' : 'Create token in Atlas',
+          icon: 'token',
+          disabled: atlasTokenAssessment.status !== 'ready',
+          title: atlasTokenAssessment.status === 'ready' ? atlasTokenAssessment.commandName : atlasTokenAssessment.message,
+          run: () => {
+            if (sourceFile instanceof TFile) void this.plugin.createAtlasTokenFromStatblock(sourceFile, source.binding.data);
+          },
+        });
+      }
+      const inspection = linkInspection;
+      const hasUnlinkedSelection = inspection?.status === 'ready'
+        && inspection.targets.some((target) => !target.alreadyLinkedToTarget);
+      const hasLinkedSelection = inspection?.status === 'ready'
+        && inspection.targets.some((target) => target.alreadyLinkedToTarget);
       actions.push({
-        id: 'create-token',
-        label: isPortuguese ? 'Criar token no Atlas' : 'Create token in Atlas',
-        icon: 'token',
-        disabled: assessment.status !== 'ready',
-        title: assessment.status === 'ready' ? assessment.commandName : assessment.message,
-        run: () => {
-          if (sourceFile instanceof TFile) void this.plugin.createAtlasTokenFromStatblock(sourceFile, source.binding.data);
-        },
-      });
-      actions.push({
-        id: 'link-existing-token',
-        label: isPortuguese ? 'Vincular token existente…' : 'Link existing token…',
+        id: 'link-selected-atlas-tokens',
+        label: isPortuguese
+          ? `Vincular tokens selecionados${inspection?.status === 'ready' ? ` (${inspection.targets.length})` : ''}`
+          : `Link selected Atlas tokens${inspection?.status === 'ready' ? ` (${inspection.targets.length})` : ''}`,
         icon: 'link',
-        disabled: assessment.status === 'not-statblock',
-        title: assessment.status === 'not-statblock' ? assessment.message : undefined,
-        run: () => this.showNotice(isPortuguese
-          ? 'No Atlas, clique com o botão direito no token do mapa ou no cartão da aba Tokens, escolha “Link Statblock” e selecione esta nota.'
-          : 'In Atlas, right-click the token on the map or in the Tokens tab, choose “Link Statblock”, and select this note.', 12000),
+        disabled: !hasUnlinkedSelection,
+        title: hasUnlinkedSelection
+          ? (isPortuguese
+            ? 'Vincula os tokens selecionados nesta cena à ficha atual. Um vínculo anterior será substituído conforme as regras do Atlas.'
+            : 'Links the selected tokens in this scene to the current statblock. Any previous link is replaced using Atlas rules.')
+          : atlasTokenLinkInspectionMessage(inspection, language) ?? (isPortuguese ? 'Não há tokens selecionados para vincular.' : 'There are no selected tokens to link.'),
+        run: () => { void this.applySelectedAtlasTokenLinks(sourceFile instanceof TFile ? sourceFile.path : source.path, language, false); },
       });
+      if (hasLinkedSelection) {
+        actions.push({
+          id: 'unlink-selected-atlas-tokens',
+          label: isPortuguese
+            ? `Desvincular tokens selecionados (${inspection.targets.filter((target) => target.alreadyLinkedToTarget).length})`
+            : `Unlink selected Atlas tokens (${inspection.targets.filter((target) => target.alreadyLinkedToTarget).length})`,
+          icon: 'unlink',
+          run: () => { void this.applySelectedAtlasTokenLinks(sourceFile instanceof TFile ? sourceFile.path : source.path, language, true); },
+        });
+      }
     }
 
     this.imageSocketMenuClose = openImageSocketActionsMenu(socket, {
       label: isPortuguese ? 'Ações da imagem' : 'Image actions',
       actions,
       ...(isNativeImageField ? {
-        hint: isPortuguese
-          ? 'Token art aceita apenas tokens vinculados pelo Atlas. Para imagens comuns, crie um Field do tipo Image.'
-          : 'Token art accepts only tokens linked through Atlas. Create an Image Field for ordinary pictures.',
+        hint: isForgeV2Note
+          ? (isPortuguese
+            ? 'Escolha uma imagem local para Token art e crie um TokenAsset na biblioteca do Atlas. Também é possível vincular Characters já existentes.'
+            : 'Choose a local image for Token art and create an Atlas TokenAsset in the library. You can also link existing Characters.')
+          : (isPortuguese
+            ? 'Token art aceita tokens vinculados pelo Atlas. Selecione tokens em uma cena e use Vincular tokens selecionados; para imagens comuns, crie um Field do tipo Image.'
+            : 'Token art accepts tokens linked through Atlas. Select tokens in a map and use Link selected Atlas tokens; create an Image Field for ordinary pictures.'),
       } : {}),
       onClose: () => { this.imageSocketMenuClose = null; },
     });
+  }
+
+  private async createAtlasTokenAssetFromForgeImage(
+    statblockPath: string,
+    tokenName: string,
+    imageValue: unknown,
+    language: 'en' | 'pt-BR',
+  ): Promise<void> {
+    const isPortuguese = language === 'pt-BR';
+    try {
+      const result = await createForgeTokenAssetFromImage(this.app, statblockPath, tokenName, imageValue);
+      if (result.status === 'created') {
+        this.showNotice(isPortuguese
+          ? `Token criado na biblioteca do Atlas: ${result.asset.name}.`
+          : `Token created in the Atlas library: ${result.asset.name}.`, 7000);
+        return;
+      }
+      if (result.status === 'already-exists') {
+        this.showNotice(isPortuguese
+          ? `Esta ficha já possui um TokenAsset na biblioteca do Atlas: ${result.asset.name}.`
+          : `This statblock already has an Atlas TokenAsset: ${result.asset.name}.`, 9000);
+        return;
+      }
+      this.showNotice(result.message, 9000);
+    } catch (error) {
+      this.showNotice(isPortuguese
+        ? `Falha ao criar o token no Atlas: ${error instanceof Error ? error.message : String(error)}`
+        : `Could not create the Atlas token: ${error instanceof Error ? error.message : String(error)}`, 9000);
+    }
+  }
+
+  private async applySelectedAtlasTokenLinks(
+    statblockPath: string,
+    language: 'en' | 'pt-BR',
+    unlink: boolean,
+  ): Promise<void> {
+    const isPortuguese = language === 'pt-BR';
+    try {
+      const result = unlink
+        ? await unlinkSelectedAtlasTokensFromStatblock(this.app, statblockPath, { updateStatblockAvatar: false, notify: false, notice: false })
+        : await linkSelectedAtlasTokensToStatblock(this.app, statblockPath, { updateStatblockAvatar: false, notice: false });
+      if (result.status !== 'linked' && result.status !== 'unlinked') {
+        this.showNotice(result.message, 9000);
+        return;
+      }
+      const action = result.status === 'linked'
+        ? (isPortuguese ? 'Tokens vinculados' : 'Tokens linked')
+        : (isPortuguese ? 'Tokens desvinculados' : 'Tokens unlinked');
+      const summary = isPortuguese
+        ? `${action}: ${result.changedCount}. Ignorados: ${result.skippedCount}.`
+        : `${action}: ${result.changedCount}. Skipped: ${result.skippedCount}.`;
+      this.showNotice(summary, 7000);
+    } catch (error) {
+      this.showNotice(isPortuguese
+        ? `Falha ao atualizar os vínculos dos tokens: ${error instanceof Error ? error.message : String(error)}`
+        : `Could not update token links: ${error instanceof Error ? error.message : String(error)}`, 9000);
+    }
   }
 
   private openStatblockImagePicker(
@@ -982,13 +1120,14 @@ export class StatblockRenderSurface {
         : 'This image is pinned by the template and cannot be replaced.');
       return;
     }
-    if (fieldKey === 'image') {
+    if (fieldKey === 'image' && !isForgeNativeV2StatblockNote(this.app, source.path)) {
       this.showNotice(language === 'pt-BR'
-        ? 'O campo Token art aceita apenas tokens vinculados pelo Atlas. Use um Field do tipo Image para imagens comuns.'
-        : 'Token art accepts only tokens linked through Atlas. Use an Image Field for ordinary pictures.');
+        ? 'O campo Token art aceita imagens locais para fichas Forge v2 ou tokens vinculados pelo Atlas. Use um Field do tipo Image para imagens comuns.'
+        : 'Token art accepts local images for Forge v2 statblocks or tokens linked through Atlas. Use an Image Field for ordinary pictures.');
       return;
     }
-    const images = this.app.vault.getFiles().filter((file) => isSupportedVaultImagePath(file.path));
+    const images = this.app.vault.getFiles().filter((file) => isSupportedVaultImagePath(file.path)
+      && (fieldKey !== 'image' || ATLAS_TOKEN_IMAGE_EXTENSIONS.has(file.extension.toLowerCase())));
     if (images.length === 0) {
       this.showNotice(language === 'pt-BR' ? 'Nenhuma imagem compatível foi encontrada no Vault.' : 'No supported image files were found in the Vault.');
       return;
@@ -1224,7 +1363,7 @@ export class StatblockRenderSurface {
 
   /** Persist a per-ability Counter maximum without changing the template-wide default.
    *  Forge's typed marks are projected to Atlas' `used/max` text representation
-   *  before writing, so the individual maximum survives reloads and publication.
+   *  before writing, so the individual maximum survives reloads in existing Atlas-origin notes.
    */
   private queueAbilityCounterMaximumSave(
     template: ForgeTemplate,
@@ -1238,7 +1377,7 @@ export class StatblockRenderSurface {
     }
 
     const save = this.counterSaveQueue.then(async () => {
-      const projection = projectForgeStatblockDataForAtlas(template, source.binding.data);
+      const projection = projectForgeStatblockDataForLegacyNote(template, source.binding.data);
       if (!Object.prototype.hasOwnProperty.call(projection.data, fieldKey)) return;
 
       if (source.format === 'markdown-frontmatter') {
@@ -1275,67 +1414,5 @@ export class StatblockRenderSurface {
     new Notice(translateForgeText(message, language), duration);
   }
 
-  private async publishToAtlas(): Promise<void> {
-    if (!this.template || !this.loadedSource) return;
-    try {
-      await this.counterSaveQueue;
-      const sourceFile = this.sourcePath ? this.app.vault.getAbstractFileByPath(this.sourcePath) : null;
-      const fallbackData = { ...this.loadedSource.binding.data };
-      const result = await publishAtlasStatblock({
-        app: this.app,
-        template: this.template,
-        layout: this.layout ?? undefined,
-        data: fallbackData,
-        templateFolder: this.plugin.settings.templateFolder,
-        statblockFolder: this.plugin.settings.statblockFolder,
-        fallbackName: this.loadedSource.basename,
-        sourceFile: sourceFile instanceof TFile ? sourceFile : null,
-        templateSourcePath: this.templatePath,
-      });
-      const language = normalizeForgeLanguage(this.plugin.settings.language);
-      const isPortuguese = language === 'pt-BR';
-      const actionText = result.updatedExistingNote
-        ? (isPortuguese ? 'A nota original foi atualizada' : 'The original note was updated')
-        : (isPortuguese ? 'Uma nota Markdown foi criada' : 'A Markdown note was created');
-      const templateNote = result.createdTemplateCopy
-        ? (isPortuguese ? ` Template Atlas publicado em ${result.atlasTemplateFile.path}.` : ` Atlas template published at ${result.atlasTemplateFile.path}.`)
-        : '';
-      const association = isPortuguese
-        ? ' A associação ao token pode ser feita pelo Atlas.'
-        : ' Atlas can link a token to this note.';
-      const warnings = result.warnings.length
-        ? ` ${isPortuguese ? 'Avisos' : 'Warnings'}: ${result.warnings.map((warning) => translateForgeText(warning, language)).join(' ')}`
-        : '';
-      this.showNotice(`${actionText}: ${result.statblockFile.path}.${templateNote}${association}${warnings}`, 12000);
 
-      // Refresh first: the status panel is appended afterward so a redraw does not erase its actions.
-      await this.refresh();
-      const root = this.contentEl.querySelector('.statblock-forge__render-view');
-      root?.querySelector('.statblock-forge__published-note')?.remove();
-      const message = el('div', 'statblock-forge__status statblock-forge__published-note');
-      message.append(el('strong', '', 'Statblock compatível com Atlas.'));
-
-      const openButton = el('button', 'statblock-forge__button is-secondary', 'Abrir nota Atlas');
-      openButton.type = 'button';
-      openButton.addEventListener('click', () => { void this.app.workspace.getLeaf(false)?.openFile(result.statblockFile); });
-      message.append(openButton);
-
-      const tokenAssessment = assessAtlasTokenCreation(this.app, result.statblockFile, fallbackData, true);
-      if (tokenAssessment.status === 'ready') {
-        const createTokenButton = el('button', 'statblock-forge__button', 'Criar token no Atlas');
-        createTokenButton.type = 'button';
-        createTokenButton.addEventListener('click', () => {
-          void this.plugin.createAtlasTokenFromStatblock(result.statblockFile, fallbackData);
-        });
-        message.append(createTokenButton);
-      } else {
-        message.append(el('p', 'statblock-forge__footnote', tokenAssessment.message));
-      }
-
-      localizeForgeElement(message, normalizeForgeLanguage(this.plugin.settings.language));
-      root?.append(message);
-    } catch (error) {
-      this.showNotice(`Statblock Forge: falha ao publicar para Atlas: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
 }

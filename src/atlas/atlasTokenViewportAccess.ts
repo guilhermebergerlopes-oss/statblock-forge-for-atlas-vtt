@@ -133,9 +133,10 @@ export function getAtlasTokenViewportAccess(
  * Converts a Pixi screen/global point to Atlas world coordinates and asks the
  * Atlas TokenRenderer which token is topmost at that point.
  *
- * Atlas 0.14.0's Viewport accepts a point object in toWorld(), and
- * TokenRenderer.hitTestTokens() accepts worldX/worldY and returns string|null.
- * These private/internal runtime contracts must be revalidated for Atlas 0.15.0.
+ * The supplied Atlas 0.17.0 source confirms that Viewport.toWorld() accepts a
+ * point object and TokenRenderer.hitTestTokens() accepts worldX/worldY and
+ * returns a token instance ID or null. These are internal contracts and are
+ * intentionally pinned to the inspected Atlas 0.17.0 source profile.
  */
 export function hitTestAtlasToken(
   access: AtlasTokenViewportAccess,

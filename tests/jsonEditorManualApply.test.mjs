@@ -39,7 +39,7 @@ test('recovering an unfinished JSON draft does not schedule an automatic apply',
 
 test('Done and Save still apply pending JSON before leaving or saving the editor', () => {
   const close = sectionBetween('private closeJsonSidebar(', 'private setJsonStatus(');
-  const save = sectionBetween('private async save(', 'private async exportToAtlas(');
+  const save = source.slice(source.indexOf('private async save('));
   assert.match(close, /this\.applyJsonDraft\(\)/);
   assert.match(save, /this\.applyJsonDraft\(\)/);
 });

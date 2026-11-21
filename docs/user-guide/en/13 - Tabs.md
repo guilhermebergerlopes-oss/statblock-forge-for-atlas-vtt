@@ -23,8 +23,8 @@ Tabs: Combat options
 │   └── Stat: Reach
 ├── Section: Ranged
 │   └── Entries: Ranged attacks
-└── Section: Spells
-    └── Spells: Spell list
+└── Section: Special abilities
+    └── Groups: Special abilities
 ```
 
 Tabs organizes the tabs. Each Section is a panel and has its own internal Grid. Content remains linked to Template Fields; switching tabs does not duplicate or change Values.
@@ -130,7 +130,7 @@ If you add other blocks inside an Ability tab's Section, that structure no longe
 | Several attacks that should appear together. | One Entries block, optionally inside a Section. |
 | Melee and ranged attacks in separate panels, each with its own list. | Ability Tabs with one Entries block per Section. |
 | Attacks, attack bonus, and reach in one panel. | Tabs with a Section; place Entries and Stat inside the Section. This is not specialized Ability Tabs. |
-| Spells separated by circle or category. | Generic Tabs with one Section per group, or a Spells block if native Spell Groups are sufficient. |
+| Grouped values separated by category. | Generic Tabs with one Section per group, or a Groups block. |
 
 ## See also
 

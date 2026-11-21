@@ -1,4 +1,4 @@
-import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, TFolder, type EventRef } from 'obsidian';
+import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, TFolder } from 'obsidian';
 import { ForgeSettingTab } from './src/settings/ForgeSettingTab';
 import { DEFAULT_TOGGLE_STATBLOCK_MODE_SHORTCUT, matchesForgeShortcut, normalizeForgeShortcut } from './src/settings/forgeShortcut.ts';
 import { TemplateEditorView, STATBLOCK_FORGE_EDITOR_VIEW } from './src/views/TemplateEditorView';
@@ -8,6 +8,7 @@ import { StatblockNotePanels } from './src/views/StatblockNotePanels.ts';
 import { ForgeTemplatePickerModal } from './src/views/StatblockFilePickers';
 import { TemplateDeletionModal } from './src/views/TemplateDeletionModal';
 import { TemplateOverwriteModal } from './src/views/TemplateOverwriteModal.ts';
+import { TemplateBackupManagerModal } from './src/views/TemplateBackupManagerModal.ts';
 import { UnsavedTemplateChangesModal } from './src/views/UnsavedTemplateChangesModal.ts';
 import { normalizeTemplateFolder, FORGE_TEMPLATE_EXTENSION } from './src/templates/templateFormat';
 import { parseTemplateFileText } from './src/templates/forgeFileFormat.ts';
@@ -15,11 +16,14 @@ import { createInitialStatblockData } from './src/templates/statblockCreationMod
 import { saveTemplateDocument, TemplateNameConflictError, type TemplateOverwriteConfirmation } from './src/templates/templateRepository.ts';
 import { createTemplateVaultStorage } from './src/templates/templateVaultStorage.ts';
 import { createForgeLayout, isRecord } from './src/templates/forgeTemplate.ts';
+import { resolveAtlasTemplateLayoutForForgeCopy } from './src/templates/forgeLayoutSidecar.ts';
 import { createForgeStatblockNoteFromTemplate } from './src/statblocks/forgeStatblockNoteCreator.ts';
 import { openForgeStatblockNoteForEditing } from './src/statblocks/forgeStatblockEditorWorkflow.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './src/atlas/forgeTemplateLinkResolver';
-import { getForgeAtlasPublicAPI, registerForgeAtlasSheetProvider } from './src/atlas/atlasSheetProvider.ts';
+import { startForgeAtlasPreviewBridge } from './src/atlas/forgeAtlasPreviewBridge.ts';
+import { AtlasForgeResourceTokenSync } from './src/atlas/atlasResourceTokenSync.ts';
 import { refreshForgeStatblockTemplateLinkPath } from './src/statblocks/forgeTemplateLink';
+import { ForgeTemplateLinkMaintenance } from './src/statblocks/forgeTemplateLinkMaintenance.ts';
 import { assessAtlasTokenCreation, dispatchAtlasCreateTokenCommand } from './src/atlas/atlasTokenWorkflow';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from './src/i18n/localization';
 import { DEFAULT_DOCUMENTATION_FOLDER, documentationFolderForLanguage, normalizeDocumentationFolder, writeForgeDocumentation } from './src/documentation/documentationPackage.ts';
@@ -27,6 +31,13 @@ import { normalizeForgeCustomBorders, normalizeForgeCustomThemes, type ForgeCust
 import { createForgeStylePackage, downloadForgeStylePackage, MAX_FORGE_STYLE_PACKAGE_BYTES, parseForgeStylePackage } from './src/templates/stylePackage.ts';
 import { StylePackageImportModal } from './src/views/StylePackageImportModal.ts';
 import { readPersistedTemplateEditorDrafts, upsertPersistedTemplateEditorDrafts, removePersistedTemplateEditorDraft, type PersistedTemplateEditorDraft } from './src/templates/templateEditorDraftStorage.ts';
+import {
+  cloneForgeDiceHistory,
+  isForgeDiceHistorySnapshotCurrent,
+  readForgeDiceHistory,
+  upsertForgeDiceHistory,
+  type ForgeDiceHistoryEntry,
+} from './src/statblocks/forgeDiceHistoryStorage.ts';
 import type { ClosedTemplateEditorDraft } from './src/views/closedTemplateEditorDraft.ts';
 import {
   createEmptyForgeTokenLinkStore,
@@ -81,6 +92,11 @@ export default class StatblockForgePlugin extends Plugin {
   private forgeTokenLinkStoreStatus: ForgeTokenLinkStoreParseResult['status'] = 'empty';
   private forgeTokenLinkStoreIssues: string[] = [];
   private persistedForgeTokenLinksRaw: unknown = undefined;
+  private forgeDiceHistoryEntries: ForgeDiceHistoryEntry[] = [];
+  private persistedForgeDiceHistoryRaw: unknown = undefined;
+  private hasPersistedForgeDiceHistory = false;
+  private forgeDiceHistoryDirty = false;
+  private forgeDiceHistoryRevision = 0;
   private hasPersistedForgeTokenLinks = false;
   private forgeTokenLinkStoreDirty = false;
   private dataWriteQueue: Promise<void> = Promise.resolve();
@@ -88,11 +104,14 @@ export default class StatblockForgePlugin extends Plugin {
   private editorRecoveryPromptOpen = false;
 
   async onload(): Promise<void> {
-    const storedData = await this.loadData() as (Partial<StatblockForgeSettings> & { editorDrafts?: unknown; forgeTokenLinks?: unknown }) | null;
-    const { editorDrafts, forgeTokenLinks: storedForgeTokenLinks, ...storedSettings } = storedData ?? {};
+    const storedData = await this.loadData() as (Partial<StatblockForgeSettings> & { editorDrafts?: unknown; forgeTokenLinks?: unknown; forgeDiceHistory?: unknown }) | null;
+    const { editorDrafts, forgeTokenLinks: storedForgeTokenLinks, forgeDiceHistory: storedForgeDiceHistory, ...storedSettings } = storedData ?? {};
     this.editorRecoveryDrafts = readPersistedTemplateEditorDrafts(editorDrafts);
     this.hasPersistedForgeTokenLinks = Object.prototype.hasOwnProperty.call(storedData ?? {}, FORGE_TOKEN_LINKS_DATA_KEY);
     this.persistedForgeTokenLinksRaw = storedForgeTokenLinks;
+    this.hasPersistedForgeDiceHistory = Object.prototype.hasOwnProperty.call(storedData ?? {}, 'forgeDiceHistory');
+    this.persistedForgeDiceHistoryRaw = storedForgeDiceHistory;
+    this.forgeDiceHistoryEntries = readForgeDiceHistory(storedForgeDiceHistory);
     const tokenLinkLoad = readPersistedForgeTokenLinks(storedForgeTokenLinks);
     this.forgeTokenLinkStore = tokenLinkLoad.data;
     this.forgeTokenLinkStoreStatus = tokenLinkLoad.status;
@@ -110,45 +129,85 @@ export default class StatblockForgePlugin extends Plugin {
       toggleStatblockModeShortcut: normalizeForgeShortcut(storedSettings.toggleStatblockModeShortcut),
     };
 
-    // The fork owns the Ctrl-hover preview lifecycle. Forge supplies its exact
-    // renderer through the public sheet-provider API. The API can appear or be
-    // replaced after Forge loads, so reconnect on workspace changes and when
-    // the fork explicitly requests registration immediately before Ctrl-hover.
-    let registeredAtlasAPI: ReturnType<typeof getForgeAtlasPublicAPI> = null;
-    let unregisterAtlasProvider: (() => void) | null = null;
-    const tryRegisterAtlasProvider = (): void => {
-      const currentAtlasAPI = getForgeAtlasPublicAPI(this.app);
-      if (registeredAtlasAPI !== currentAtlasAPI) {
-        unregisterAtlasProvider?.();
-        unregisterAtlasProvider = null;
-        registeredAtlasAPI = null;
-      }
-      if (!currentAtlasAPI || unregisterAtlasProvider) return;
-      const unregister = registerForgeAtlasSheetProvider(this.app, this, currentAtlasAPI);
-      if (!unregister) return;
-      unregisterAtlasProvider = unregister;
-      registeredAtlasAPI = currentAtlasAPI;
-    };
-    this.register(() => {
-      unregisterAtlasProvider?.();
-      unregisterAtlasProvider = null;
-      registeredAtlasAPI = null;
-    });
-    tryRegisterAtlasProvider();
-    this.app.workspace.onLayoutReady(tryRegisterAtlasProvider);
-    this.registerEvent(this.app.workspace.on('layout-change', tryRegisterAtlasProvider));
-    this.registerEvent(this.app.workspace.on('active-leaf-change', tryRegisterAtlasProvider));
-    const workspaceProviderEvents = this.app.workspace as unknown as {
-      on: (name: string, callback: () => void) => EventRef;
-    };
-    this.registerEvent(workspaceProviderEvents.on(
-      'statblock-forge-atlas-provider-registration-requested',
-      tryRegisterAtlasProvider,
-    ));
+    // Atlas 0.17.0 owns the native Ctrl-hover lifecycle. Forge only intercepts
+    // Forge-native v2 token notes and supplies its renderer; all other previews
+    // continue through Atlas' original NotePreviewUIManager implementation.
+    startForgeAtlasPreviewBridge(this.app, this);
+    const atlasResourceTokenSync = new AtlasForgeResourceTokenSync(this.app);
+    atlasResourceTokenSync.start();
+    this.register(() => atlasResourceTokenSync.stop());
 
     this.registerView(STATBLOCK_FORGE_EDITOR_VIEW, (leaf) => new TemplateEditorView(leaf, this));
     this.registerExtensions([FORGE_TEMPLATE_EXTENSION], STATBLOCK_FORGE_EDITOR_VIEW);
     this.registerView(STATBLOCK_FORGE_RENDER_VIEW, (leaf) => new StatblockRenderView(leaf, this));
+    const templateLinkMaintenance = new ForgeTemplateLinkMaintenance({
+      listTemplates: async () => {
+        const templates = this.app.vault.getFiles().filter((file) => file.extension.toLowerCase() === FORGE_TEMPLATE_EXTENSION);
+        const records = await Promise.all(templates.map(async (file) => {
+          try {
+            const parsed = parseTemplateFileText(await this.app.vault.cachedRead(file), file.extension);
+            return parsed.fileFormat === 'forge' ? { path: file.path, templateId: parsed.template.id } : null;
+          } catch {
+            return null;
+          }
+        }));
+        return records.filter((record): record is { path: string; templateId: string } => record !== null);
+      },
+      listStatblockNotes: async () => this.app.vault.getMarkdownFiles().map((file) => ({
+        path: file.path,
+        frontmatter: this.app.metadataCache.getFileCache(file)?.frontmatter,
+      })),
+      updateNoteLink: async (notePath, update) => {
+        const note = this.app.vault.getAbstractFileByPath(notePath);
+        if (!(note instanceof TFile) || note.extension.toLowerCase() !== 'md') return false;
+        let changed = false;
+        await this.app.fileManager.processFrontMatter(note, (frontmatter: unknown) => {
+          if (isRecord(frontmatter)) changed = update(frontmatter);
+        });
+        return changed;
+      },
+      onTemplateTreeChanged: (callback) => {
+        const shouldRefresh = (file: TFile | TFolder): void => {
+          if (file instanceof TFolder || file.extension.toLowerCase() === FORGE_TEMPLATE_EXTENSION) callback();
+        };
+        const created = this.app.vault.on('create', shouldRefresh);
+        const renamed = this.app.vault.on('rename', shouldRefresh);
+        const metadataChanged = this.app.metadataCache.on('changed', (file) => {
+          if (file?.extension?.toLowerCase() !== 'md') return;
+          const link = readForgeTemplateLink(this.app, file);
+          if (!link) return;
+          const linkedTemplate = this.app.vault.getAbstractFileByPath(link.templatePath);
+          if (!(linkedTemplate instanceof TFile) || linkedTemplate.extension.toLowerCase() !== FORGE_TEMPLATE_EXTENSION) {
+            callback();
+            return;
+          }
+          void this.app.vault.cachedRead(linkedTemplate).then((text) => {
+            try {
+              const parsed = parseTemplateFileText(text, linkedTemplate.extension);
+              if (parsed.fileFormat !== 'forge' || parsed.template.id !== link.templateId) callback();
+            } catch {
+              callback();
+            }
+          }).catch(() => callback());
+        });
+        return () => {
+          this.app.vault.offref(created);
+          this.app.vault.offref(renamed);
+          this.app.metadataCache.offref(metadataChanged);
+        };
+      },
+      onReady: (callback) => this.app.workspace.onLayoutReady(callback),
+    }, (result) => {
+      if (result.notesUpdated > 0) {
+        this.showNotice(`${result.notesUpdated} ${this.uiLabel('statblock note link(s) were repaired after a template move or restore.', 'vínculo(s) de statblock foram corrigidos após mover ou restaurar um template.')}`);
+      }
+      if (result.ambiguousTemplates > 0 || result.failedNotes.length > 0) {
+        console.warn('Statblock Forge: template-link maintenance left ambiguous or failed references unchanged.', result);
+      }
+    }, (error) => console.warn('Statblock Forge: could not repair moved template links.', error));
+    templateLinkMaintenance.start();
+    this.register(() => templateLinkMaintenance.stop());
+
     this.statblockNotePanels = new StatblockNotePanels(this.app, this);
     this.statblockNotePanels.start();
     this.register(() => { void this.statblockNotePanels?.stop(); this.statblockNotePanels = null; });
@@ -171,6 +230,16 @@ export default class StatblockForgePlugin extends Plugin {
       id: 'recover-unsaved-forge-template-drafts',
       name: this.uiLabel('Recover unsaved Forge template drafts', 'Recuperar rascunhos não salvos de templates Forge'),
       callback: () => this.promptForNextEditorRecoveryDraft(true),
+    });
+    this.addCommand({
+      id: 'recover-forge-template-backup',
+      name: this.uiLabel('Recover Forge template backup…', 'Recuperar backup de template Forge…'),
+      callback: () => new TemplateBackupManagerModal(
+        this.app,
+        this.settings.templateFolder,
+        normalizeForgeLanguage(this.settings.language),
+        (path, safetyBackupPath) => this.showNotice(`${this.uiLabel('Template restored from backup:', 'Template restaurado do backup:')} ${path}${safetyBackupPath ? ` · ${this.uiLabel('Safety backup:', 'Backup de segurança:')} ${safetyBackupPath}` : ''}`),
+      ).open(),
     });
     this.addCommand({
       id: 'open-forge-template',
@@ -487,13 +556,29 @@ export default class StatblockForgePlugin extends Plugin {
     if (!(currentSource instanceof TFile) || currentSource.extension.toLowerCase() !== 'atlastemplate') {
       throw new Error('O template Atlas de origem não existe mais no Vault.');
     }
-    const parsed = parseTemplateFileText(await this.app.vault.cachedRead(currentSource), currentSource.extension);
+    const originalText = await this.app.vault.cachedRead(currentSource);
+    const parsed = parseTemplateFileText(originalText, currentSource.extension);
+    let sidecarText: string | null = null;
+    if (!parsed.layout) {
+      const sourceSidecarPath = `${currentSource.parent?.path ?? ''}/.statblock-forge/layouts/${parsed.template.id}.json`.replace(/^\//, '');
+      const configuredSidecarPath = `${this.settings.templateFolder}/.statblock-forge/layouts/${parsed.template.id}.json`;
+      for (const sidecarPath of [...new Set([sourceSidecarPath, configuredSidecarPath])]) {
+        const sidecarFile = this.app.vault.getAbstractFileByPath(sidecarPath);
+        if (sidecarFile instanceof TFile) {
+          sidecarText = await this.app.vault.cachedRead(sidecarFile);
+          break;
+        }
+      }
+    }
+    const layoutResolution = resolveAtlasTemplateLayoutForForgeCopy(parsed.template, parsed.layout, sidecarText);
     const copied = await saveTemplateDocument({
       storage: createTemplateVaultStorage(this.app),
       templateFolder: this.settings.templateFolder,
       name: currentSource.basename,
       template: parsed.template,
-      layout: parsed.layout ?? createForgeLayout(parsed.template),
+      layout: layoutResolution.layout,
+      sourcePath: currentSource.path,
+      originalText,
       saveAsCopy: true,
       ...(overwrite ? {
         overwriteExistingPath: overwrite.overwriteExistingPath,
@@ -502,9 +587,10 @@ export default class StatblockForgePlugin extends Plugin {
     });
     const copiedFile = this.app.vault.getAbstractFileByPath(copied.file.path);
     if (!(copiedFile instanceof TFile)) throw new Error('A cópia Forge não foi encontrada no Vault.');
-    this.showNotice(copied.overwrittenExisting
+    const resultMessage = copied.overwrittenExisting
       ? `${this.uiLabel('Template replaced:', 'Template substituído:')} ${copiedFile.path}. Backup: ${copied.backupPath ?? 'indisponível'}`
-      : `${this.uiLabel('Created Forge copy:', 'Cópia Forge criada:')} ${copiedFile.path}`);
+      : `${this.uiLabel('Created Forge copy:', 'Cópia Forge criada:')} ${copiedFile.path}`;
+    this.showNotice(layoutResolution.warning ? `${resultMessage}. ${layoutResolution.warning}` : resultMessage, layoutResolution.warning ? 12000 : 8000);
     return copiedFile;
   }
 
@@ -890,6 +976,37 @@ export default class StatblockForgePlugin extends Plugin {
     window.setTimeout(() => this.promptForNextEditorRecoveryDraft(false), 0);
   }
 
+  /** Returns recent Forge-owned rolls for one statblock without exposing mutable plugin state. */
+  getForgeDiceHistoryEntries(statblockPath: string, limit = 20): ForgeDiceHistoryEntry[] {
+    const bounded = Number.isInteger(limit) ? Math.max(1, Math.min(20, limit)) : 20;
+    return this.forgeDiceHistoryEntries
+      .filter((entry) => entry.statblockPath === statblockPath)
+      .slice().sort((a, b) => b.timestamp - a.timestamp).slice(0, bounded)
+      .map((entry) => readForgeDiceHistory([entry])[0]!)
+      .filter(Boolean);
+  }
+
+  /** Finds one persisted Forge history entry by its stable roll id. */
+  getForgeDiceHistoryEntry(id: string): ForgeDiceHistoryEntry | null {
+    const entry = this.forgeDiceHistoryEntries.find((candidate) => candidate.id === id);
+    return entry ? readForgeDiceHistory([entry])[0] ?? null : null;
+  }
+
+  /** Records a validated Forge statblock roll and persists it through the shared data-write queue. */
+  recordForgeDiceHistoryEntry(entry: ForgeDiceHistoryEntry): void {
+    const parsed = readForgeDiceHistory([entry])[0];
+    if (!parsed || parsed.id !== entry.id || parsed.repeatable !== entry.repeatable) return;
+    this.forgeDiceHistoryEntries = upsertForgeDiceHistory(this.forgeDiceHistoryEntries, parsed);
+    this.forgeDiceHistoryRevision += 1;
+    this.forgeDiceHistoryDirty = true;
+    void this.persistPluginData().catch((error) => {
+      this.showNotice(this.uiLabel(
+        `The roll was made, but its history could not be saved: ${error instanceof Error ? error.message : String(error)}`,
+        `A rolagem foi realizada, mas não foi possível salvar o histórico: ${error instanceof Error ? error.message : String(error)}`,
+      ));
+    });
+  }
+
   private persistPluginData(): Promise<void> {
     // Build the snapshot inside the serialized queue. Settings, drafts and
     // token links therefore cannot overwrite one another with stale snapshots
@@ -911,7 +1028,27 @@ export default class StatblockForgePlugin extends Plugin {
         snapshot[FORGE_TOKEN_LINKS_DATA_KEY] = this.persistedForgeTokenLinksRaw;
       }
 
+      const historyRevisionAtSnapshot = this.forgeDiceHistoryRevision;
+      const historySnapshot = this.forgeDiceHistoryDirty
+        ? cloneForgeDiceHistory(this.forgeDiceHistoryEntries)
+        : null;
+      if (historySnapshot) {
+        snapshot.forgeDiceHistory = historySnapshot;
+      } else if (this.hasPersistedForgeDiceHistory) {
+        // Preserve malformed or newer-version data during unrelated settings writes.
+        snapshot.forgeDiceHistory = this.persistedForgeDiceHistoryRaw;
+      }
+
       await this.saveData(snapshot);
+      if (historySnapshot) {
+        this.persistedForgeDiceHistoryRaw = historySnapshot;
+        this.hasPersistedForgeDiceHistory = true;
+        // A new roll may be recorded while saveData() is pending. Keep the
+        // dirty flag set in that case so the next queued write persists it.
+        if (isForgeDiceHistorySnapshotCurrent(historyRevisionAtSnapshot, this.forgeDiceHistoryRevision)) {
+          this.forgeDiceHistoryDirty = false;
+        }
+      }
       if (shouldWriteTokenStore && currentStore) {
         this.persistedForgeTokenLinksRaw = snapshot[FORGE_TOKEN_LINKS_DATA_KEY];
         this.hasPersistedForgeTokenLinks = true;

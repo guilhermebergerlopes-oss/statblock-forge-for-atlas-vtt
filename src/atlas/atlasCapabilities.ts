@@ -25,14 +25,14 @@ export const ATLAS_PUBLIC_CAPABILITIES: readonly AtlasPublicCapability[] = [
     label: 'Templates nativos',
     status: 'documented',
     explanation: 'A biblioteca nativa do Atlas procura templates JSON com extensão .atlastemplate em qualquer pasta do Vault; arquivos .forgetemplate não são reconhecidos diretamente.',
-    integration: 'O Forge mantém seus próprios statblocks vinculados a .forgetemplate e os abre em seu editor independente. A exportação para Atlas continua sendo uma ação separada que gera .atlastemplate.',
+    integration: 'O Forge importa .atlastemplate como origem somente leitura e cria uma cópia .forgetemplate para edição. O Forge não grava nem exporta templates .atlastemplate.',
   },
   {
     id: 'token-from-statblock-command',
     label: 'Criação e associação de token a partir do statblock',
     status: 'documented',
     explanation: 'Atlas documenta o comando “Create token from statblock image”: com uma nota statblock ativa e uma imagem local no Vault, cria um token e já o vincula à nota.',
-    integration: 'O Forge abre a nota publicada e tenta acionar o comando visível do Atlas quando o gerenciador de comandos do Obsidian está disponível; caso contrário, orienta a execução manual. Tokens já existentes continuam usando “Link Statblock”.',
+    integration: 'O Forge abre a nota de statblock e tenta acionar o comando visível do Atlas quando o gerenciador de comandos do Obsidian está disponível; caso contrário, orienta a execução manual. Tokens já existentes continuam usando “Link Statblock”.',
   },
   {
     id: 'native-statblock-editor',
@@ -46,7 +46,7 @@ export const ATLAS_PUBLIC_CAPABILITIES: readonly AtlasPublicCapability[] = [
     label: 'Ability Parts nativas',
     status: 'documented',
     explanation: 'O formato verificado do Atlas aceita text, number, list, dice e choice nas partes de Entries.',
-    integration: 'Esses tipos são exportados diretamente. Counter do Forge é projetado como text para o Atlas e restaurado como marcas ao abrir a mesma nota no Forge.',
+    integration: 'Os formatos nativos são reconhecidos durante a importação. Os Counter de notas Atlas existentes mantêm uma representação textual reversível que o Forge restaura ao abrir a nota.',
   },
   {
     id: 'browser-named-rolls',
@@ -60,7 +60,7 @@ export const ATLAS_PUBLIC_CAPABILITIES: readonly AtlasPublicCapability[] = [
     label: 'Registro de renderizadores de statblock',
     status: 'not-documented',
     explanation: 'Não foi encontrada uma API pública documentada para registrar renderizadores externos ou substituir o renderizador nativo.',
-    integration: 'O Forge mantém seu próprio renderizador e sua prévia independente.',
+    integration: 'Não há API pública de renderer. Para Atlas 0.17.0 e 0.18.0, o Forge utiliza diretamente o NotePreviewUIManager interno e substitui o caminho de prévia somente para notas Forge; isso cria dependência intencional da implementação exata do Atlas.',
   },
   {
     id: 'ability-part-extension',
@@ -74,7 +74,7 @@ export const ATLAS_PUBLIC_CAPABILITIES: readonly AtlasPublicCapability[] = [
     label: 'Sincronização online de personagens e Counters',
     status: 'not-documented',
     explanation: 'Não foi encontrada uma API pública para plugins externos lerem ou alterarem o estado online de personagens, recursos ou Counters.',
-    integration: 'A etapa 6 continuará bloqueada até existir uma interface pública documentada e permissões verificáveis.',
+    integration: 'Para operações locais, o Forge pretende utilizar diretamente os stores e serviços internos do Atlas; não presume uma interface pública documentada para plugins externos. Isso não implica que o estado de personagens em sessões online possa ser alterado sem respeitar os serviços e controles próprios do Atlas.',
   },
 ] as const;
 

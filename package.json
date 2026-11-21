@@ -1,6 +1,6 @@
 {
   "name": "statblock-forge",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "Create and customize tabletop RPG statblocks with reusable templates, configurable fields, formulas, resources, layouts, and dice tools.",
   "license": "AGPL-3.0-only",
   "engines": {
@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "build:styles": "node scripts/compile-styles.mjs",
     "test:compendium": "node --experimental-strip-types --test tests/fieldCompendium.test.mjs",
-    "test:layout": "node --experimental-strip-types --test tests/gridLayout.test.mjs"
+    "test:layout": "node --experimental-strip-types --test tests/gridLayout.test.mjs",
+    "audit:release": "node scripts/audit-release.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

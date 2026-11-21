@@ -1,7 +1,175 @@
+## Unreleased
+
+- Fixes Field drag-and-drop into **Metric** and **Table** Containers. Field drops now target the entire visible data-Container surface instead of only its central insertion zone, and drop-target lookup resolves the Forge block wrapper rather than nested Atlas elements that may also carry `data-block-id`. Empty Metrics and Tables now show an editor-only drop hint. The Canvas tree and Add Container pickers display **Metric** and **Table** without the redundant `container` suffix; Forge remains at 0.5.0.
+- Removes the exact Atlas-version allowlist for runtime integration. Atlas 0.17.0 and later versions can be used: exact 0.17.0/0.18.0 snapshots retain their inspected profiles, while later versions use the closest forward-compatible baseline (0.17.0 or 0.18.0) and must expose the methods/services required by each feature. Atlas 0.18.0+ saved rolls are enabled by minimum-version comparison and AssetService capability checks. Versions below 0.17.0 remain Vault/file-only. Forge stays at 0.5.0.
+- Adds optional **Dice Lab looks** when saving statblock/Dice Field rolls to Atlas 0.18.0 or newer. For simple additive formulas, Forge stores the dice as a preset `look` and keeps only the numeric bonus in `formula`; matching active Dice Sets are copied with their names, colours, critical, explosion, advantage, and disadvantage rules. Other simple dice formulas become an independent natural-critical look that can be customized in Atlas' native saved-roll editor. Written `adv`/`dis` and formulas with unsupported modifiers remain formula presets without conversion. Pin/unpin matching now recognizes the converted look formula even if the collection's default Dice Set later changes.
+- Adds **Pin to Atlas dice row** / **Unpin from Atlas dice row** to Forge statblock roll-link context menus when the formula matches a saved roll in the owning collection. Uses the collection `diceRow` through `AssetService.updateCollectionSettings()`, preserves custom dice and existing order, starts from Atlas’ seven standard dice when the row is unset, and respects the ten-position limit. Reordering remains in Atlas’ native row editor.
+- Adds **Save roll to Atlas collection** to Forge statblock/Dice Field roll-link context menus. The action stores a named formula in the owning Atlas collection through `AssetService.updateCollectionSettings()` (`dicePresets`), follows Atlas saved-roll limits (40 rolls, 40-character names, 100-character formulas) on Atlas 0.18.0 or newer, preserves `adv`/`dis`, and leaves other collection settings untouched.
+- Adds typed `adv`/`dis` suffixes to statblock roll links and Dice Fields (for example, `1d20+5 adv`, `1d20+5 dis`, and `Stealth +5 adv`). The suffix is preserved when sending a roll to Atlas and applied by Forge’s off-map roller; an opposing Shift/Alt request cancels the written side. Dice Fields with a written side no longer show a misleading simple `avg` hint.
+- Verifies the existing direct Atlas runtime integration against the original Atlas 0.18.0 source and enables its exact adapter alongside the already verified 0.17.0 profile. Later versions use the forward-compatible capability mode described in the first Unreleased entry.
+- Keeps Forge Ctrl-hover preview interception enabled for verified runtime profiles rather than hard-coding 0.17.0; updates runtime, TokenAsset, DiceTool, Resource, and user-guide compatibility notes. Forge version remains 0.5.0.
+
+- Removes Atlas Template export and Atlas statblock publishing from Forge. `.atlastemplate` is now import-only: Forge reads the original as a read-only source and saves an editable `.forgetemplate` copy. Existing Atlas sidecars are read during import when valid, but no new Atlas sidecars are written.
+- Forge-owned Template JSON now stores the reorganized Field type IDs (`inline`, `selection`, `counter`, `groups`). Older IDs remain readable, and native Atlas IDs are normalized when importing `.atlastemplate` files.
+
+- Allows **Selection** options to be used as boolean formula references. Each configured option evaluates to `1` when selected and `0` otherwise; the Selection Field itself evaluates to `1` when any value is selected. Works in Number/Rating, Metric, and derived Scores formulas without changing Atlas-native Choice values.
+- Adds a per-Field **Multiple choices** setting to Checkboxes. New Checkbox Fields default to a single selected option; enabling the setting allows multiple selections within that Field only. Other Checkbox Fields remain independent, and older templates without the setting retain their previous multi-select behavior.
+- Reorganizes the Field picker into **Values** (Number, Rating, Dice, Counter), **Text** (In-line, Markdown), **Choice** (Checkboxes, Selection), **Image**, and **Collections** (List, Entries, Pairs, Groups). Forge-owned Template JSON now writes the reorganized Field type IDs (`inline`, `selection`, `counter`, `groups`); older IDs are normalized on load, while native Atlas IDs are normalized when `.atlastemplate` files are imported. Legacy category metadata is normalized on load, and Atlas `scores` storage remains internal to Table Containers.
+- Replaced the Counters-per-row preset selector with an unbounded positive-integer input; the renderer now applies the grid columns directly to the rendered Counter grid in both Canvas and live statblocks.
+- Renamed the Template Editor's **Structure** tab to **Data** in English and **Dados** in Portuguese, while retaining the internal draft key for compatibility.
+
+## Final transition audit — independent Atlas integration (Stage 7.4, Forge 0.5.0)
+
+- Adds `npm run audit:release` to verify plugin/package/lockfile identity, reject legacy compatibility-fork integration markers in production source, resolve all relative imports, and confirm the original Atlas runtime entry points are wired into plugin startup.
+- Confirms that the active integration targets only the original Atlas VTT `atlas-vtt` plugin and the inspected 0.17.0 internal-runtime profile. No compatibility-fork plugin, provider API, handshake, or dice/history API is required.
+- Confirms the complete relative-import graph resolves and that preview, token/Resource synchronization, and native map DiceTool integration are part of the current plugin startup.
+- Clarifies the historical Stage 5.5 changelog entry: its temporary migration marker was removed in Stage 7.1. Historical transition reports remain as records of intermediate implementation states.
+- Keeps the Forge version at 0.5.0. No Atlas source files or Vault data are modified by this audit.
+
+## Runtime consolidation — single Atlas discovery path (Stage 7.3, Forge 0.5.0)
+
+- Removes `atlasRuntimeDetection.ts`, a manifest-file detector that had no production callers; the live plugin registry and per-map discovery in `atlasRuntime.ts` remain the single runtime source of truth.
+- Moves renderer, TokenRenderer, and TokenStatblockLinkService resolution into `inspectAtlasMapLeaf()` so the central runtime resolves each per-map service once.
+- Refactors `atlasTokenAdapter.ts` into a typed token-focused projection of the central runtime context; it no longer walks Workspace leaves or calls ServiceManager getters independently.
+- Removes the redundant `ATLAS_TOKEN_VIEW_TYPE` alias; all internal consumers and tests use `ATLAS_VIEW_TYPE` from `atlasRuntime.ts`.
+- Keeps Atlas capability documentation, token state readers, link storage, public command dispatch, and feature-specific action services because they still have active consumers or serve as tested integration contracts.
+- Adds regression tests proving that runtime and token adapters share the same live context and that removed discovery/alias paths are not reintroduced.
+
+## Runtime cleanup — retired Atlas diagnostics (Stage 7.2, Forge 0.5.0)
+
+- Removes `atlasStatus.ts`, an unused template-folder status helper with no production or test consumers.
+- Removes `atlasTokenIntegrationDiagnostics.ts` and `atlasTokenViewportAccess.ts`; the viewport hit-test path was used only by an unmounted diagnostic report and was not part of token linking, Resource sync, preview, or roll execution.
+- Removes the unused `AtlasTokenAdapterDiagnostic` snapshot API from `atlasTokenAdapter.ts`; keeps the runtime context/status checks required by active token, AssetService, and statblock-link operations.
+- Keeps `atlasCapabilities.ts` as a tested record of Atlas documented/public capabilities and keeps `atlasTokenAdapter.ts` as the live internal-runtime adapter.
+- Updates current Portuguese/English overview documentation and README to state the verified Atlas 0.17.0 internal-runtime dependency accurately. Historical stage reports remain as historical records.
+- The former external sheet provider and registration handshake had already been removed in Stage 2; this stage verifies no provider/handshake implementation remains in active source rather than deleting a nonexistent implementation.
+
+## Fork identity cleanup (Stage 7.1, Forge 0.5.0)
+
+- Removes the final legacy fork plugin-ID constant from the then-current manifest detector; runtime integration exposes only the original Atlas plugin ID (`atlas-vtt`). The unused file-based detector itself is retired in Stage 7.3.
+- Updates the runtime test to reject an unrelated plugin manifest without importing or exporting any legacy fork identifier.
+- Keeps negative dependency-audit assertions in tests so future changes cannot silently reintroduce the former ID or fork roll API into active modules.
+- Updates the Stage 1 and Stage 5.1/5.5 integration notes to mark temporary bridge references as historical and document the completed migration.
+
+## Template compatibility — final lifecycle verification (Stage 6.4, Forge 0.5.0)
+
+- Adds end-to-end lifecycle coverage for legacy grid Templates, repeated Atlas imports with Forge sidecars, Forge copy creation, backup restoration after a Template move, and automatic repair of v1/v2 statblock backlinks.
+- Verifies that legacy grid migration is deterministic across repeated imports, that already-migrated Atlas data is idempotent when reopened, and that the original legacy source bytes are not rewritten during inspection or copy creation.
+- Fixes legacy grid migration to retain the complete original grid-block payload in `fsExtras.atlasLegacyGrid.originalPayload`, including unknown extension properties that were previously not represented by the normalized geometry and field settings. The payload is preserved as data and is never executed.
+- Verifies that a legacy file carrying the `.forgetemplate` extension but lacking the namespaced Forge metadata is protected from in-place overwrite.
+- Verifies repeated `.atlastemplate` imports read the sidecar associated with the source Atlas Template ID, produce independent Forge copies with fresh IDs, and leave both the native Atlas file and sidecar unchanged.
+- Verifies that restoring a moved Template from a validated backup targets the unique stable Template ID, creates a safety backup, restores the exact Forge file, and repairs both Forge-native v2 and Atlas-published v1 backlinks without changing the Atlas Template ID or unrelated note frontmatter.
+- Adds `TEMPLATE-COMPATIBILITY-MATRIX-0.5.0.md` documenting the tested file contracts, projections, warnings, backup behavior, and migration boundaries. No Vault files are migrated automatically.
+
+## Template backup recovery (Stage 6.3.2, Forge 0.5.0)
+
+- Adds versioned `.forgetemplate.bak` envelopes containing the exact original path, stable Template ID, source text, byte length, timestamp, and CRC-32 corruption check. CRC-32 detects accidental damage; it is not an authenticity or security signature.
+- Keeps legacy raw `.forgetemplate.bak` files readable. The recovery tool resolves their destination by stable Template ID when unambiguous, otherwise restores as a new copy without replacing an unrelated file.
+- Adds **Recover Forge template backup…** to the Command Palette with a listing of verified, damaged, legacy, and unavailable backups.
+- Requires a second explicit confirmation before replacing an existing destination. A safety backup is created before restoration; compare-and-swap refuses to overwrite edits made after confirmation.
+- Protects a destination whose current valid Template ID differs from the backup ID, and prevents duplicate Template IDs when recreating a missing file.
+- Changes confirmed template replacement to store a versioned backup envelope and to use compare-and-swap for the replacement write. If a concurrent edit wins, the current file is preserved and the backup remains available.
+- Adds tests for checksum corruption, missing-file recovery, overwrite safety backups, stale backup/target snapshots, ID conflicts, legacy backup inference, and interrupted replacement.
+
+## Template import/export consolidation (Stage 6.2, Forge 0.5.0)
+
+- Consolidates native Atlas template creation and reuse through `writeAtlasTemplateExport()`, shared by direct export and Atlas statblock publishing.
+- Native `.atlastemplate` exports now write a matching Forge layout sidecar under `<templateFolder>/.statblock-forge/layouts/<templateId>.json`, preserving the source Forge layout for later re-import.
+- Normalizes the sidecar `templateId` to the exported Atlas template ID, preventing a sidecar from pointing at the source Forge template ID after export.
+- Uses compare-and-swap when updating an existing valid sidecar; malformed, unsupported, mismatched, orphaned, or concurrently changed sidecars are preserved and reported instead of silently overwritten.
+- Requires the exact inspected native template text before reusing a prior Atlas export. A concurrent modification aborts reuse without changing the native template or its sidecar.
+- Atlas statblock publishing now uses the same repository writer; on later publication failure it removes only a sidecar created by the attempt or conditionally restores an updated sidecar, preserving subsequent concurrent edits.
+- Adds repository tests for export/import sidecar round trips, stale-source conflicts, damaged/orphan sidecars, compare-and-swap conflicts, and publisher reuse/rollback routing.
+
+## Template formats — audit and sidecar preservation (Stage 6.1, Forge 0.5.0)
+
+- Documents the Atlas 0.17.0 native template schema and the distinction between `.atlastemplate`, `.forgetemplate`, and Forge layout sidecars.
+- Fixes Atlas-to-Forge copy creation to load the external `.statblock-forge/layouts/<templateId>.json` sidecar before creating a `.forgetemplate`, preserving custom Grid, width, theme, and block layout settings.
+- Adds explicit sidecar inspection for invalid JSON, unsupported format/version, mismatched Template IDs, and invalid block maps; invalid sidecars fall back to the default layout with a warning and are not rewritten.
+- Preserves unknown future per-block Forge layout properties during sidecar read/write cycles, matching the existing preservation of unknown root and appearance properties.
+- Adds contract tests for native Atlas fields/blocks, Forge metadata, export projection, overwrite protection, sidecar import, and forward-compatible properties.
+
+## Atlas integration — roll migration regression and final audit (Stage 5.5, Forge 0.5.0)
+
+- Adds end-to-end coverage for rolls from multiple statblocks across multiple Atlas maps, then serializes Forge history through the `data.json` boundary and replays the saved recipes after a simulated plugin reload with both maps closed.
+- Verifies that Atlas persisted `diceLog`, transient DiceTool history, and Forge-owned history merge without duplicate IDs or cross-statblock leakage; unrelated native toolbar rolls stay outside Forge statblock histories.
+- Removes test dependence on mock fork dice APIs. In-map and off-map roll fixtures now exercise only Atlas 0.17.0's native `DiceTool` and Forge's local roller, with no compatibility-fork plugin installed.
+- At the Stage 5.5 checkpoint, the legacy plugin ID constant was still retained as a migration marker; Stage 7.1 subsequently removed it. The current runtime, roll, history, and repeat modules no longer reference the compatibility fork or its API.
+- Corrects the README's outdated Rest integration note and documents the completed direct Atlas/Forge integration.
+
+## 0.5.0 — Integração direta com o runtime do Atlas (Etapas 0–5.4)
+
+### Changed
+- Estabelece e preserva a linha de base do Forge 0.4.4, do Atlas VTT original 0.17.0 e do fork 0.17.2 para a transição.
+- Substitui a identificação principal do fork pela identificação original `atlas-vtt` e passa a procurar o manifesto do Atlas original.
+- Adiciona um runtime centralizado para descobrir a instância carregada do Atlas, suas visualizações de mapa, `ServiceManager`, stores e serviços por mapa sem manter referências em cache.
+- Centraliza a descoberta das visualizações usadas por tokens, Resources e DiceTool.
+- Mapeia diretamente o DiceTool, o EventEmitter e o histórico por mapa do Atlas original 0.17.0; adiciona `src/atlas/atlasDiceRuntime.ts` para descoberta dinâmica de views visíveis, direcionamento por `viewId` e leitura separada do histórico transitório e do `diceLog` persistido.
+- Registra que `OffMapRollsContext` e `rollStatblockDice()` são estruturas internas da árvore React/bundle do Atlas, não serviços globais públicos; define a migração de rolagens sem mapa e histórico sem presumir APIs que o Atlas original não expõe.
+- Direciona rolagens de prévias Forge abertas pelo Ctrl-hover ao `DiceTool` do mapa Atlas que originou a prévia, sem consultar a API de rolagem do fork quando há um mapa válido.
+- Encaminha `tokenId`, nome, imagem e habilidade como metadados da origem do statblock; encaminha o `DiceRollOrigin` transitório apenas quando o Atlas confirma o mesmo `viewId`, `mapPath` e token ainda colocado na cena.
+- Reutiliza o conjunto de dados do Template e as regras de vantagem/desvantagem do DiceTool do mapa de origem.
+- Quando não há `viewId` explícito, escolhe um único mapa visível ou a folha Atlas ativa; recusa direcionamento ambíguo em vez de registrar a rolagem em um mapa arbitrário.
+- Cria um perfil interno verificado exclusivamente para Atlas 0.17.0; versões não verificadas continuam sem ativar hooks internos automaticamente.
+- Substitui o provider externo de Ctrl-hover por uma janela própria do Forge integrada diretamente ao `NotePreviewUIManager` original do Atlas 0.17.0.
+- Lê vínculos de tokens do Atlas com prioridade para `TokenEntity.statblockPath` e fallback para `TokenAsset.statblockPath`, resolvendo Assets por ID e depois por caminho de imagem.
+- Adiciona um catálogo de leitura fiel aos `ResourceDefinition` do Atlas 0.17.0, preservando chave estável, caminho de Field, direção, cor, regra de derrota, visibilidade de jogador e slot.
+- Identifica Resources efetivos de coleções explícitas e legadas, aplicando fallbacks de presets, exceções de Cairn/Daggerheart/Draw Steel e a antiga opção de Stress bar.
+- Adiciona ações para vincular ou desvincular os tokens Character selecionados no mapa à ficha Forge atual, usando o `TokenStatblockLinkService` singleton do Atlas para atualizar Assets, arquivos de mapas e todos os stores abertos. Tokens genéricos são ignorados porque o Ctrl-hover original do Atlas só emite prévias para Characters.
+- Quando o resolver nativo do Atlas não reconhece a nota Forge v2, atualiza explicitamente `statblockPath` nos Characters de mapas abertos após o serviço nativo atualizar Assets e arquivos de mapas.
+- Mantém os registros legados `forgeTokenLinks` intactos durante esta subetapa; a revisão, migração ou remoção desses dados será tratada separadamente para evitar perda de vínculos anteriores.
+- Sincroniza os máximos dos Resources de Characters vinculados a notas Forge v2 com os valores dos Fields da ficha, usando `updateTokens()` e o histórico não rastreável do Atlas; o PartySync nativo continua observando as mudanças.
+- Resolve as definições com a prioridade de regras do Atlas: sistema da campanha em jogo antes das regras da coleção; campanhas e coleções legadas herdam os Resources do preset, enquanto `resources: []` explícito permanece vazio.
+- Preserva os valores atuais dentro dos novos máximos, respeita `overriddenMax`, inicializa Resources novos conforme `drains`/`fills`, remove apenas valores explicitamente esvaziados e ignora Fields ausentes ou não numéricos.
+- Acompanha alterações de Templates, notas, coleções, arquivos de campanha, presets e abertura de cenas nos mapas GM carregados; aplica novamente os máximos quando as definições de Resource mudam de Field e reinicia apenas tokens que ainda estavam no valor inicial.
+- Endurece a transação de Rest para Resources do Atlas: valida todos os stores e snapshots antes da primeira escrita, prepara um recibo completo por token/Resource e reverte commits parciais quando uma gravação posterior falha.
+- Coordena o commit dos Resources do Atlas com a gravação da nota Markdown/frontmatter ou JSON por meio de `runRestNotePersistenceWithAtlasRollback()`, registrando o recibo do Atlas antes de a operação Vault terminar.
+- Se a gravação da nota falhar após o commit do Atlas, executa a compensação registrada; falhas no próprio commit continuam sendo compensadas pela camada de Resources, sem um segundo rollback externo.
+- Mantém a validação de escolhas e gastos e o cálculo dentro da fila serializada e do callback que lê a versão mais recente da nota; os rótulos de gastos passam a usar os dados calculados a partir desse conteúdo atual.
+- Uma falha de `refresh()` depois de uma persistência concluída passa a ser um aviso visual, sem comunicar incorretamente que a gravação falhou ou tentar reverter valores já salvos.
+- Faz o rollback reconhecer entradas ainda intactas, restaurar somente valores efetivamente gravados e recusar sobrescrever edições que não correspondam aos snapshots anteriores ou posteriores da operação.
+- Endurece o rollback de Rest para continuar a compensação em mapas e stores PartySync independentes mesmo quando uma restauração falha; verifica o estado efetivo após chamadas que podem lançar depois de mutar e mantém o recibo reutilizável para nova tentativa.
+- Agrupa múltiplos Resources de token em uma única atualização por mapa e múltiplos Resources PartySync em uma única atualização por store; valida todos os snapshots antes da primeira gravação e preserva valores não relacionados, máximos por forma, `overriddenMax` e `maxByHand`.
+- Corrige a tipagem do snapshot de Resources para declarar `overriddenMax`, que já era capturado e usado pelo fluxo de sincronização.
+- Permite escolher uma imagem local para o Field reservado Token art de fichas Forge v2 e criar diretamente um `TokenAsset` do Atlas sem passar pelo importador de statblocks nativos.
+- Copia a arte para `atlas-vtt/assets`, registra o token na coleção padrão do Atlas com vínculo para a nota Forge, preserva a imagem original e solicita a atualização da biblioteca do Atlas.
+- Evita duplicar TokenAssets já associados à mesma ficha e mantém a cópia de imagem quando o resultado do registro não pode ser confirmado, evitando deixar um registro salvo sem seu arquivo.
+
+### Fixed
+- Intercepts `NotePreviewUIManager.showOrCreatePreview()` only for Forge-native v2 token notes; Atlas-native statblocks, scene links, encounter folders, and ordinary note previews continue through Atlas' original method.
+- Reuses the existing Forge `renderStatblock()` renderer inside an Atlas-styled floating window with pin/close controls, drag positioning, map visibility handling, token-update subscription, and cleanup on Atlas map or Forge plugin unload.
+- Preserves the effective Template/statblock width and constrains tall previews to a scrollable Forge body; Ctrl+wheel is handled within the preview rather than changing the application zoom.
+
+### Compatibility
+- The Forge version remains **0.5.0** throughout the transition, until an explicit request to advance it.
+- Ctrl-hover no longer requires the fork or its sheet-provider API on the verified Atlas 0.17.0 runtime.
+- Scene-independent rolls and per-statblock roll history now use Forge-owned code and persistence. In-map rolls continue to use the originating Atlas DiceTool; the fork history/repeat bridge is no longer required.
+- No Atlas source file is modified. Forge patches only the live `NotePreviewUIManager` methods for the lifetime of the plugin and restores them on unload.
+- Creating or linking TokenAssets requires an initialized Atlas map so Forge can reach the internal `AssetService` and `TokenStatblockLinkService` instances; Atlas remains responsible for asset persistence and cross-map synchronization.
+- Forge token linking passes `updateStatblockAvatar: false`, preserving the Forge statblock's own serialization and image-field data.
+
+
+### Atlas integration — scene-independent rolls
+
+- Added a Forge-owned off-map dice roller using the local Atlas-compatible formula engine.
+- Resolved the collection Dice Set using the original Atlas 0.17.0 precedence: collection pick, legacy collection dice rules, system preset, then d20. Template Dice Set selections still take precedence.
+- Preserved Atlas advantage/disadvantage, keep direction for roll-under sets, d100 tens-only shared units, explosion rules, critical-result rules, dice names/colours, and roll source metadata.
+- Added a Forge result dialog for rolls made without an Atlas map. These local rolls are not written to Atlas map history.
+- Removed the fork's off-map roll, roll-rules, and statblock-history API requirements. Forge now persists statblock roll recipes and merges open Atlas map histories directly.
+
+### Atlas integration — statblock roll history and repetition (Stage 5.4)
+
+- Adds Forge-owned roll history to plugin `data.json`, retaining up to 20 entries per statblock and 500 entries globally; writes share the serialized plugin-data queue and use a revision guard so a roll recorded during an in-flight save is included in the next queued snapshot.
+- Combines the Atlas `diceLog` persisted history and DiceTool's transient `rollHistory` from open maps, filters by `source.statblockPath`, and deduplicates by roll ID without combining the underlying map stores.
+- Saves replay recipes for Forge statblock rolls, including original formula, source metadata, Dice Set, advantage/disadvantage, and originating map/view when applicable.
+- Repeats a roll through its originating visible Atlas map when available. If a Forge-owned Atlas roll's map is closed or hidden, Forge repeats it locally using the stored Dice Set and modifiers.
+- Keeps Atlas map records that were not produced by Forge live and repeatable only while their source map is available; viewing them does not silently copy them into Forge persistence.
+- Removes the functional dependency on the fork's `dice.statblock-history` API.
+
 ## 0.4.4 — Largura da pré-visualização Ctrl
 
 ### Fixed
-- Ctrl-hover provider previews now inherit the effective statblock width: the Template width by default, or the per-statblock override when present.
+- Ctrl-hover previews now inherit the effective statblock width: the Template width by default, or the per-statblock override when present.
 - Exposes the effective width to the Atlas fork preview window while preserving the existing scrollable-body behavior.
 - Updates package, manifest, provider and bundled documentation versions to 0.4.4.
 
@@ -777,3 +945,11 @@
 - Na visualização independente e no painel lado a lado, a superfície da ficha recebe o espaço restante e mantém `overflow-y: auto` funcional.
 - No modo empilhado, a ficha conserva sua altura natural e a rolagem permanece no contêiner da nota do Obsidian, incluindo o conteúdo Markdown abaixo dela.
 - O host recebe e remove a classe estrutural junto ao ciclo de vida de `StatblockRenderSurface`.
+
+## 0.5.0 — Transition Stage 6.3.1
+
+- Added automatic repair of Forge statblock backlinks after a `.forgetemplate` is renamed, moved with a folder, or restored from trash. Repairs use the stable template ID and update YAML only when the current path and ID still match the inspected link.
+- Added startup reconciliation for stale template paths and a metadata-cache retry path for notes whose frontmatter becomes available after startup.
+- Ambiguous duplicate template IDs and missing templates remain unchanged; the service reports those states instead of guessing.
+- Template deletion confirmation now counts exact Forge backlinks or Atlas-published statblock references and makes clear that linked Markdown notes are never deleted with a Template.
+- Added serialized lifecycle management and teardown for template-link maintenance listeners.

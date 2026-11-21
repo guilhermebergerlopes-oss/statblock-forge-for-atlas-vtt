@@ -11,7 +11,7 @@ part: 1
 
 # Creating and Editing Templates
 
-This note follows the workflow for creating, editing, saving, and maintaining a Template. The most important principle is: **define Fields first, then connect them to Canvas blocks**. Creating a Field does not automatically add a block to the layout.
+This note follows the workflow for creating, editing, saving, and maintaining a Template. The most important principle is: **define Fields, then organize them in Canvas Blocks**. Metric and Table are special Block types with data-Container behavior: Fields are placed inside them rather than converted into new Field types.
 
 ## Create a new Template
 
@@ -19,18 +19,18 @@ This note follows the workflow for creating, editing, saving, and maintaining a 
 2. Forge opens an editor with a new, unsaved Template.
 3. Review the reserved header Fields.
 4. Add the Fields required by your system.
-5. Connect Fields to blocks and arrange them on the Canvas.
-6. Adjust containers, size, and appearance.
+5. Connect Fields to ordinary blocks or place them inside data Containers.
+6. Use **Add Container** to create Section, Row, Tabs, Metric, or Table; then adjust size and appearance.
 7. Use Save to name and write the Template file.
 
 The initial Template includes these conventional header Fields:
 
 | Default key | Initial label | Type | Common purpose |
 |---|---|---|---|
-| `name` | Name | `text` | Name shown in the header. |
+| `name` | Name | `inline` | Name shown in the header. |
 | `image` | Token art | `image` | Header Token artwork. |
 | `level` | Level | `rating` | Statblock level/rank. |
-| `type` | Type | `text` | Creature/character type. |
+| `type` | Type | `inline` | Creature/character type. |
 | `hp` | HP | `number` | Hit Points. |
 | `description` | Description | `markdown` | Description text. |
 
@@ -56,16 +56,16 @@ The editor has three main work areas:
 
 The **Canvas** is the visual representation of the layout. You can add, drag, select, and resize blocks, and organize containers. The Canvas does not store each creature's Values; it configures how data will be presented.
 
-### Structure
+### Data
 
-The **Structure** tab shows the block/container tree. Use it to select nested elements, find blocks by name, and understand hierarchy. Selecting a container lets you access its children and reorganize the structure.
+The **Data** tab shows the block/container tree. Use it to select nested elements, find blocks by name, and understand hierarchy. Selecting a container lets you access its children and reorganize the structure.
 
 ### Properties
 
 The **Properties** tab shows settings for the selected element. Controls depend on the element type:
 
 - Field-linked block: Field, presentation, and type-specific properties;
-- `Metric` and `Line`: Field set/order and presentation options;
+- `Metric Container`: child Field order and presentation options; `Line`: Field set/order and presentation options;
 - `Section`, `Row`, and `Tabs`: structural properties;
 - appearance: inheritance mode, color, border, alignment, padding, and other styles;
 - player permissions: controls where applicable.
@@ -79,7 +79,7 @@ In the **Fields** area, add a Field and configure:
 1. **Label:** readable text shown in the UI.
 2. **Key:** identifier used in JSON and internal references.
 3. **Type:** data type; determines available editors and options.
-4. **Type-specific options:** for example, unit and formula for Number/Rating, options for Choice/Checkboxes, Scores columns, Entries structure, or Dice Formula settings.
+4. **Type-specific options:** for example, unit and formula for Number/Rating, options for Choice/Checkboxes, Table storage/column settings, Entries structure, or Dice Formula settings.
 
 Forge validates duplicate keys and invalid identifiers. A key must begin with a letter and may contain letters, numbers, `_`, and `-`, up to 40 characters. Keys are compared case-insensitively. `formerKeys` preserves recognized old aliases during migrations; do not reuse an old key as a new Field's key.
 
@@ -90,18 +90,18 @@ Forge validates duplicate keys and invalid identifiers. A key must begin with a 
 
 Forge chooses a suitable default block when a Field is dragged to the Canvas. Examples:
 
-- `number`, `rating`, `text`, `choice`, and `dice` typically start as `Stat`;
+- `number`, `rating`, `inline`, `selection`, and `dice` typically start as `Stat`;
 - `markdown` starts as `Text`;
 - `list` starts as `Tags`;
-- `scores` starts as `Scores`;
+- `scores` is managed internally by a Table Container; do not create it as a standalone Field;
 - `entries` starts as `Entries`;
 - `pairs` starts as `Pairs`;
 - `image` starts as `Image`;
-- `spells` starts as `Spells`;
-- `counters` starts as `Counters`;
+- `groups` is presented as `Groups`;
+- `counter` starts as `Counter`;
 - `checkboxes` starts as `Checkboxes`.
 
-Other blocks—such as `Title`, `Metric`, `Line`, and `Track`—serve specific presentations and are not the same as creating a new Field. A Field may be displayed in more than one location when the structure and block options allow it. See [[05 - Fields]] and the individual block notes in Part 2 for supported combinations and examples.
+Other elements—such as `Title`, `Line`, and `Track`—serve specific presentations. `Metric` and `Table` are Canvas Block types with data-Container behavior: Metric groups scalar Fields, while Table accepts compatible user Fields. Pairs remains a standalone Collection. Each child Field becomes a column. **Show Labels in columns** controls headings and **Show Labels in rows** independently names data rows; both can be enabled together. **Allow adding rows in statblocks** exposes an Add row action in editable statblocks. Fields can be reordered in the Table inspector. Tables can optionally expose row labels and an Add row action in editable statblocks. Table's Atlas-native `scores` adapter is private storage, not a user Field. Drag a compatible Field onto a data Container Block to add it as a child. See [[05 - Fields]] and [[10 - Containers Overview]].
 
 ## Configure example Values (Samples)
 
@@ -144,15 +144,18 @@ A copied Template receives a new ID to avoid collisions and may record its linea
 
 - A Template created in Forge is saved as `.forgetemplate`.
 - Updating a `.forgetemplate` keeps the Forge format and its `statblockForge` metadata.
-- An opened `.atlastemplate` updated in place remains in the Atlas-native format.
-- Exporting to `.atlastemplate` creates a clean Atlas file without Forge-only layout metadata. Features exclusive to Forge may be transformed, omitted, or reported as incompatible according to the projection rules.
+- An `.atlastemplate` is a read-only source. When opened, Forge imports its data and creates a `.forgetemplate` copy for editing; the original Atlas file is never updated by Forge.
+- During import, Forge may read an existing legacy layout sidecar to recover compatible settings. Forge does not create, export, or update `.atlastemplate` files or Atlas sidecars.
 
-Use `.forgetemplate` as the working source when you need to retain Forge-only layout and settings. Use `.atlastemplate` when your goal is to share an Atlas-compatible version. See Part 5 for compatibility details.
+Use `.forgetemplate` as the Forge working format. `.atlastemplate` files can be opened as import sources, but editing continues in the `.forgetemplate` copy. See Part 5 for compatibility details.
 
 ## Conflicts, copies, and backups
 
 - If a Template already exists with the intended name, choose another name or follow the explicit confirmation workflow offered by Forge.
-- A confirmed replacement of an existing `.forgetemplate` creates a backup before writing, under `.statblock-forge/backups/` inside the configured Template folder.
+- A confirmed replacement of an existing `.forgetemplate` creates a versioned backup under `.statblock-forge/backups/` inside the configured Template folder.
+- Use **Recover Forge template backup…** in the Command Palette to inspect and restore verified backups. Forge validates the backup contents and original Template ID before offering restoration.
+- Restoring over an existing file requires a second confirmation and creates a separate safety backup first. Compare-and-swap preserves edits made after the confirmation was shown.
+- Older raw `.forgetemplate.bak` files remain discoverable. When their original folder is unknown, Forge resolves the target by stable Template ID or restores a separate copy instead of overwriting an unrelated file.
 - Updating the same file is different from creating a copy and replacing another file.
 - Before broad changes, also keep an external backup of the Vault.
 

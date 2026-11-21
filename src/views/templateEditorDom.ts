@@ -114,16 +114,22 @@ export function collapsibleAppearanceGroup(title: string, _description?: string,
 
 export function fieldTypeLabel(type: string): string {
   const labels: Record<string, string> = {
-    value: 'Value', metric: 'Metric', abilities: 'Abilities', table: 'Table', counters: 'Counters',
-    checkboxes: 'Checkboxes', image: 'Image', tags: 'Tags', pairs: 'Pairs', spells: 'Spells',
-    text: 'Text', markdown: 'Markdown', number: 'Number', rating: 'Rating', dice: 'Dice', choice: 'Choice',
-    list: 'List', scores: 'Tabular Data', entries: 'Entries / Abilities',
+    values: 'Values', image: 'Image', collections: 'Collections',
+    text: 'In-line', markdown: 'Markdown', number: 'Number', rating: 'Rating',
+    dice: 'Dice', choice: 'Selection', list: 'List',
+    scores: 'Table storage (internal)', entries: 'Entries', pairs: 'Pairs',
+    spells: 'Groups', counters: 'Counter', checkboxes: 'Checkboxes',
   };
   return labels[type] ?? type;
 }
 
+/** Selectable standalone Field types, ordered by their editor presentation group. */
 export const FIELD_TYPE_OPTIONS = [
-  'text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'entries', 'pairs', 'image', 'spells', 'counters', 'checkboxes',
+  'number', 'rating', 'dice', 'counters',
+  'text', 'markdown',
+  'checkboxes', 'choice',
+  'image',
+  'list', 'entries', 'pairs', 'spells',
 ].map((type) => ({ value: type, label: fieldTypeLabel(type) }));
 
 export const FIELD_MEANING_OPTIONS = [

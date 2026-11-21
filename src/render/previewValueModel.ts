@@ -3,6 +3,7 @@
  * preview. These mirror the public value shapes, without importing Atlas code.
  */
 import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
+import { selectionHasValue, selectionOptionIsSelected, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -117,68 +118,68 @@ export function scorePreviewGrid(raw: unknown, field: ForgeField | undefined): S
   return { columns, rows, align, header: field?.header !== false };
 }
 
-export interface SpellPreviewLine {
+export interface GroupPreviewLine {
   level?: string;
   text: string;
 }
 
-export interface SpellPreviewGroup {
+export interface GroupPreviewGroup {
   header: string;
-  spells: SpellPreviewLine[];
+  values: GroupPreviewLine[];
 }
 
-function spellText(value: unknown): string {
+function groupValueText(value: unknown): string {
   if (value === undefined || value === null) return '';
-  if (Array.isArray(value)) return value.map(spellText).filter(Boolean).join(', ');
-  if (isRecord(value)) return Object.entries(value).map(([key, item]) => `${key}: ${spellText(item)}`).filter(Boolean).join(' · ');
+  if (Array.isArray(value)) return value.map(groupValueText).filter(Boolean).join(', ');
+  if (isRecord(value)) return Object.entries(value).map(([key, item]) => `${key}: ${groupValueText(item)}`).filter(Boolean).join(' · ');
   return String(value).trim();
 }
 
-function isSpellHeader(value: string): boolean {
+function isGroupHeader(value: string): boolean {
   const text = value.trim();
   return text.endsWith(':') || !text.includes(':');
 }
 
 /**
- * Parses Atlas' spell list convention. Header strings (ending in `:` or with
- * no colon) start groups; one-key records such as { "1/day": "fireball" }
- * are levelled spell lines.
+ * Parses Atlas' legacy Groups convention. Header strings (ending in `:` or with
+ * no colon) start groups; one-key records such as { "1/day": "quick strike" }
+ * are categorized value rows.
  */
-export function spellPreviewGroups(raw: unknown, creatureName = 'Creature'): SpellPreviewGroup[] {
+export function groupPreviewGroups(raw: unknown, creatureName = 'Creature'): GroupPreviewGroup[] {
   if (raw === undefined || raw === null || raw === '') return [];
   const entries: unknown[] = Array.isArray(raw)
     ? raw
     : isRecord(raw)
       ? Object.entries(raw).map(([key, value]) => ({ [key]: value }))
       : [raw];
-  const groups: SpellPreviewGroup[] = [];
+  const groups: GroupPreviewGroup[] = [];
 
   for (const entry of entries) {
-    if (typeof entry === 'string' && isSpellHeader(entry)) {
+    if (typeof entry === 'string' && isGroupHeader(entry)) {
       const trimmedHeader = entry.trim();
       const header = trimmedHeader.endsWith(':') || /[^a-zA-Z0-9:]$/.test(trimmedHeader)
         ? trimmedHeader
         : `${trimmedHeader}:`;
-      groups.push({ header, spells: [] });
+      groups.push({ header, values: [] });
       continue;
     }
 
-    let line: SpellPreviewLine | null = null;
+    let line: GroupPreviewLine | null = null;
     if (typeof entry === 'string') {
       const text = entry.trim();
       if (text) line = { text };
     } else if (isRecord(entry)) {
       const [level, value] = Object.entries(entry)[0] ?? [];
-      const text = spellText(value);
+      const text = groupValueText(value);
       if (level && text) line = { level, text };
     } else {
-      const text = spellText(entry);
+      const text = groupValueText(entry);
       if (text) line = { text };
     }
 
     if (!line) continue;
-    if (groups.length === 0) groups.push({ header: `${creatureName} knows the following spells:`, spells: [] });
-    groups[groups.length - 1]?.spells.push(line);
+    if (groups.length === 0) groups.push({ header: `${creatureName} has the following values:`, values: [] });
+    groups[groups.length - 1]?.values.push(line);
   }
 
   return groups;
@@ -186,14 +187,15 @@ export function spellPreviewGroups(raw: unknown, creatureName = 'Creature'): Spe
 
 
 /**
- * Evaluates the safe arithmetic subset used by Atlas Scores derived columns.
- * It deliberately has no `eval`, property access outside sample references,
- * assignments, or arbitrary function calls.
+ * Evaluates the safe arithmetic subset shared by Number/Rating, Metric, and
+ * Scores formulas. It deliberately has no `eval`, property access outside
+ * declared sample references, assignments, or arbitrary function calls.
  */
 export function evaluatePreviewFormula(
   source: string,
   sample: Record<string, unknown>,
   slotValue: unknown,
+  fields: readonly ForgeField[] = [],
 ): number | null {
   source = source.trim();
   if (!source || source.length > 500) return null;
@@ -410,10 +412,22 @@ export function evaluatePreviewFormula(
     return numberOf(value);
   };
   const truthy = (value: FormulaAtom): boolean => typeof value === 'boolean' ? value : value !== 0;
+  const selectionFields = new Map(fields.filter((field) => field.type === 'choice').map((field) => [field.key, field]));
   const readRef = (ref: string): unknown => {
-    if (Object.prototype.hasOwnProperty.call(sample, ref)) return sample[ref];
     const [rootKey, ...parts] = ref.split('.');
-    if (!rootKey || !Object.prototype.hasOwnProperty.call(sample, rootKey)) return undefined;
+    if (!rootKey) return undefined;
+    const selectionField = selectionFields.get(rootKey);
+    if (selectionField) {
+      const raw = sample[rootKey];
+      if (parts.length === 0) return selectionHasValue(raw) ? 1 : 0;
+      if (parts.length === 1) {
+        const option = selectionOptionReferences(selectionField).find((candidate) => candidate.key === parts[0]);
+        if (option) return selectionOptionIsSelected(selectionField, raw, option.value, option.key) ? 1 : 0;
+      }
+      return undefined;
+    }
+    if (Object.prototype.hasOwnProperty.call(sample, ref)) return sample[ref];
+    if (!Object.prototype.hasOwnProperty.call(sample, rootKey)) return undefined;
     let value: unknown = sample[rootKey];
     for (const part of parts) {
       if (Array.isArray(value) && /^\d+$/.test(part)) {

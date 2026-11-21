@@ -2,6 +2,7 @@
 import type { ForgeField } from '../templates/forgeTemplate.ts';
 import { isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 import { isDiceFieldValue } from './diceFieldEditorModel.ts';
+import { writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
 
 export const MAX_DICE_FIELD_FORMULA_LENGTH = 500;
 const REFERENCE = /@([A-Za-z_][A-Za-z0-9_.]{0,79})|\{([A-Za-z_][A-Za-z0-9_.-]{0,79})\}/g;
@@ -26,7 +27,7 @@ export function setDiceFieldFormula(field: ForgeField, formula: string): boolean
 export function isDiceFieldFormulaSyntaxValid(formula: string): boolean {
   const source = formula.trim();
   if (!source || source.length > MAX_DICE_FIELD_FORMULA_LENGTH) return false;
-  const replaced = source.replace(REFERENCE, '2').replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
+  const replaced = writtenAdvantage(source).formula.replace(REFERENCE, '2').replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
   if (/[{}]/.test(replaced)) return false;
   return isDiceFieldValue(replaced);
 }
@@ -57,9 +58,10 @@ export function resolveDiceFieldFormula(
 ): string | null {
   const source = diceFieldFormula(field).trim();
   if (!source) return null;
+  const writtenSide = writtenAdvantage(source);
 
   let invalid = false;
-  const expanded = source.replace(REFERENCE, (_match, atKey: string | undefined, braceKey: string | undefined) => {
+  const expanded = writtenSide.formula.replace(REFERENCE, (_match, atKey: string | undefined, braceKey: string | undefined) => {
     const key = atKey ?? braceKey ?? '';
     const reference = fields.find((candidate) => candidate.key === key);
     if (!reference || reference.key === field.key || !isFormulaCapableNumericField(reference)) {
@@ -79,7 +81,7 @@ export function resolveDiceFieldFormula(
   const normalized = expanded.replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
   // An unmatched brace is almost certainly a misspelled or malformed placeholder.
   if (invalid || /[{}]/.test(normalized) || !isDiceFieldValue(normalized)) return '';
-  return normalized;
+  return writtenSide.word ? `${normalized} ${writtenSide.word}` : normalized;
 }
 
 /** Exact `{fieldKey}` references used by dependency validation and rename operations. */

@@ -37,7 +37,7 @@ export function setLineField(
   const block = lineBlock(template, blockId);
   const field = template.fields.find((item) => item.key === fieldKey);
   if (!field || !isLineCompatibleField(field)) {
-    throw new Error('Line aceita apenas campos Text, Number, Rating, Dice e Choice.');
+    throw new Error('Line aceita apenas campos In-line, Number, Rating, Dice e Selection.');
   }
 
   const fields = currentFields(block);

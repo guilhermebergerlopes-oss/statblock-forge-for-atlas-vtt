@@ -11,11 +11,13 @@ import {
   findLayoutBlock,
   findLayoutParentId,
   moveLayoutBlockTo,
+  removeLayoutBlock,
   type LayoutBlockType,
 } from '../templates/layoutEditorModel.ts';
 import { clearGridPlacementAnchors, packPhysicalGrid } from '../templates/gridLayout.ts';
 import { DEFAULT_GRID_COLUMN_COUNT, GRID_COLUMN_COUNT, MAX_BLOCK_ROWS, MAX_GRID_COLUMN_COUNT, MAX_GRID_ROWS } from '../templates/layoutLimits.ts';
 import { readTemplateGridGeometry, templateGridCellAtPoint } from './templateGridGeometry.ts';
+import { addFieldToContainer, containerAcceptsField, removeFieldFromContainer } from '../templates/containerEditorModel.ts';
 import {
   FIELD_TO_BLOCK,
   isRecord,
@@ -133,6 +135,7 @@ export function resolveCanvasDropLocation(
   template: ForgeTemplate,
   target: HTMLElement | null,
   point: CanvasDropPoint,
+  payload?: CanvasDragPayload,
 ): CanvasDropLocation {
   if (!target) {
     return { parentId: null, index: template.layout.blocks.length, position: 'append', axis: 'none' };
@@ -158,10 +161,23 @@ export function resolveCanvasDropLocation(
     return { parentId: null, index: template.layout.blocks.length, position: 'append', axis: 'none' };
   }
 
+  // Field palette drops target the entire Metric/Table surface. Unlike moving
+  // layout blocks, they should not depend on hitting an arbitrarily small
+  // central insertion zone inside a rendered native Atlas block.
+  if (payload?.fieldKey && (block.type === 'metric' || block.type === 'scores')) {
+    return {
+      parentId: block.id,
+      index: 0,
+      position: 'inside',
+      axis: 'none',
+    };
+  }
+
   const rect = target.getBoundingClientRect();
   const ratioX = rect.width > 0 ? (point.clientX - rect.left) / rect.width : 0.5;
   const ratioY = rect.height > 0 ? (point.clientY - rect.top) / rect.height : 0.5;
-  const isContainer = ['section', 'row', 'tabs'].includes(block.type) && Array.isArray(block.blocks);
+  const isContainer = (['section', 'row', 'tabs'].includes(block.type) && Array.isArray(block.blocks))
+    || block.type === 'metric' || block.type === 'scores';
   if (isContainer && ratioX > 0.22 && ratioX < 0.78 && ratioY > 0.22 && ratioY < 0.78) {
     return {
       parentId: block.id,
@@ -224,11 +240,10 @@ function addFieldAtCanvasLocation(
   const field = template.fields.find((item) => item.key === fieldKey);
   if (!field) throw new Error('Field not found.');
 
-  const category = layout.fieldKinds?.[fieldKey];
-  // Most categories are data families whose concrete Field type determines
-  // the matching Canvas block. Metric remains a presentation preset that
-  // intentionally overrides the normal Stat block for numeric Fields.
-  const blockType = category === 'metric' ? 'metric' : FIELD_TO_BLOCK[field.type] ?? 'text';
+  // Containers are created independently. Dragging a Field to the general
+  // Canvas creates its normal presentation block; dropping it inside a
+  // Metric or Table is handled as a child-reference operation below.
+  const blockType = FIELD_TO_BLOCK[field.type] ?? 'text';
 
   if (parentId) {
     const parent = findLayoutBlock(template, parentId);
@@ -329,6 +344,38 @@ function applySparseGridPosition(
   return true;
 }
 
+function moveFieldIntoContainer(
+  template: ForgeTemplate,
+  layout: ForgeLayoutDocument,
+  fieldKey: string,
+  destination: ForgeBlock,
+): ForgeBlock {
+  const field = template.fields.find((item) => item.key === fieldKey);
+  if (!field || (destination.type !== 'metric' && destination.type !== 'scores')) {
+    throw new Error('O Field ou o Container de destino não existe.');
+  }
+  const kind = destination.type === 'metric' ? 'metric' : 'table';
+  if (!containerAcceptsField(kind, field)) {
+    throw new Error(kind === 'metric'
+      ? 'Metric aceita Fields In-line, Number, Rating, Dice e Selection.'
+      : 'Este Field não pode ser usado em um slot da Table.');
+  }
+
+  const existing = findFirstBlockForField(template, fieldKey);
+  if (existing && existing.id !== destination.id) {
+    if (existing.type === 'metric' || existing.type === 'scores') {
+      removeFieldFromContainer(template, layout, existing.id, fieldKey);
+    } else {
+      removeLayoutBlock(template, layout, existing.id);
+    }
+  }
+  if (!addFieldToContainer(template, layout, destination.id, fieldKey)
+    && !(Array.isArray(destination.fields) && destination.fields.includes(fieldKey))) {
+    throw new Error('Não foi possível adicionar este Field ao Container.');
+  }
+  return destination;
+}
+
 /** Apply a resolved Canvas drop and return the block that should become selected. */
 export function applyCanvasDrop(
   template: ForgeTemplate,
@@ -355,9 +402,22 @@ export function applyCanvasDrop(
   }
   if (!payload.fieldKey) return null;
 
+  const dropParent = location.position === 'inside' && location.parentId
+    ? findLayoutBlock(template, location.parentId) : null;
+  if (dropParent && (dropParent.type === 'metric' || dropParent.type === 'scores')) {
+    return moveFieldIntoContainer(template, layout, payload.fieldKey, dropParent);
+  }
+
   const field = template.fields.find((item) => item.key === payload.fieldKey);
   if (!field) throw new Error('Field not found.');
-  const existing = findFirstBlockForField(template, payload.fieldKey);
+  if (field.type === 'scores' || field.forgeInternal === 'table-storage') {
+    throw new Error('Table storage is internal and cannot be placed as a Field.');
+  }
+  let existing = findFirstBlockForField(template, payload.fieldKey);
+  if (existing && (existing.type === 'metric' || existing.type === 'scores')) {
+    removeFieldFromContainer(template, layout, existing.id, payload.fieldKey);
+    existing = null;
+  }
   if (existing && location.parentId && findLayoutBlock(template, location.parentId)?.type === 'tabs'
     && existing.type !== 'section') {
     const sectionBlock = addLayoutBlock(template, layout, 'section', null, location.parentId);
@@ -393,11 +453,14 @@ export function applyCanvasDrop(
   return added;
 }
 
-function closestBlockTarget(event: DragEvent): HTMLElement | null {
-  const target = event.target as Element | null;
+export function findCanvasBlockTarget(target: Element | null): HTMLElement | null {
   return target && typeof target.closest === 'function'
-    ? target.closest<HTMLElement>('[data-block-id]')
+    ? target.closest<HTMLElement>('.statblock-forge__preview-block[data-block-id]')
     : null;
+}
+
+function closestBlockTarget(event: DragEvent): HTMLElement | null {
+  return findCanvasBlockTarget(event.target as Element | null);
 }
 
 function closestGridTarget(event: DragEvent): HTMLElement | null {
@@ -432,6 +495,7 @@ export function attachTemplateCanvasDropZone(
         ? 'move'
         : 'copy';
     }
+    const payload = readCanvasDragPayload(event.dataTransfer);
     const target = closestBlockTarget(event);
     const gridTarget = target ? null : closestGridTarget(event);
     if (highlighted && highlighted !== target) {
@@ -441,7 +505,7 @@ export function attachTemplateCanvasDropZone(
     }
     highlighted = target;
     if (highlighted) {
-      const location = resolveCanvasDropLocation(template, highlighted, event);
+      const location = resolveCanvasDropLocation(template, highlighted, event, payload);
       highlighted.dataset.dropPosition = location.position;
       highlighted.dataset.dropAxis = location.axis;
       highlighted.classList.add('is-drop-target', `is-drop-${location.position}`);
@@ -462,7 +526,7 @@ export function attachTemplateCanvasDropZone(
     const payload = readCanvasDragPayload(event.dataTransfer);
     if (!payload.blockId && !payload.fieldKey) return;
     if (payload.blockId && target?.dataset.blockId === payload.blockId) return;
-    const location = resolveCanvasDropLocation(template, target ?? gridTarget, event);
+    const location = resolveCanvasDropLocation(template, target ?? gridTarget, event, payload);
     onDrop({ target, payload, location });
   };
 

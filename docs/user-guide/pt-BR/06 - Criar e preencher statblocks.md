@@ -34,13 +34,13 @@ Após a criação, o Forge abre a ficha e direciona o foco para o primeiro Field
 
 A edição acontece diretamente na visualização do statblock. O controle varia de acordo com o tipo de Field:
 
-- Texto e Markdown usam editores de texto.
+- In-line e Markdown usam editores de texto.
 - Number e Rating usam controles numéricos apropriados.
-- List permite inserir itens simples; Spells usa um editor estruturado de grupos de conjuração e níveis/usos.
+- List permite inserir itens simples; Groups usa um editor estruturado de cabeçalhos de grupo, categorias e valores.
 - Dados tabulares, Entries, Pairs, Counters e outros valores estruturados usam editores específicos.
-- Choice apresenta as opções configuradas no template.
+- Selection apresenta as opções configuradas no template.
 
-Em Fields do tipo Spells, adicione grupos de conjuração, linhas de nível/uso e nomes de magias separados por vírgula. `Ctrl/Cmd + Enter` salva; `Tab` navega para o próximo Field; `Escape` cancela a edição atual.
+Em Fields do tipo Groups (ID JSON Forge `groups`; tipo nativo Atlas `spells`, reconhecido na importação), adicione cabeçalhos de grupo, linhas de categoria/uso e valores separados por vírgula. `Ctrl/Cmd + Enter` salva; `Tab` navega para o próximo Field; `Escape` cancela a edição atual.
 
 ## O que é salvo
 

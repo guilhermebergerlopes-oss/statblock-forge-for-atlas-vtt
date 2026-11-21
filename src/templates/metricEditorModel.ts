@@ -114,7 +114,7 @@ export function removeMetricSlot(template: ForgeTemplate, blockId: string, slotI
   const block = findMetricBlock(template, blockId);
   if (!block) return false;
   const slots = metricSlots(block);
-  if (slots.length <= 1 || slotIndex < 0 || slotIndex >= slots.length) return false;
+  if (slotIndex < 0 || slotIndex >= slots.length) return false;
   block.fields = slots.filter((_key, index) => index !== slotIndex);
   for (const property of ['formulas', 'formulaLabels'] as const) {
     const values = property === 'formulas' ? metricFormulas(block) : metricFormulaLabels(block);

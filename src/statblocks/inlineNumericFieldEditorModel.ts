@@ -1,4 +1,6 @@
 import type { ForgeField } from '../templates/forgeTemplate.ts';
+import { writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
+import { writtenRoll } from './atlasDiceEngine/textRolls.ts';
 
 /** Convert the stored Number/Rating value to the initial text shown by an inline editor. */
 export function inlineNumericFieldDraftValue(value: unknown): string {
@@ -7,15 +9,35 @@ export function inlineNumericFieldDraftValue(value: unknown): string {
 }
 
 /**
+ * Resolve a Number Field value that is intentionally a roll rather than a numeric quantity.
+ * A trailing `adv`/`dis` is required so ordinary descriptive text is never accepted as a Number.
+ * Bare positive bonuses such as `5 adv` are normalized to `+5 adv` for the dice engine.
+ */
+export function numberFieldAdvantageRollFormula(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text) return null;
+  const side = writtenAdvantage(text);
+  if (!side.side) return null;
+  const direct = writtenRoll(text);
+  if (direct) return direct;
+  if (/^\d+(?:[.,]\d+)?$/.test(side.formula.trim())) {
+    return writtenRoll(`+${side.formula.trim().replace(',', '.')} ${side.word}`);
+  }
+  return null;
+}
+
+/**
  * Parse a contextual Number/Rating edit without changing the source format unnecessarily.
- * Number Fields are always numeric; Rating Fields also preserve fractions such as 1/4
- * and legacy descriptive strings when they do not participate in arithmetic.
+ * Number Fields normally store numeric values, but may also store a valid dice expression
+ * ending in `adv` or `dis`. Rating Fields preserve fractions and legacy descriptive strings.
  */
 export function parseInlineNumericFieldDraft(field: ForgeField, raw: string, language: 'en' | 'pt-BR' = 'pt-BR'): unknown {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
   if (field.type === 'number') {
+    if (numberFieldAdvantageRollFormula(trimmed)) return trimmed;
     const normalized = trimmed.includes(',') && !trimmed.includes('.') ? trimmed.replace(',', '.') : trimmed;
     const value = Number(normalized);
     if (!Number.isFinite(value)) {

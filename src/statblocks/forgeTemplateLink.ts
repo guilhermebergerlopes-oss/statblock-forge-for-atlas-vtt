@@ -75,9 +75,17 @@ export function forgeStatblockTemplateLinkFromFrontmatter(frontmatter: unknown):
 }
 
 /** Update only the YAML backlink path after a uniquely identified Forge template was moved. */
-export function refreshForgeStatblockTemplateLinkPath(frontmatter: Record<string, unknown>, newPath: string): boolean {
+export function refreshForgeStatblockTemplateLinkPath(
+  frontmatter: Record<string, unknown>,
+  newPath: string,
+  expected?: { expectedOldPath?: string; expectedTemplateId?: string },
+): boolean {
   const current = forgeStatblockTemplateLinkFromFrontmatter(frontmatter);
   if (!current) return false;
+  // Compare-and-swap guards make delayed rename events harmless: never rewrite
+  // a note whose link was already changed to another template/path meanwhile.
+  if (expected?.expectedOldPath !== undefined && current.templatePath !== expected.expectedOldPath) return false;
+  if (expected?.expectedTemplateId !== undefined && current.templateId !== expected.expectedTemplateId) return false;
   let next: ForgeStatblockTemplateLink;
   try {
     next = createForgeStatblockTemplateLink({

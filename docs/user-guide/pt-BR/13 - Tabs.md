@@ -23,8 +23,8 @@ Tabs: Combat options
 │   └── Stat: Reach
 ├── Section: Ranged
 │   └── Entries: Ranged attacks
-└── Section: Spells
-    └── Spells: Spell list
+└── Section: Special abilities
+    └── Groups: Special abilities
 ```
 
 Tabs organiza as abas. Cada Section é um painel e possui sua própria Grid interna. O conteúdo continua vinculado aos Fields do Template; mudar de aba não duplica nem altera os Values.
@@ -78,7 +78,7 @@ A definição do Field e os Values já armazenados nas notas são dados separado
 ## Regras e limitações
 
 - Tabs aceita somente Sections como filhos diretos.
-- Não coloque Stat, Metric, Row, Entries ou outros blocos diretamente no Tabs; coloque-os dentro de uma Section.
+- Tabs aceita somente Sections como filhos diretos. Não coloque Metric, Table, Row ou blocos de conteúdo diretamente no Tabs; coloque esses elementos dentro da Section correspondente.
 - Row não pode conter Tabs. Para usar Tabs dentro de uma composição horizontal, coloque uma Section dentro da Row e o Tabs dentro dessa Section.
 - Cada painel Section usa a Grid configurada no Template.
 - O Tabs reserva altura suficiente para a maior aba, além da faixa de navegação e de seu Heading fixo opcional.
@@ -130,7 +130,7 @@ Se você adicionar outros blocos dentro de uma Section de Abilities, aquela estr
 | Vários ataques que devem aparecer juntos. | Uma Entries, possivelmente dentro de Section. |
 | Ataques corpo a corpo e à distância em painéis separados, cada qual com uma lista própria. | Abilities Tabs com um Entries por Section. |
 | Ataques, bônus de ataque e alcance no mesmo painel. | Tabs com Section; dentro da Section, Entries e Stat. Não é Abilities Tabs especializada. |
-| Magias separadas por círculo ou categoria. | Tabs genérico com uma Section por grupo, ou um bloco Spells se a estrutura nativa de Spell Groups for suficiente. |
+| Valores agrupados por categoria. | Tabs genérico com uma Section por grupo, ou um bloco Groups. |
 
 ## Veja também
 

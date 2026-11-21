@@ -88,7 +88,7 @@ O bloco Image usa `cover`: o quadro é completamente preenchido, preservando a p
 
 ## Token art não é um Image Field comum
 
-A Key reservada `image` representa a arte do Token no cabeçalho e é tratada pelo Atlas. No bloco de cabeçalho, o Forge oferece ações para criar um Token no Atlas ou vincular um Token existente, quando o contexto atende aos requisitos. Não use **Choose from Vault** para essa Key. Para um retrato independente, crie uma Key como `portrait` do tipo Image.
+A Key reservada `image` representa a arte do Token no cabeçalho. Em uma ficha Forge v2, escolha **Escolher arte do token** para selecionar uma imagem local do Vault e depois use **Criar token na biblioteca do Atlas** para registrar um TokenAsset nativo vinculado à nota Forge. O Forge copia a imagem para a pasta compartilhada `atlas-vtt/assets`; a nota de origem e a imagem original não são alteradas. Essa criação faz uma cópia única: trocar a arte na nota Forge depois não atualiza um TokenAsset já registrado. O mesmo menu pode vincular tokens **Character** já existentes: selecione-os em uma cena e escolha **Vincular tokens selecionados**; **Desvincular tokens selecionados** remove o vínculo compartilhado ou limpa um override exclusivo da instância selecionada. Tokens genéricos do mapa não são oferecidos para vínculo direto porque o Ctrl-hover do Atlas é emitido para tokens Character. Criar ou vincular TokenAssets exige um mapa do Atlas inicializado para que o Forge acesse o AssetService original. Para um retrato independente que não deva virar token, crie um Field `Image` comum, como `portrait`.
 
 ## Veja também
 

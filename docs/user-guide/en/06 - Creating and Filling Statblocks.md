@@ -32,13 +32,13 @@ After creation, Forge opens the sheet and focuses the first empty editable Field
 
 Editing takes place directly in the rendered statblock. Controls depend on Field type:
 
-- Text and Markdown use text editors.
+- In-line and Markdown use text editors.
 - Number and Rating use numeric controls.
-- List accepts simple items; Spells uses a structured editor for spellcasting groups and use/level rows.
+- List accepts simple items; Groups uses a structured editor for group headings, categories, and values.
 - Tabular Data, Entries, Pairs, Counters, and other structured types use dedicated editors.
-- Choice displays the options defined by the template.
+- Selection displays the options defined by the template.
 
-For Spells, add spellcasting groups, use/level rows, and comma-separated spell names. `Ctrl/Cmd + Enter` saves, `Tab` moves to the next Field, and `Escape` cancels the current edit.
+For Groups (Forge JSON type `groups`; native Atlas import type `spells` is normalized on import), add group headings, category/usage rows, and comma-separated values. `Ctrl/Cmd + Enter` saves, `Tab` moves to the next Field, and `Escape` cancels the current edit.
 
 ## What is saved
 

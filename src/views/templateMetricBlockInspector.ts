@@ -1,4 +1,5 @@
 import type { ForgeLayoutDocument } from '../templates/forgeTemplate.ts';
+import { addFieldToContainer, containerAcceptsField } from '../templates/containerEditorModel.ts';
 import {
   addMetricSlot,
   metricAvailableFields,
@@ -15,7 +16,7 @@ import {
   setMetricSlotFormulaLabel,
 } from '../templates/metricEditorModel.ts';
 import { translateForgeText } from '../i18n/localization.ts';
-import { button, el, inputText, labeledControl, numberInput, selectInput, toggleControl } from './templateEditorDom.ts';
+import { button, el, fieldTypeLabel, inputText, labeledControl, numberInput, selectInput, toggleControl } from './templateEditorDom.ts';
 import { renderNumericTrackingControls } from './templateNumericTrackingControls.ts';
 import type { TemplateBlockInspectorContext } from './templateBlockInspectorContext.ts';
 
@@ -50,8 +51,8 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     const compatible = metricAvailableFields(template, block.id, index);
     const boundField = template.fields.find((field) => field.key === key);
     const source = inputText(
-      formula || (boundField ? `${boundField.label.trim() || boundField.key} · ${boundField.type}` : key),
-      'Field or formula',
+      formula || (boundField ? `${boundField.label.trim() || boundField.key} · ${fieldTypeLabel(boundField.type)}` : key),
+      translateForgeText('Compatible Fields: In-line, Number, Rating, Dice and Selection', context.language),
     );
     source.classList.add('statblock-forge__metric-slot-source');
     const suggestionsId = `metric-field-suggestions-${block.id}-${index}`;
@@ -60,13 +61,13 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     suggestions.id = suggestionsId;
     compatible.forEach((field) => {
       const option = el('option');
-      option.value = `${field.label.trim() || field.key} · ${field.type}`;
+      option.value = `${field.label.trim() || field.key} · ${fieldTypeLabel(field.type)}`;
       option.label = field.key;
       suggestions.append(option);
     });
     if (boundField && !compatible.some((field) => field.key === boundField.key)) {
       const option = el('option');
-      option.value = `${boundField.label.trim() || boundField.key} · ${boundField.type}`;
+      option.value = `${boundField.label.trim() || boundField.key} · ${fieldTypeLabel(boundField.type)}`;
       option.label = boundField.key;
       suggestions.append(option);
     }
@@ -78,7 +79,7 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     source.addEventListener('change', () => {
       const entered = source.value.trim();
       const selected = [...compatible, ...(boundField && !compatible.some((field) => field.key === boundField.key) ? [boundField] : [])]
-        .find((field) => entered === field.key || entered === `${field.label.trim() || field.key} · ${field.type}`);
+        .find((field) => entered === field.key || entered === `${field.label.trim() || field.key} · ${fieldTypeLabel(field.type)}`);
       if (selected) {
         if (!setMetricSlotField(template, block.id, index, selected.key)) return;
         context.render();
@@ -125,13 +126,32 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     remove.classList.add('is-danger', 'statblock-forge__destructive-icon-button');
     remove.classList.add('statblock-forge__metric-slot-remove');
     remove.setAttribute('aria-label', 'Remove slot (keeps its field and data)');
-    remove.disabled = slots.length <= 1;
+    remove.disabled = false;
     row.append(remove);
     slotGroup.append(row);
     slotList.append(slotGroup);
   });
   panel.append(slotList);
-  const addNumber = button('Add number', () => {
+
+  const usedFieldKeys = new Set(slots.filter(Boolean));
+  const availableFields = template.fields.filter((field) =>
+    containerAcceptsField('metric', field) && !usedFieldKeys.has(field.key),
+  );
+  const addFieldRow = el('div', 'statblock-forge__metric-add-field');
+  const addFieldPicker = selectInput('', [
+    { value: '', label: 'Choose a Field' },
+    ...availableFields.map((field) => ({ value: field.key, label: `${field.label.trim() || field.key} · ${fieldTypeLabel(field.type)}` })),
+  ]);
+  const addField = button('Add Field', () => {
+    if (!addFieldPicker.value) return;
+    if (addFieldToContainer(template, layout, block.id, addFieldPicker.value)) context.render();
+  }, true);
+  addField.disabled = availableFields.length === 0;
+  addFieldRow.append(addFieldPicker, addField);
+  panel.append(labeledControl('Fields inside this Metric', addFieldRow,
+    'Drop compatible Fields onto the Metric on the Canvas, or add them here.'));
+
+  const addNumber = button('Add empty slot', () => {
     if (addMetricSlot(template, block.id)) context.render();
   }, true);
   addNumber.classList.add('statblock-forge__properties-add-compact');

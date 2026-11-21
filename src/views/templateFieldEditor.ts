@@ -17,9 +17,7 @@ import { removePinnedTemplateImageField, renamePinnedTemplateImageField } from '
 import { renameFieldCompendiumIdentity } from '../templates/fieldCompendiumModel.ts';
 import { setNumericFieldFormula } from '../templates/numericFieldModel.ts';
 import { isDiceFieldFormulaSyntaxValid, setDiceFieldFormula } from '../statblocks/diceFieldFormulaModel.ts';
-import { fieldTypesForCategory, resolveFieldCategory, type ForgeFieldCategory } from '../templates/fieldCategoryModel.ts';
-import { scorePreviewGrid } from '../render/previewValueModel.ts';
-import { setScoresFieldAlignment, setScoresFieldColumns, setScoresFieldProperty, setScoresFieldSlotKey, validateScoresFieldSlotKeys } from '../templates/tableEditorModel.ts';
+import { FIELD_CATEGORY_DEFAULT_TYPES, fieldTypesForCategory, resolveFieldCategory, type ForgeFieldCategory } from '../templates/fieldCategoryModel.ts';
 import { renderChoiceFieldSettings } from './templateChoiceFieldSettings.ts';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from '../i18n/localization.ts';
 import {
@@ -32,7 +30,6 @@ import {
   textareaInput,
   labeledControl,
   selectInput,
-  toggleControl,
 } from './templateEditorDom.ts';
 import type { ComponentHelpGroup } from './componentHelp.ts';
 
@@ -111,29 +108,26 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
   name.classList.add('statblock-forge__add-field-name-input');
 
   const categories: Array<{ value: ForgeFieldCategory; label: string }> = [
-    { value: 'value', label: 'Value' },
-    { value: 'metric', label: 'Metric' },
-    { value: 'collections', label: 'Collections' },
-    { value: 'table', label: 'Table' },
-    { value: 'resources', label: 'Resources' },
+    { value: 'values', label: 'Values' },
     { value: 'text', label: 'Text' },
+    { value: 'choice', label: 'Choice' },
     { value: 'image', label: 'Image' },
+    { value: 'collections', label: 'Collections' },
   ];
-  const defaultTypeByCategory: Record<ForgeFieldCategory, string> = {
-    value: 'number', metric: 'number', collections: 'entries', table: 'scores',
-    resources: 'counters', text: 'markdown', image: 'image',
-  };
   const storedSelection = context.getAddFieldSelection();
-  let selectedCategory = storedSelection.category;
+  // Metric and Table used to appear as Field categories. They are now
+  // first-class Canvas Containers, so obsolete picker state falls back to Values.
+  let selectedCategory = categories.some((item) => item.value === storedSelection.category)
+    ? storedSelection.category : 'values';
   let selectedType = fieldTypesForCategory(selectedCategory).includes(storedSelection.type)
     ? storedSelection.type
-    : defaultTypeByCategory[selectedCategory];
+    : FIELD_CATEGORY_DEFAULT_TYPES[selectedCategory];
   context.setAddFieldSelection(selectedCategory, selectedType);
 
   const categoryPicker = context.renderComponentHelpPicker('fields', categories, selectedCategory, (value) => {
     selectedCategory = value as ForgeFieldCategory;
     if (!fieldTypesForCategory(selectedCategory).includes(selectedType)) {
-      selectedType = defaultTypeByCategory[selectedCategory];
+      selectedType = FIELD_CATEGORY_DEFAULT_TYPES[selectedCategory];
     }
     context.setAddFieldSelection(selectedCategory, selectedType);
     renderTypeControl();
@@ -354,7 +348,7 @@ export function renderTemplateFieldCard(context: TemplateFieldEditorContext, fie
   }
   row.append(label, labeledControl('Key', key), typeControl);
   if (showRemoveButton) {
-    const removeField = button('Remover', () => context.removeField(field.key), true);
+    const removeField = button(translateForgeText('Remove Field', context.language), () => context.removeField(field.key), true);
     removeField.classList.add('statblock-forge__property-delete-button', 'is-danger');
     row.append(removeField);
   }
@@ -400,144 +394,6 @@ export function renderTemplateFieldCard(context: TemplateFieldEditorContext, fie
     )));
   }
 
-
-  if (field.type === 'scores') {
-    // Keep table properties directly alongside the other Field settings. Do
-    // not hide essential row/column permissions or the column editor in a
-    // disclosure: users should be able to discover them immediately.
-    const tableOptions = el('div', 'statblock-forge__scores-field-options');
-    tableOptions.append(el('strong', 'statblock-forge__scores-field-heading', translateForgeText('Table options', context.language)));
-
-    const scoreOptions = el('div', 'statblock-forge__field-toggles statblock-forge__scores-field-toggles');
-    scoreOptions.append(
-      toggleControl(translateForgeText('Show header row', context.language), field.header !== false, (checked) => {
-        setScoresFieldProperty(template, field.key, 'header', checked);
-        context.renderPreviewOnly();
-      }),
-      toggleControl(translateForgeText('Allow adding/removing rows', context.language), field.addRows !== false, (checked) => {
-        setScoresFieldProperty(template, field.key, 'addRows', checked);
-        context.renderPreviewOnly();
-      }),
-      toggleControl(translateForgeText('Allow adding/removing columns', context.language), field.addColumns !== false, (checked) => {
-        setScoresFieldProperty(template, field.key, 'addColumns', checked);
-        context.renderPreviewOnly();
-      }),
-    );
-    tableOptions.append(scoreOptions);
-
-    const currentColumns = (): string[] => [...scorePreviewGrid(asRecord(template.sample)[field.key], field).columns];
-    const columnEditor = el('div', 'statblock-forge__scores-field-columns');
-    const columnHeading = el('div', 'statblock-forge__scores-field-columns-heading');
-    columnHeading.append(el('strong', '', translateForgeText('Columns', context.language)));
-    const addColumn = button(translateForgeText('Add column', context.language), () => {
-      const current = currentColumns();
-      if (current.length >= 12) return;
-      const next = [...current, `${translateForgeText('Column', context.language)} ${current.length + 1}`];
-      setScoresFieldColumns(template, field.key, next, [...current.map((_item, at) => at), null]);
-      context.render();
-    }, true);
-    addColumn.classList.add('statblock-forge__scores-field-add-column', 'statblock-forge__properties-add-compact');
-    addColumn.disabled = currentColumns().length >= 12;
-    columnHeading.append(addColumn);
-    columnEditor.append(columnHeading);
-
-    const columns = currentColumns();
-    const slotKeyIssues = validateScoresFieldSlotKeys([field]);
-    const showSlotKeyRepair = slotKeyIssues.length > 0;
-    if (showSlotKeyRepair) {
-      columnEditor.append(el('p', 'statblock-forge__warning', `${slotKeyIssues.map((issue) => issue.message).join(' ')} Edite as chaves abaixo para resolver os conflitos; nenhum valor será removido automaticamente.`));
-    }
-    const slotKeys = Array.isArray(field.slotKeys) ? field.slotKeys : [];
-    const moveColumn = (from: number, to: number): void => {
-      const current = currentColumns();
-      if (from < 0 || to < 0 || from >= current.length || to >= current.length || from === to) return;
-      const indexes = current.map((_item, at) => at);
-      const [moved] = indexes.splice(from, 1);
-      indexes.splice(to, 0, moved);
-      setScoresFieldColumns(template, field.key, indexes.map((sourceIndex) => current[sourceIndex]), indexes);
-      context.render();
-    };
-
-    columns.forEach((column, index) => {
-      const row = el('div', 'statblock-forge__scores-field-column');
-      const actions = el('div', 'statblock-forge__scores-field-column-actions');
-      actions.append(el('strong', 'statblock-forge__scores-field-column-index', `${translateForgeText('Column', context.language)} ${index + 1}`));
-      const up = button('↑', () => moveColumn(index, index - 1), true);
-      up.disabled = index === 0;
-      up.title = translateForgeText('Move column left', context.language);
-      up.setAttribute('aria-label', `${translateForgeText('Move column left', context.language)} ${index + 1}`);
-      const down = button('↓', () => moveColumn(index, index + 1), true);
-      down.disabled = index === columns.length - 1;
-      down.title = translateForgeText('Move column right', context.language);
-      down.setAttribute('aria-label', `${translateForgeText('Move column right', context.language)} ${index + 1}`);
-      const remove = button('×', () => {
-        const current = currentColumns();
-        if (current.length <= 1 || index >= current.length) return;
-        context.confirmDelete(`${translateForgeText('column', context.language)} “${current[index]}”`, () => {
-          const latest = currentColumns();
-          if (latest.length <= 1 || index >= latest.length) return;
-          const next = latest.filter((_item, at) => at !== index);
-          const indexes = latest.flatMap((_item, at) => at === index ? [] : [at]);
-          setScoresFieldColumns(template, field.key, next, indexes);
-          context.render();
-        });
-      }, true);
-      remove.disabled = columns.length <= 1;
-      remove.title = translateForgeText('Remove column', context.language);
-      remove.setAttribute('aria-label', `${translateForgeText('Remove column', context.language)} ${index + 1}`);
-      remove.classList.add('is-danger', 'statblock-forge__destructive-icon-button');
-      actions.append(up, down, remove);
-
-      const name = inputText(column, `${translateForgeText('Column', context.language)} ${index + 1}`);
-      name.setAttribute('aria-label', `${translateForgeText('Column', context.language)} ${index + 1} ${translateForgeText('Name', context.language)}`);
-      name.addEventListener('change', () => {
-        const current = currentColumns();
-        if (index >= current.length) return;
-        const next = [...current];
-        next[index] = name.value.trim();
-        setScoresFieldColumns(template, field.key, next, current.map((_item, at) => at));
-        context.renderPreviewOnly();
-      });
-      const alignmentValues = Array.isArray(field.align) ? field.align : [];
-      const alignment = selectInput(String(alignmentValues[index] ?? 'start'), [
-        { value: 'start', label: translateForgeText('Left', context.language) },
-        { value: 'center', label: translateForgeText('Center', context.language) },
-        { value: 'end', label: translateForgeText('Right', context.language) },
-      ]);
-      alignment.setAttribute('aria-label', `${translateForgeText('Alignment', context.language)}: ${column || index + 1}`);
-      alignment.addEventListener('change', () => {
-        setScoresFieldAlignment(template, field.key, index, alignment.value as 'start' | 'center' | 'end');
-        context.renderPreviewOnly();
-      });
-      const inputs = el('div', 'statblock-forge__scores-field-column-inputs');
-      inputs.append(
-        labeledControl(translateForgeText('Name', context.language), name),
-        labeledControl(translateForgeText('Alignment', context.language), alignment),
-      );
-      if (showSlotKeyRepair) {
-        const slotKey = inputText(typeof slotKeys[index] === 'string' ? String(slotKeys[index]) : '', `slot_${index + 1}`);
-        slotKey.setAttribute('aria-label', `Identificador interno da coluna ${index + 1}`);
-        slotKey.addEventListener('change', () => {
-          try {
-            if (setScoresFieldSlotKey(template, field.key, index, slotKey.value)) context.render();
-          } catch (error) {
-            context.showNotice(error instanceof Error ? error.message : String(error));
-            slotKey.value = typeof slotKeys[index] === 'string' ? String(slotKeys[index]) : '';
-          }
-        });
-        inputs.append(labeledControl('Internal key', slotKey));
-      }
-      row.append(actions, inputs);
-      columnEditor.append(row);
-    });
-
-    tableOptions.append(columnEditor);
-    tableOptions.append(el('small', 'statblock-forge__detail', translateForgeText(
-      'Edit the starting cell values directly in the table on the Canvas. New statblocks begin with this sample.',
-      context.language,
-    )));
-    card.append(tableOptions);
-  }
 
   const meaning = selectInput(typeof field.meaning === 'string' ? field.meaning : '', FIELD_MEANING_OPTIONS);
   meaning.addEventListener('change', () => {

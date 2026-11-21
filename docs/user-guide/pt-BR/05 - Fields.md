@@ -7,32 +7,29 @@ tags:
 
 # Fields
 
-Fields são as propriedades de dados de um statblock. Cada Field tem uma chave interna (`key`), um rótulo (`label`) e um tipo (`type`). O tipo determina o formato do dado e quais opções de edição ficam disponíveis.
+Fields são as propriedades de dados de um statblock. Cada Field tem uma chave interna (`key`), um rótulo (`label`) e um tipo (`type`). O tipo determina o formato do dado e quais opções de edição ficam disponíveis. Metric e Table são Containers, não tipos de Field.
 
-## Tipos disponíveis
+## Grupos de Fields
 
-| Tipo | Uso | Formato geral |
+O seletor organiza os Fields em cinco grupos de apresentação. Os arquivos Forge gravam os IDs reorganizados descritos abaixo; o editor normaliza os valores para o modelo interno e preserva a compatibilidade com arquivos antigos.
+
+| Grupo | Tipos apresentados | Uso |
 |---|---|---|
-| Text | Nome curto, categoria ou texto simples. | Texto. |
-| Markdown | Descrições e conteúdo textual com formatação. | Texto Markdown. |
-| Number | Quantidades, HP, alcance ou outros valores numéricos. | Número. |
-| Rating | Nível, classificação ou escala numérica/representativa. | Valor de rating. |
-| Dice | Expressões de dados. | Notação de dados, por exemplo `2d6+2`. |
-| Choice | Seleção entre opções definidas no template. | Uma ou mais opções, conforme configuração. |
-| List | Conjunto simples de itens. | Lista de textos. |
-| Dados tabulares | Valores armazenados em linhas e colunas. | Estrutura de dados tabulares. |
-| Entries / Abilities | Entradas como habilidades, ataques ou poderes. | Lista de entradas com partes configuráveis. |
-| Pairs | Dados organizados em pares de chave e valor. | Objeto de pares. |
-| Image | Imagem associada à ficha. | Referência de imagem. |
-| Spells | Grupos de conjuração com níveis/usos e listas de magias. | Cabeçalhos e registros `{ nível: 'magias' }` no formato nativo do Atlas. |
-| Counters | Contadores com valores e limites. | Coleção de contadores. |
-| Checkboxes | Opções booleanas marcáveis. | Mapa de valores booleanos. |
+| **Values** | Number, Rating, Dice, Counter | Valores numéricos, classificações, expressões de dados e contadores. |
+| **Text** | In-line, Markdown | Texto simples em linha e conteúdo com formatação. |
+| **Choice** | Checkboxes, Selection | Opções booleanas e seleção entre opções definidas no template. |
+| **Image** | Image | Imagem associada à ficha. |
+| **Collections** | List, Entries, Pairs, Groups | Listas, entradas estruturadas, pares de chave/valor e grupos de conteúdo. |
 
-## Dados tabulares e bloco Table
+Os arquivos `.forgetemplate` e sidecars JSON do Forge gravam os identificadores reorganizados: **In-line** usa `inline`, **Selection** usa `selection`, **Counter** usa `counter` e **Groups** usa `groups`. Ao abrir templates antigos, o Forge reconhece os IDs anteriores (`text`, `choice`, `counters` e `spells`) e os normaliza automaticamente. Na importação de `.atlastemplate`, os IDs nativos são normalizados para os IDs atuais do Forge. **Checkboxes** continua como `checkboxes`. O armazenamento `scores` usado pelo Container Table é interno e não aparece como Field comum.
 
-**Dados tabulares** é um tipo de Field: ele armazena as linhas, colunas e valores da ficha. O bloco **Table**, por outro lado, é um elemento de layout que referencia esse Field e define como os dados serão apresentados no Canvas e no statblock. O bloco não cria uma segunda cópia dos dados.
+## Dados tabulares e Container Table
 
-Em **Properties**, crie ou configure um Field **Tabular Data**. Em **Structure**, adicione um bloco **Table** e vincule-o ao Field para exibir os dados.
+**Table** não é um Field: é um Container de dados criado por **Add Container → Table**. O Forge administra um Field nativo Atlas do tipo `scores` para armazenar linhas e valores da tabela. Esse Field técnico fica oculto da paleta de Fields e suas configurações são acessadas pelo inspetor da Table.
+
+Para acrescentar dados, arraste qualquer Field compatível, para dentro da Table ou use **Fields inside this Table** no inspetor. Cada Field adicionado vira uma coluna, com seu Label como cabeçalho. **Show Labels in columns** controla os cabeçalhos dos Fields; **Show Labels in rows** exibe um Label para cada linha de dados, de forma independente. As duas opções podem ficar ativadas ao mesmo tempo. Quando **Allow adding rows in statblocks** está ativado, statblocks editáveis mostram a ação **Add row**. As linhas adicionais guardam seus próprios valores sem alterar os Values originais dos Fields. Use os botões de seta no inspetor para reorganizar os Fields. Remover um Field apenas desfaz o vínculo; o Field original e seus Values permanecem no Template e nas fichas.
+
+Pairs permanece uma Collection independente e não pode ser vinculada a uma Table. Se um Template antigo usava Pairs dentro de uma Table, o Forge remove esse vínculo durante a migração sem apagar o Field nem seus Values.
 
 ## Campos de cabeçalho
 
@@ -40,10 +37,10 @@ O template inicial contém Fields reservados para informações principais:
 
 | Key | Label padrão | Tipo | Significado |
 |---|---|---|---|
-| `name` | Name | Text | Nome da criatura/personagem. |
+| `name` | Name | In-line (JSON ID `inline`) | Nome da criatura/personagem. |
 | `image` | Token art | Image | Arte do token no cabeçalho. |
 | `level` | Level | Rating | Nível ou classificação. |
-| `type` | Type | Text | Categoria ou tipo de criatura. |
+| `type` | Type | In-line (JSON ID `inline`) | Categoria ou tipo de criatura. |
 | `hp` | HP | Number | Pontos de vida. |
 | `description` | Description | Markdown | Descrição principal. |
 
@@ -63,11 +60,11 @@ Regras de key documentadas pelo editor:
 
 Ao renomear uma key, o Forge registra a chave anterior em `formerKeys` e atualiza referências reconhecidas no layout, nas amostras, em condições e em outras configurações compatíveis.
 
-## Fields do tipo Spells
+## Field Groups (JSON ID `groups`) — Atlas import ID `spells`
 
-O tipo **Spells** tem um editor próprio na ficha. Clique no bloco para configurar um ou mais grupos de conjuração. Cada grupo pode ter um cabeçalho (por exemplo, *Conjuração inata*) e várias linhas com um rótulo de uso/nível (como *À vontade*, *1º círculo* ou *1/dia*) e os nomes das magias separados por vírgula.
+O tipo **Groups** (ID JSON Forge `groups`, o tipo nativo Atlas `spells` é convertido durante a importação) tem um editor próprio na ficha. Clique no bloco para configurar um ou mais grupos de valores. Cada grupo pode ter um cabeçalho e várias linhas; cada linha possui um rótulo de categoria ou uso e um ou mais valores separados por vírgula.
 
-No inspetor do bloco, escolha **Lista em linhas** ou **Abas**. O modo Abas cria uma aba para cada rótulo de uso/nível dentro do grupo. O Forge salva os dados na estrutura nativa do Atlas, sem adicionar um formato proprietário. Quando o Field está vazio, a prévia mostra uma orientação para adicionar o primeiro grupo; novos statblocks começam sem magias.
+No inspetor do bloco, escolha **Lista em linhas** ou **Abas**. O modo Abas cria uma aba para cada rótulo de categoria ou uso dentro do grupo. O Forge salva os dados na estrutura nativa do Atlas, sem adicionar um formato proprietário. Quando o Field está vazio, a prévia mostra uma orientação para adicionar o primeiro grupo; novos statblocks começam com os valores de Groups vazios.
 
 ## Configurações específicas
 
@@ -75,10 +72,10 @@ Alguns tipos oferecem configurações adicionais:
 
 - **Number:** unidade, tracking e fórmulas quando aplicável.
 - **Rating:** configuração numérica e fórmula quando aplicável.
-- **Choice:** opções e modo de seleção simples ou múltipla.
-- **Dados tabulares:** colunas e permissões de linhas/colunas.
+- **Selection:** opções e modo de seleção simples ou múltipla; cada opção pode ser referenciada em fórmulas como `1` (selecionada) ou `0` (não selecionada).
+- **Table:** Fields filhos em ordem configurável e opção para exibir seus Labels como cabeçalhos de linha; o Field `scores` interno é gerenciado pelo Container.
 - **Entries / Abilities:** chaves de nome e descrição, além de partes adicionais (Parts).
-- **Counters:** presets de linhas e valores máximos.
+- **Counter:** presets de linhas e valores máximos.
 - **Checkboxes:** opções booleanas com keys próprias, que podem ser referenciadas em fórmulas como `1` (marcada) ou `0` (desmarcada).
 - **Image:** enquadramento e referência visual da imagem.
 
@@ -86,7 +83,7 @@ A disponibilidade exata dos controles depende do tipo e do contexto em que o Fie
 
 ## Recursos avançados
 
-A Parte 4 explica fórmulas para Number/Rating, referências booleanas de Checkboxes, dados, Counters, Conditions nativas do Atlas, Rest e permissões de jogadores. Consulte [[25 - Fórmulas em Number e Rating]] para começar.
+A Parte 4 explica fórmulas para Number/Rating, referências booleanas de Checkboxes e Selection, dados, Counters, Conditions nativas do Atlas, Rest e permissões de jogadores. Consulte [[25 - Fórmulas em Number e Rating]] para começar.
 
 ## Excluir Fields
 
@@ -105,13 +102,13 @@ Ao criar uma nova ficha, o Forge pode abrir automaticamente o primeiro Field edi
 | HP atual ou quantidade de usos | Number ou Counter, conforme o comportamento desejado. |
 | Texto de ambientação | Markdown |
 | Dano `3d8+2` | Dice |
-| Uma categoria escolhida de uma lista | Choice |
+| Uma categoria escolhida de uma lista | Selection |
 | Tags ou sentidos | List |
-| Atributos organizados em linhas e colunas | Dados tabulares |
+| Atributos organizados em linhas e colunas | Container Table |
 | Ataques com alcance, dano e custo | Entries / Abilities |
 | Resistências nomeadas com valores | Pairs |
 | Retrato ou token art | Image |
-| Grupos de conjuração e magias por nível/uso | Spells |
+| Valores agrupados por categoria ou uso | Groups |
 | Opções booleanas reutilizáveis | Checkboxes |
 
 ## Próximo passo

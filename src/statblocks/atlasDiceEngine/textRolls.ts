@@ -18,7 +18,8 @@
  * (`Very Close - 1d12+2` rolls 1d12+2). Exploding dice such as `2d6!` use the same term grammar as
  * the formula parser. What the parser refuses (`101d6`, `1d0`) rolls nothing. Where that leaves a
  * number outside every roll, the whole text is read as one formula instead, so a value such as
- * `2 + 1d6` or `(1d8+2)*2` rolls whole.
+ * `2 + 1d6` or `(1d8+2)*2` rolls whole. A final space-separated `adv` or `dis` stays on the
+ * roll link for the Atlas Dice Tool to interpret.
  *
  * A roll joined to a `@` reference by operators, brackets and spaces alone (`2d6 + @int`,
  * `@level d6`) is part of one that cannot be made: text is read once its references that name a
@@ -27,6 +28,7 @@
  */
 import { FORMULA_LIMITS, parseFormula } from './parseFormula.ts';
 import { readTerm } from './formulaTerms.ts';
+import { writtenAdvantage } from './writtenAdvantage.ts';
 
 /** A piece of a text: words, or a roll written in it with the formula a click on it rolls. */
 export interface RollPiece {
@@ -170,9 +172,8 @@ function canEndAt(text: string, end: number): boolean {
   return !(next === '.' && end + 1 < text.length && /\d/.test(text[end + 1]!));
 }
 
-/** A roll as written, spelled as the parser reads it: no label, a plain minus and times, `+ -` as `-`. */
-function spelled(written: string): string {
-  return written
+function normalizedRollBody(formula: string): string {
+  return formula
     .trim()
     .replace(/^(?:ATK|Attack)[ \t]*:[ \t]*/i, '')
     .replace(/[−–]/g, '-')
@@ -180,20 +181,23 @@ function spelled(written: string): string {
     .replace(/\+[ \t]*-/g, '-');
 }
 
-/** A roll as written, as the formula the dice tool rolls: no spaces (but in a label), no label before it; a bare bonus stays bare. */
+/** A roll as written, as the formula the dice tool rolls: compact math plus a final `adv`/`dis` word. */
 export function toRollFormula(written: string): string {
-  return spelled(written).replace(/\s+(?![^[]*\])/g, '');
+  const { formula, word } = writtenAdvantage(written.trim());
+  const roll = normalizedRollBody(formula).replace(/\s+(?![^[]*\])/g, '');
+  return word ? `${roll} ${word}` : roll;
 }
 
 /** Whether a formula is a roll: the parser accepts it, and it throws dice or opens with a sign. */
 export function isRollFormula(formula: string): boolean {
-  const parsed = parseFormula(formula);
-  return parsed.ok && (/^[+-]/.test(formula) || parsed.terms.some((term) => term.kind === 'dice' && term.count > 0));
+  const body = normalizedRollBody(writtenAdvantage(formula.trim()).formula);
+  const parsed = parseFormula(body);
+  return parsed.ok && (/^[+-]/.test(body) || parsed.terms.some((term) => term.kind === 'dice' && term.count > 0));
 }
 
 /** The formula a text written as one roll rolls, or null where it is no roll. */
 export function writtenRoll(written: string): string | null {
-  return isRollFormula(spelled(written)) ? toRollFormula(written) : null;
+  return isRollFormula(written) ? toRollFormula(written) : null;
 }
 
 /** The text in pieces as running text reads it, before a stray number sends it to be read whole. */
@@ -237,12 +241,19 @@ function scanned(text: string): RollPiece[] {
     }
 
     const span = formulaSpan(text, formulaStart);
-    if (!span || !canEndAt(text, span.end)) {
+    if (!span) {
+      at += 1;
+      continue;
+    }
+    // Atlas recognizes a final, space-separated `adv` or `dis` as part of the same roll.
+    const side = /^[ \t]+(?:adv|dis)(?![\p{L}\p{N}_])/iu.exec(text.slice(span.end));
+    const end = side ? span.end + side[0].length : span.end;
+    if (!canEndAt(text, end)) {
       at += 1;
       continue;
     }
 
-    const written = text.slice(displayStart, span.end);
+    const written = text.slice(displayStart, end);
     const formula = writtenRoll(written);
     if (formula === null) {
       at += 1;
@@ -253,8 +264,8 @@ function scanned(text: string): RollPiece[] {
     words(text.slice(plainStart, displayStart));
     if (joined) words(written);
     else pieces.push({ text: written, formula });
-    at = span.end;
-    plainStart = span.end;
+    at = end;
+    plainStart = end;
   }
 
   if (plainStart < text.length) words(text.slice(plainStart));

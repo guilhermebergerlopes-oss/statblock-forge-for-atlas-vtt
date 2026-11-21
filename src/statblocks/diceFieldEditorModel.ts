@@ -1,6 +1,7 @@
 /** Dice notation helpers used by the inline Dice Field editor. */
 import { parseFormula } from './atlasDiceEngine/parseFormula.ts';
 import type { DiceTerm, ParsedFormula } from './atlasDiceEngine/formulaTypes.ts';
+import { writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
 
 export interface DiceAverageResult {
   average: number;
@@ -49,7 +50,8 @@ function normalizeFormulaText(text: string): string {
 }
 
 function parsedDiceField(text: string): ParsedFormula | null {
-  const source = formulaWithReferencePlaceholders(normalizeFormulaText(text).trim())
+  const side = writtenAdvantage(normalizeFormulaText(text).trim());
+  const source = formulaWithReferencePlaceholders(side.formula.trim())
     .replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
   if (!source) return null;
   const parsed = parseFormula(source);
@@ -71,6 +73,7 @@ export function parseDiceField(text: string): ParsedFormula | null {
  * and quotients are intentionally left without a hint rather than displaying a misleading value.
  */
 export function parseDiceAverage(text: string): DiceAverageResult | null {
+  if (writtenAdvantage(text.trim()).side) return null;
   const parsed = parsedDiceField(text);
   if (!parsed || !parsed.linear) return null;
 

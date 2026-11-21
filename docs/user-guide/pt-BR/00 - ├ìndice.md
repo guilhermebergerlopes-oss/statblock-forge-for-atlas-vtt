@@ -8,7 +8,7 @@ tags:
   - documentação
   - índice
 status: revisão ampliada
-versao-forge: 0.4.4
+versao-forge: 0.5.0
 ---
 
 # Statblock Forge — documentação
@@ -16,7 +16,7 @@ versao-forge: 0.4.4
 Este manual explica como criar Templates reutilizáveis, organizar statblocks no Canvas, configurar Fields, montar fórmulas e usar os recursos avançados do **Statblock Forge for Atlas VTT**. As notas são destinadas a um Vault do Obsidian e utilizam Markdown, frontmatter YAML, wikilinks e callouts.
 
 > [!info] Escopo desta edição
-> A edição acompanha o código do Forge **0.4.4**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 34 notas no idioma escolhido: este índice e 33 notas de assunto, organizadas em quatro partes.
+> A edição acompanha o código do Forge **0.5.0**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 34 notas no idioma escolhido: este índice e 33 notas de assunto, organizadas em quatro partes.
 
 ## Roteiro recomendado
 
@@ -98,7 +98,7 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 | **Field** | Definição de um dado, com `key`, `label`, `type` e opções específicas. |
 | **Value** | Conteúdo de um Field em uma ficha específica. |
 | **Bloco** | Elemento do layout que apresenta um Field ou conteúdo estático. |
-| **Container** | Bloco estrutural que organiza outros blocos, como Section, Row e Tabs. |
+| **Container** | Estrutura do Canvas. Section, Row e Tabs são Containers estruturais; Metric e Table são Containers de dados que agrupam Fields-filhos. |
 | **Statblock** | Instância preenchida de um Template. |
 | **Sample** | Values de exemplo armazenados no Template, usados na prévia e opcionalmente ao criar uma ficha. |
 | **Resource** | Valor rastreado que pode ser gasto e recuperado por regras de Rest ou pelo Atlas. |
@@ -107,7 +107,7 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 
 ## Escopo, versão e idioma
 
-- Base: Statblock Forge **v0.4.4**.
+- Base: Statblock Forge **v0.5.0**.
 - Requisito mínimo declarado no manifesto: Obsidian **1.8.7**.
 - O plugin é marcado como desktop-only.
 - Os nomes dos controles aparecem em inglês quando esse é o texto da interface; Português (Brasil) está disponível nas configurações.

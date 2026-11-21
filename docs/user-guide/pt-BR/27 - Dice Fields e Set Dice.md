@@ -126,8 +126,8 @@ Um Dice Field segue a associação normal entre Field e bloco. Os contextos conf
 
 - **Stat:** apresenta a fórmula como link individual.
 - **Line:** apresenta a fórmula em uma linha com outros Fields.
-- **Metric:** um slot associado a Dice pode apresentar a expressão resolvida como link; uma fórmula própria do slot Metric tem prioridade sobre o Dice Formula do Field.
-- **Texto de Entries, Lists, Pairs e Spells:** expressões de dados reconhecidas no texto podem se tornar links por meio do scanner de rolagens em texto. Isso não transforma o texto em um Dice Field nem cria dependências `{fieldKey}` por si só.
+- **Metric Container:** um Field Dice dentro do Container pode apresentar a expressão resolvida como link; uma fórmula própria do slot Metric tem prioridade sobre o Dice Formula do Field.
+- **Texto de Entries, Lists, Pairs e Groups:** expressões de dados reconhecidas no texto podem se tornar links por meio do scanner de rolagens em texto. Isso não transforma o texto em um Dice Field nem cria dependências `{fieldKey}` por si só.
 
 Um bloco controla apresentação. O tipo Dice controla o dado. Uma fórmula dinâmica só é aplicada quando o bloco/renderer está exibindo o Field Dice associado.
 
@@ -148,6 +148,10 @@ A gramática é compartilhada com o parser de dados do Atlas. Exemplos:
 | Descartar | `4d6dh1`, `4d6dl1` | Descarta dados maiores/menores conforme o modificador. |
 | Contar sucessos/falhas | `8d10cs>=8`, `8d10cf<2` | Conta dados que atendem à comparação. |
 | Etiqueta | `2d6[fire]` | Nomeia o grupo de dados no resultado. |
+| Vantagem/desvantagem escrita | `1d20+5 adv`, `1d20+5 dis` | Solicita vantagem (`adv`) ou desvantagem (`dis`) na rolagem. |
+
+> [!note] Sufixo de rolagem de statblock
+> `adv` e `dis` são interpretados pelo sistema de links de rolagem do statblock, não pela gramática aritmética geral. O sufixo deve ser a palavra final e não se aplica a Number/Rating ou Rest Formula.
 
 Modificadores podem ter regras de comparação e limites específicos. Nem toda combinação de modificadores é válida. Use exemplos simples primeiro e confira a mensagem do editor.
 
@@ -216,18 +220,24 @@ Se o JSON estiver inválido, ele não aparece no seletor. Se o Template apontar 
 
 ## Vantagem, desvantagem e fila da próxima rolagem
 
-Os links gerados no statblock encaminham a rolagem ao Atlas quando a integração de dados está disponível.
+Os links de rolagem usam o Dice Tool original do Atlas quando a ficha pertence a um mapa aberto. Sem mapa aberto, o Forge executa a rolagem localmente, usando o Dice Set do Template ou o mesmo Dice Set da coleção que o runtime verificado do Atlas selecionaria.
 
 - Clique no link para rolar normalmente.
 - `Shift` + clique solicita vantagem quando o conjunto/regras permitem.
 - `Alt` + clique solicita desvantagem quando permitido.
+- Clique com o botão direito em uma fórmula para usar **Salvar rolagem na coleção Atlas**. Dê um nome à rolagem; o Forge grava a fórmula resolvida em `dicePresets` da coleção associada ao statblock. O Atlas permite até 40 rolagens salvas, com nomes de até 40 caracteres. A fórmula precisa ser compatível com o parser do Atlas e ter no máximo 100 caracteres. Quando a fórmula for uma rolagem aditiva simples, o diálogo também poderá salvá-la como uma aparência individual do Dice Lab: um Dice Set ativo correspondente será copiado com suas regras e aparência, ou os próprios dados da fórmula gerarão uma aparência com crítico natural. Você poderá editar a rolagem salva depois no editor nativo do Atlas. Fórmulas terminadas em `adv`/`dis` ou com modificadores não suportados continuam como fórmulas comuns para preservar seu significado.
+- Também é possível escrever `adv` ou `dis` como palavra final da fórmula: `1d20+5 adv`, `1d20+5 dis` ou `Stealth +5 adv`. O sufixo funciona em links de texto e em Dice Fields.
+- Quando o sufixo e o atalho do clique pedem lados opostos, eles se cancelam. Por exemplo, `1d20+5 adv` clicado com `Alt` rola sem vantagem nem desvantagem.
+- O Dice Set ativo precisa definir uma regra para o lado escrito; caso contrário, o Forge não executa a rolagem local como se fosse normal.
 - Clique com o botão direito abre o menu contextual de rolagem.
 - **Add to next roll** coloca a fórmula na fila sem rolar imediatamente.
 - Como atalho, mantenha `N` pressionado e clique no link para adicionar/remover a fórmula da fila.
 
 As fórmulas enfileiradas são somadas à próxima rolagem bem-sucedida da mesma ficha. A fila é por sessão e não é salva no Template nem na nota. Uma rolagem indisponível/falha não consome os modificadores pendentes.
 
-Quando a API `dice.statblock-history` do fork Atlas está disponível, o menu contextual também pode mostrar o histórico da ficha e permitir repetir uma rolagem anterior. Consulte o relatório de integração com Atlas para os limites de persistência do histórico.
+O menu contextual inclui **Histórico de rolagens** sem depender do fork. O Forge combina os registros `diceLog` persistidos e `rollHistory` transitórios dos mapas Atlas abertos com seu próprio histórico salvo em `data.json`. O histórico do Forge mantém até 20 rolagens por ficha e 500 no total.
+
+As rolagens feitas por links do Forge guardam a fórmula, a origem, o Dice Set e a vantagem/desvantagem usados. Se o mapa original ainda estiver aberto e visível, repetir a rolagem usa o DiceTool daquele mapa. Se o mapa tiver sido fechado, o Forge repete localmente com o Dice Set salvo. Entradas antigas lidas diretamente de um mapa continuam repetíveis enquanto o mapa de origem estiver disponível; elas não são copiadas para o histórico persistente do Forge apenas por serem exibidas.
 
 ## Dice Formula, Number Formula e Rest Formula não são intercambiáveis
 

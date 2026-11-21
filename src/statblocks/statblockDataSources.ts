@@ -1,7 +1,7 @@
 import type { TFile, App } from 'obsidian';
 import { bindStatblockData, unwrapStatblockJson, type StatblockDataBinding } from '../render/statblockDataModel.ts';
 import { isRecord, type ForgeField, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
-import { restoreForgeStatblockDataFromAtlas } from '../atlas/atlasTemplateAdapter.ts';
+import { restoreForgeStatblockDataFromLegacyNote } from '../atlas/atlasTemplateAdapter.ts';
 
 export type StatblockSourceFormat = 'markdown-frontmatter' | 'json';
 
@@ -37,7 +37,7 @@ export function createLoadedStatblockSource(input: {
 }): LoadedStatblockSource {
   // Atlas renders Forge-only per-entry Counters as text; restore their typed
   // marks in memory before binding so Forge remains the richer editor.
-  const forgeData = restoreForgeStatblockDataFromAtlas(input.template, input.raw);
+  const forgeData = restoreForgeStatblockDataFromLegacyNote(input.template, input.raw);
   const binding = bindStatblockData(input.template, forgeData);
   for (const field of input.template.fields) {
     if (Object.prototype.hasOwnProperty.call(binding.data, field.key)) {

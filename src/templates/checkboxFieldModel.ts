@@ -73,6 +73,16 @@ export function validateCheckboxFieldOptions(fields: readonly ForgeField[]): Che
   return issues;
 }
 
+/**
+ * Whether this Checkbox Field permits more than one selected option.
+ * Missing values are treated as multi-choice for backwards compatibility:
+ * older templates allowed independent booleans and must retain that behavior.
+ * Newly-created fields explicitly store allowMultiple=false.
+ */
+export function checkboxFieldAllowsMultiple(field: ForgeField): boolean {
+  return field.allowMultiple !== false;
+}
+
 export function checkboxFieldOptions(field: ForgeField): CheckboxFieldOption[] {
   if (field.type !== 'checkboxes' || !Array.isArray(field.options)) return [];
   return field.options.filter((option): option is CheckboxFieldOption => isRecord(option)
@@ -234,7 +244,8 @@ export function normalizeCheckboxFieldValue(field: ForgeField, raw: unknown): Js
   // Ambiguous aliases can otherwise delete a different option's value during
   // normalization. Keep the raw object untouched until the schema is repaired.
   if (validateCheckboxFieldOptions([field]).length > 0) return value;
-  for (const option of checkboxFieldOptions(field)) {
+  const options = checkboxFieldOptions(field);
+  for (const option of options) {
     const current = value[option.key];
     const aliasValue = checkboxAliasBooleanValue(value, option.aliases ?? []);
     value[option.key] = typeof current === 'boolean' ? current : typeof aliasValue === 'boolean' ? aliasValue : false;
@@ -243,12 +254,24 @@ export function normalizeCheckboxFieldValue(field: ForgeField, raw: unknown): Js
       if (aliases.has(existingKey.toLowerCase())) delete value[existingKey];
     }
   }
+  if (!checkboxFieldAllowsMultiple(field)) {
+    // Keep the first selected option in schema order. This also makes old
+    // malformed single-choice values deterministic without dropping unknown keys.
+    let selected = false;
+    for (const option of options) {
+      if (value[option.key] !== true) continue;
+      if (!selected) selected = true;
+      else value[option.key] = false;
+    }
+  }
   return value;
 }
 
-export function checkboxOptionIsEnabled(data: JsonRecord, fieldKey: string, optionKey: string): boolean {
-  const fieldValue = isRecord(data[fieldKey]) ? data[fieldKey] : {};
-  return fieldValue[optionKey] === true;
+export function checkboxOptionIsEnabled(data: JsonRecord, field: ForgeField, optionKey: string): boolean {
+  const fieldValue = isRecord(data[field.key]) ? data[field.key] : {};
+  if (checkboxFieldAllowsMultiple(field)) return fieldValue[optionKey] === true;
+  const selected = checkboxFieldOptions(field).find((option) => fieldValue[option.key] === true);
+  return selected?.key === optionKey;
 }
 
 export function withCheckboxOptionValue(
@@ -259,5 +282,11 @@ export function withCheckboxOptionValue(
 ): JsonRecord {
   const fieldValue = data[field.key];
   const current = isRecord(fieldValue) ? fieldValue : {};
-  return { ...current, [optionKey]: enabled };
+  const next: JsonRecord = { ...current };
+  if (!checkboxFieldAllowsMultiple(field)) {
+    // Exclusivity is scoped to this Field: other Checkboxes Fields are untouched.
+    for (const option of checkboxFieldOptions(field)) next[option.key] = false;
+  }
+  next[optionKey] = enabled;
+  return next;
 }

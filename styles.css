@@ -1312,6 +1312,8 @@
 .statblock-forge__preview-metric-grid { display: grid; gap: 0.4rem; min-width: 0; }
 .statblock-forge__preview-metric-cell { display: grid; gap: 0.15rem; min-width: 0; text-align: center; }
 .statblock-forge__preview-metric-value { font-size: 1.15em; overflow-wrap: anywhere; }
+.statblock-forge__preview-metric-rows > .is-metric-placeholder { min-height: 4.25rem; }
+.statblock-forge__preview-scores > .is-table-placeholder { min-height: 4.25rem; margin-bottom: 0.45rem; }
 .statblock-forge__metric-slots { display: grid; gap: 0.35rem; margin: 0.35rem 0; }
 .statblock-forge__metric-slot { display: grid; grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) 2rem; align-items: center; gap: 0.3rem; min-width: 0; }
 .statblock-forge__metric-slot-index { color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; text-align: center; }
@@ -1325,6 +1327,23 @@
 .statblock-forge__preview-score-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--background-modifier-border); text-align: left; vertical-align: top; }
 .statblock-forge__preview-score-table th { color: var(--text-muted); font-weight: 650; }
 .statblock-forge__preview-score-table > thead > tr > th { border-top: 1px solid var(--background-modifier-border); background: var(--background-secondary); color: var(--text-normal); }
+
+.statblock-forge__preview-table-grid { table-layout: auto; }
+.statblock-forge__preview-table-row-label { min-width: 5.5rem; white-space: nowrap; }
+.statblock-forge__preview-table-row-label-heading { min-width: 5.5rem; }
+.statblock-forge__table-row-label-editor {
+  width: 100%;
+  min-width: 4.5rem;
+  padding: 0.12rem 0.22rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+.statblock-forge__table-row-actions { display: flex; justify-content: flex-start; margin-top: 0.4rem; }
+.statblock-forge__table-slot-value { overflow-wrap: anywhere; }
+.statblock-forge__table-row-cell-value { cursor: text; }
+.statblock-forge__table-row-cell-value.statblock-forge__dice-link { cursor: pointer; }
 .statblock-forge__preview-score-value.is-editable {
   display: inline-block;
   max-width: 100%;
@@ -5220,7 +5239,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__statblock .atlas-sb-counters__body { display: block; min-width: 0; }
 .statblock-forge__statblock .atlas-sb-counters__cells {
   display: grid;
-  grid-template-columns: repeat(var(--forge-counters-per-row, 2), minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 0.65rem 0.9rem;
   min-width: 0;
@@ -5943,6 +5962,21 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 }
 .statblock-forge__save-hint { color: var(--text-muted); }
 .statblock-forge__save-problem { color: var(--text-error); }
+.statblock-forge__atlas-dice-look-option {
+  display: flex;
+  align-items: start;
+  gap: 0.55rem;
+}
+.statblock-forge__atlas-dice-look-checkbox { margin-top: 0.15rem; }
+.statblock-forge__atlas-dice-preset-formula {
+  display: block;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary-alt);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 
 
 /* Keep Save sized to its label instead of inheriting the editor's full-width button rule. */
@@ -8043,7 +8077,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   .statblock-forge__json-header > .statblock-forge__panel-title { font-size: var(--font-ui-small); }
 }
 
-/* Atlas Ctrl-hover provider previews: keep the provider mount and Forge card
+/* Atlas Ctrl-hover previews: keep the direct Forge mount and statblock card
    inside Atlas' max-height flex window. The card's body is the scrollport
    consumed by Atlas' capture-phase Ctrl+wheel handler. Without this flex chain
    the body grows to the statblock's full content height and has nothing to
@@ -8082,11 +8116,257 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   scrollbar-width: thin;
 }
 
+/* Atlas' native hover surface has a generic max-width cap. Forge previews
+   need room for the configured Template width, otherwise the card is clipped
+   inside a narrower floating window and appears smaller than the editor sheet. */
+.atlas-statblock-preview-window.statblock-forge__atlas-width-preview {
+  max-width: min(calc(var(--statblock-forge-sheet-width, 560px) + 1rem), calc(100vw - 2rem));
+}
+.atlas-statblock-preview-window.statblock-forge__atlas-width-preview .statblock-forge__atlas-preview-mount {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Atlas Ctrl-hover previews: use the actual Template/statblock width instead of
-   the Atlas default card cap. Atlas sizes the outer window from data-forge-sheet-width. */
+   the Atlas default card cap. Forge sizes its direct preview from this width. */
 .atlas-statblock-preview-window .statblock-forge__atlas-preview-mount > .statblock-forge__final-card.atlas-statblock {
   box-sizing: border-box;
   width: var(--statblock-forge-sheet-width, 560px);
   min-width: var(--statblock-forge-sheet-width, 560px);
   max-width: none;
+}
+
+/* Forge-owned dice result dialog for rolls made without an Atlas map. */
+.modal.statblock-forge__dice-roll-modal {
+  width: min(38rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+}
+.statblock-forge__dice-roll-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  max-height: min(76vh, 54rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.statblock-forge__dice-roll-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
+}
+.statblock-forge__dice-roll-source span,
+.statblock-forge__dice-roll-set,
+.statblock-forge__dice-roll-advantage {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.statblock-forge__dice-roll-set,
+.statblock-forge__dice-roll-advantage { margin: 0; }
+.statblock-forge__dice-roll-formula {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.statblock-forge__dice-roll-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.statblock-forge__dice-roll-die {
+  display: grid;
+  min-width: 3.2rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid var(--forge-die-colour, var(--background-modifier-border));
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  text-align: center;
+}
+.statblock-forge__dice-roll-die-value {
+  color: var(--forge-die-colour, var(--text-normal));
+  font-size: 1.15rem;
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.statblock-forge__dice-roll-die-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.statblock-forge__dice-roll-die.is-dropped,
+.statblock-forge__dice-roll-die.is-rerolled { opacity: 0.45; text-decoration: line-through; }
+.statblock-forge__dice-roll-die.is-exploded { border-style: dashed; }
+.statblock-forge__dice-roll-die.is-bonus { box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.statblock-forge__dice-roll-die.is-negative { border-color: var(--text-warning); }
+.statblock-forge__dice-roll-die.is-success { border-color: var(--text-success); }
+.statblock-forge__dice-roll-die.is-failure { border-color: var(--text-error); }
+.statblock-forge__dice-roll-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+.statblock-forge__dice-roll-total-label { color: var(--text-muted); }
+.statblock-forge__dice-roll-total strong {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.statblock-forge__dice-roll-total.is-high-crit strong { color: var(--text-success); }
+.statblock-forge__dice-roll-total.is-low-crit strong { color: var(--text-error); }
+.statblock-forge__dice-roll-crit { font-weight: var(--font-semibold); }
+.statblock-forge__dice-roll-crit.is-high { color: var(--text-success); }
+.statblock-forge__dice-roll-crit.is-low { color: var(--text-error); }
+.statblock-forge__dice-roll-modifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.statblock-forge__dice-roll-modifiers strong { color: var(--text-normal); }
+.statblock-forge__dice-roll-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.statblock-forge__dice-roll-footer small { color: var(--text-muted); }
+
+/* Forge template backup recovery */
+.statblock-forge__backup-modal .modal-content {
+  max-width: min(720px, 90vw);
+}
+.statblock-forge__backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: min(58vh, 620px);
+  overflow: auto;
+}
+.statblock-forge__backup-row,
+.statblock-forge__backup-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+.statblock-forge__backup-path {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  color: var(--text-muted);
+}
+.statblock-forge__backup-destination {
+  font-size: var(--font-smaller);
+  color: var(--text-muted);
+}
+.statblock-forge__backup-error {
+  color: var(--text-error);
+  font-size: var(--font-smaller);
+}
+
+/* Explicit completion control for the multi-row Groups editor. */
+.statblock-forge__spell-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.statblock-forge__spell-editor-save {
+  min-height: 2rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, white);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+}
+.statblock-forge__spell-editor-save:hover {
+  filter: brightness(1.08);
+}
+
+/* Unified Table preview: both native-grid and Field-backed Tables render as
+   the same HTML grid. Inputs are confined to their existing cells. */
+.statblock-forge__preview-score-table.is-editable { table-layout: auto; }
+.statblock-forge__table-sample-cell-editor {
+  display: block;
+  width: 100%;
+  min-width: 2.75rem;
+  max-width: 100%;
+  min-height: 1.8rem;
+  box-sizing: border-box;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  font-size: var(--font-ui-smaller);
+}
+.statblock-forge__table-sample-cell-editor:focus {
+  border-color: var(--interactive-accent);
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  outline-offset: 1px;
+}
+.statblock-forge__score-editor-row-actions-cell { width: 1%; white-space: nowrap; }
+.statblock-forge__table-empty-cell { color: var(--text-muted); text-align: center !important; }
+.statblock-forge__table-add-pair { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: end; }
+.statblock-forge__table-add-pair > .statblock-forge__labeled-control { flex: 1 1 12rem; min-width: 0; }
+
+
+/* Ctrl+hover uses a narrower Atlas floating surface than the normal statblock.
+   Prefer ordinary word boundaries there; only split an unbreakable token when
+   it would otherwise overflow the available width. */
+.atlas-statblock-preview-window .statblock-forge__atlas-preview-mount .statblock-forge__final-card.atlas-statblock {
+  word-break: normal;
+}
+.atlas-statblock-preview-window .statblock-forge__atlas-preview-mount .statblock-forge__final-card.atlas-statblock :where(
+  .statblock-forge__preview-block,
+  .statblock-forge__preview-field-value,
+  .statblock-forge__preview-metric-value,
+  .statblock-forge__table-slot-value,
+  .statblock-forge__preview-text-content,
+  .statblock-forge__preview-entry-part-value,
+  .statblock-forge__preview-pair-value,
+  .statblock-forge__preview-spell-name,
+  .statblock-forge__preview-tag-item,
+  .statblock-forge__preview-pairs-line,
+  .statblock-forge__preview-field-label,
+  .statblock-forge__preview-stat-label,
+  .statblock-forge__preview-block-heading
+) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* Column labels are a Table-level presentation option. Hide any nested Field
+   heading emitted by a native slot renderer as well as the table header. */
+.statblock-forge__preview-table-grid.is-column-labels-hidden > thead [data-table-column-label],
+.statblock-forge__preview-table-grid.is-column-labels-hidden > tbody > tr > td :is(
+  .statblock-forge__preview-block-heading,
+  .statblock-forge__preview-field-label,
+  .atlas-sb-label
+) {
+  display: none !important;
+}
+
+/* Keep the empty Table header available for its accessible row-label heading,
+   but collapse its visual box when column labels are disabled. Otherwise the
+   header's default top/bottom borders leave a stray horizontal line above
+   Counter values and row Labels. */
+.statblock-forge__preview-table-grid.is-column-labels-hidden > thead > tr > th {
+  padding-block: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
 }

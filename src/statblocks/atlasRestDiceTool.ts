@@ -1,7 +1,18 @@
 import type { App } from 'obsidian';
 import type { ForgeRestDiceSet } from './restDiceRoller.ts';
 import { forgeStatblockAdvantageSides, type ForgeAdvantageSide } from './statblockDiceMenuModel.ts';
-import { ATLAS_PLUGIN_ID } from '../atlas/atlasRuntimeDetection.ts';
+import { rollForgeOffMapDiceFormula, type ForgeOffMapDiceRollResult, type ForgeOffMapRollSource } from './atlasOffMapDiceRoller.ts';
+import { combineWrittenAdvantage, writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
+import {
+  atlasDiceRollOriginForToken,
+  getAtlasDiceHistorySnapshots,
+  getAtlasDiceRuntimeContexts,
+  resolveAtlasDiceRollTarget,
+  type AtlasDiceRollResultLike,
+  type AtlasDiceRuntimeContext,
+  type AtlasDiceTokenRollContextLike,
+} from '../atlas/atlasDiceRuntime.ts';
+import type { ForgeDiceHistoryEntry, ForgeDiceHistoryRecipe, ForgeDiceHistorySource } from './forgeDiceHistoryStorage.ts';
 
 export interface AtlasRestDiceRoll {
   formula: string;
@@ -9,88 +20,50 @@ export interface AtlasRestDiceRoll {
   id?: string;
 }
 
-export interface AtlasRestDiceRollHistoryEntry {
-  id: string;
-  formula: string;
-  total: number;
-  timestamp: number;
-  statblockPath: string;
-  tokenName?: string;
-  abilityName?: string;
-  advantage?: 'advantage' | 'disadvantage';
-  repeatable?: boolean;
-}
+export type AtlasRestDiceRollHistoryEntry = ForgeDiceHistoryEntry;
 
 export interface AtlasRestDiceAttempt {
-  /** False only when neither an Atlas map Dice Tool nor the public app-wide dice API is available. */
+  /** False only when neither a native Atlas map Dice Tool nor a valid local Dice Set is available. */
   available: boolean;
-  /** Null when Atlas was available but refused or failed to roll the formula. */
+  /** Null when the selected roller refused or failed to roll the formula. */
   roll: AtlasRestDiceRoll | null;
   error?: string;
+  engine?: 'atlas' | 'forge';
+  details?: ForgeOffMapDiceRollResult;
 }
 
-interface AtlasRollSource {
+export interface ForgeAtlasRollContext {
+  readonly viewId?: string;
+  readonly tokenId?: string;
+  readonly tokenImagePath?: string;
+  readonly originContext?: AtlasDiceTokenRollContextLike;
+}
+
+interface AtlasRollSource extends ForgeDiceHistorySource {
   type: 'statblock';
-  statblockPath: string;
-  tokenName?: string;
-  abilityName?: string;
 }
 
-interface AtlasDiceToolLike {
-  rollingDice?(set?: ForgeRestDiceSet): {
-    dice: readonly { count: number; sides: number }[];
-    advantage?: unknown;
-    disadvantage?: unknown;
-  };
-  rollDice(
-    formula: string,
-    source?: AtlasRollSource,
-    origin?: unknown,
-    options?: { set?: ForgeRestDiceSet; advantage?: 'advantage' | 'disadvantage' },
-  ): AtlasRestDiceRoll | null;
+interface ForgeHistoryPluginLike {
+  getForgeDiceHistoryEntries?(statblockPath: string, limit?: number): ForgeDiceHistoryEntry[];
+  getForgeDiceHistoryEntry?(id: string): ForgeDiceHistoryEntry | null;
+  recordForgeDiceHistoryEntry?(entry: ForgeDiceHistoryEntry): void;
 }
 
-interface AtlasPublicAPILike {
-  apiVersion?: number;
-  capabilities?: readonly string[];
-  dice?: AtlasPublicDiceAPI;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-interface AtlasPublicDicePluginLike {
-  publicAPI?: AtlasPublicAPILike;
-}
-
-interface AtlasPublicDiceAPI {
-  rollStatblock?(request: {
-    formula: string;
-    source: AtlasRollSource;
-    set?: ForgeRestDiceSet;
-    advantage?: 'advantage' | 'disadvantage';
-  }): AtlasRestDiceRoll | null;
-  rollingDiceForStatblock?(request: {
-    source: AtlasRollSource;
-    set?: ForgeRestDiceSet;
-  }): {
-    dice: readonly { count: number; sides: number }[];
-    advantage?: unknown;
-    disadvantage?: unknown;
-  } | null;
-  getStatblockRollHistory?(request: { statblockPath: string; limit?: number }): readonly AtlasRestDiceRollHistoryEntry[];
-  repeatStatblockRoll?(request: { id: string }): AtlasRestDiceRoll | null;
-}
-
-interface AtlasMapViewLike {
-  containerEl?: HTMLElement & { isShown?: () => boolean };
-  serviceManager?: {
-    getToolController?: () => {
-      getDiceTool?: () => AtlasDiceToolLike | null | undefined;
-    } | null | undefined;
-  };
+function historyPlugin(app: App): ForgeHistoryPluginLike | null {
+  try {
+    const plugins = (app as unknown as { plugins?: { plugins?: Record<string, unknown> } }).plugins?.plugins;
+    const plugin = plugins?.['statblock-forge'];
+    return isRecord(plugin) ? plugin as ForgeHistoryPluginLike : null;
+  } catch {
+    return null;
+  }
 }
 
 function diceSetForAtlas(set: ForgeRestDiceSet): ForgeRestDiceSet {
-  // This object matches Atlas's public DiceSet shape. It is only passed to
-  // DiceTool.rollDice; Forge does not mutate Atlas's library or the set object.
   return {
     ...set,
     dice: set.dice.map((die) => ({ ...die })),
@@ -100,119 +73,203 @@ function diceSetForAtlas(set: ForgeRestDiceSet): ForgeRestDiceSet {
   };
 }
 
-/** Finds only a visible Atlas map Dice Tool; hidden tabs must use the app-wide roll layer. */
-function findAtlasDiceTool(app: App): AtlasDiceToolLike | null {
-  const workspace = app.workspace as unknown as {
-    getLeavesOfType?: (viewType: string) => Array<{ view?: unknown }>;
-  };
-  if (typeof workspace.getLeavesOfType !== 'function') return null;
-
-  for (const leaf of workspace.getLeavesOfType('atlas-vtt')) {
-    const view = leaf.view as AtlasMapViewLike | undefined;
-    const candidate = view?.serviceManager?.getToolController?.()?.getDiceTool?.();
-    if (!candidate || typeof candidate.rollDice !== 'function') continue;
-    const shown = typeof view.containerEl?.isShown === 'function' ? view.containerEl.isShown() : true;
-    if (shown) return candidate;
-  }
-  return null;
-}
-
-/** Finds Atlas' versioned app-wide dice API; unlike a map Dice Tool, it works with no scene open. */
-function findAtlasPublicDiceAPI(app: App): AtlasPublicDiceAPI | null {
-  const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, AtlasPublicDicePluginLike | undefined> } }).plugins;
-  const api = pluginManager?.plugins?.[ATLAS_PLUGIN_ID]?.publicAPI;
-  if (api?.apiVersion !== 1 || !api.capabilities?.includes('dice.statblock-rolls')) return null;
-  if (typeof api.dice?.rollStatblock !== 'function' || typeof api.dice?.rollingDiceForStatblock !== 'function') return null;
-  return api.dice;
-}
-
-function findAtlasPublicDiceHistoryAPI(app: App): AtlasPublicDiceAPI | null {
-  const pluginManager = (app as unknown as { plugins?: { plugins?: Record<string, AtlasPublicDicePluginLike | undefined> } }).plugins;
-  const api = pluginManager?.plugins?.[ATLAS_PLUGIN_ID]?.publicAPI;
-  if (api?.apiVersion !== 1 || !api.capabilities?.includes('dice.statblock-history')) return null;
-  const dice = api.dice;
-  if (typeof dice?.getStatblockRollHistory !== 'function' || typeof dice?.repeatStatblockRoll !== 'function'
-    || typeof dice?.rollStatblock !== 'function') return null;
-  return dice;
-}
-
-export function hasForgeStatblockRollHistory(app: App): boolean {
-  return findAtlasPublicDiceHistoryAPI(app) !== null;
-}
-
-export function getForgeStatblockRollHistory(
-  app: App,
-  statblockPath: string,
-  limit = 10,
-): AtlasRestDiceRollHistoryEntry[] {
-  if (typeof statblockPath !== 'string' || !statblockPath.trim()) return [];
-  const api = findAtlasPublicDiceHistoryAPI(app);
-  if (!api?.getStatblockRollHistory) return [];
-  try {
-    const requestedLimit = Number.isInteger(limit) ? Math.max(1, Math.min(50, limit)) : 10;
-    const entries = api.getStatblockRollHistory({ statblockPath, limit: requestedLimit });
-    return Array.isArray(entries) ? entries
-      .filter((entry) => entry && typeof entry.id === 'string' && typeof entry.formula === 'string'
-        && Number.isFinite(entry.total) && Number.isFinite(entry.timestamp) && entry.statblockPath === statblockPath)
-      .slice(0, requestedLimit)
-      .map((entry) => ({
-        id: entry.id,
-        formula: entry.formula,
-        total: entry.total,
-        timestamp: entry.timestamp,
-        statblockPath: entry.statblockPath,
-        ...(typeof entry.tokenName === 'string' ? { tokenName: entry.tokenName } : {}),
-        ...(typeof entry.abilityName === 'string' ? { abilityName: entry.abilityName } : {}),
-        ...(entry.advantage === 'advantage' || entry.advantage === 'disadvantage' ? { advantage: entry.advantage } : {}),
-        ...(entry.repeatable === false ? { repeatable: false } : { repeatable: true }),
-      })) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function repeatForgeStatblockRollFromHistory(app: App, id: string): AtlasRestDiceAttempt {
-  const api = findAtlasPublicDiceHistoryAPI(app);
-  if (!api?.repeatStatblockRoll || typeof id !== 'string' || !id.trim()) return { available: false, roll: null };
-  try {
-    const result = api.repeatStatblockRoll({ id });
-    if (!result || !Number.isFinite(result.total)) return { available: true, roll: null };
-    return {
-      available: true,
-      roll: {
-        formula: typeof result.formula === 'string' ? result.formula : '',
-        total: Math.trunc(result.total),
-        ...(typeof result.id === 'string' ? { id: result.id } : {}),
-      },
-    };
-  } catch (error) {
-    return { available: true, roll: null, error: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function rollSourceOf(source: { statblockPath: string; tokenName?: string; abilityName?: string }): AtlasRollSource {
+function rollSourceOf(source: {
+  statblockPath: string;
+  tokenId?: string;
+  tokenName?: string;
+  tokenImagePath?: string;
+  abilityName?: string;
+}): AtlasRollSource {
   return {
     type: 'statblock',
     statblockPath: source.statblockPath,
+    ...(source.tokenId ? { tokenId: source.tokenId } : {}),
     ...(source.tokenName ? { tokenName: source.tokenName } : {}),
+    ...(source.tokenImagePath ? { tokenImagePath: source.tokenImagePath } : {}),
     ...(source.abilityName ? { abilityName: source.abilityName } : {}),
   };
 }
 
-/** The active Atlas dice rules, written as a default bonus formula (for example `1d20+1d6`). */
+function sourceForHistory(source: AtlasRollSource): ForgeDiceHistorySource {
+  return {
+    statblockPath: source.statblockPath,
+    ...(source.tokenId ? { tokenId: source.tokenId } : {}),
+    ...(source.tokenName ? { tokenName: source.tokenName } : {}),
+    ...(source.tokenImagePath ? { tokenImagePath: source.tokenImagePath } : {}),
+    ...(source.abilityName ? { abilityName: source.abilityName } : {}),
+  };
+}
+
+function recordHistory(app: App, entry: ForgeDiceHistoryEntry): void {
+  try { historyPlugin(app)?.recordForgeDiceHistoryEntry?.(entry); } catch { /* the roll itself remains valid if history storage is unavailable */ }
+}
+
+function recipeFor(
+  engine: 'atlas' | 'forge',
+  source: AtlasRollSource,
+  set: ForgeRestDiceSet | null,
+  advantage: 'advantage' | 'disadvantage' | null | undefined,
+  mapContext?: Pick<AtlasDiceRuntimeContext, 'mapPath' | 'viewId'>,
+): ForgeDiceHistoryRecipe {
+  return {
+    engine,
+    source: sourceForHistory(source),
+    ...(set ? { diceSet: diceSetForAtlas(set) } : {}),
+    ...(advantage ? { advantage } : {}),
+    ...(mapContext?.mapPath ? { mapPath: mapContext.mapPath } : {}),
+    ...(mapContext?.viewId ? { viewId: mapContext.viewId } : {}),
+  };
+}
+
+function recordSuccessfulRoll(
+  app: App,
+  result: AtlasDiceRollResultLike | ForgeOffMapDiceRollResult,
+  source: AtlasRollSource,
+  recipe: ForgeDiceHistoryRecipe,
+  engine: 'atlas' | 'forge',
+): void {
+  if (!result || typeof result.id !== 'string' || !result.id.trim()
+    || !Number.isFinite(result.total) || !Number.isFinite(result.timestamp)) return;
+  const formula = typeof result.formula === 'string' ? result.formula : '';
+  if (!formula) return;
+  recordHistory(app, {
+    id: result.id,
+    timestamp: Number(result.timestamp),
+    formula,
+    total: Number(result.total),
+    statblockPath: source.statblockPath,
+    ...(source.tokenName ? { tokenName: source.tokenName } : {}),
+    ...(source.abilityName ? { abilityName: source.abilityName } : {}),
+    ...(recipe.advantage ? { advantage: recipe.advantage } : {}),
+    repeatable: !!recipe.diceSet,
+    engine,
+    recipe,
+  });
+}
+
+function sourceFromUnknown(value: unknown): ForgeDiceHistorySource | null {
+  if (!isRecord(value) || value.type !== 'statblock'
+    || typeof value.statblockPath !== 'string' || !value.statblockPath.trim()) return null;
+  return {
+    statblockPath: value.statblockPath,
+    ...(typeof value.tokenId === 'string' ? { tokenId: value.tokenId } : {}),
+    ...(typeof value.tokenName === 'string' ? { tokenName: value.tokenName } : {}),
+    ...(typeof value.tokenImagePath === 'string' ? { tokenImagePath: value.tokenImagePath } : {}),
+    ...(typeof value.abilityName === 'string' ? { abilityName: value.abilityName } : {}),
+  };
+}
+
+function mapHistoryEntries(app: App, statblockPath: string): ForgeDiceHistoryEntry[] {
+  const entries: ForgeDiceHistoryEntry[] = [];
+  for (const snapshot of getAtlasDiceHistorySnapshots(app)) {
+    const results = [...snapshot.persistedHistory, ...snapshot.inMemoryHistory];
+    for (const result of results) {
+      const source = sourceFromUnknown(result.source);
+      if (!source || source.statblockPath !== statblockPath || typeof result.id !== 'string'
+        || typeof result.formula !== 'string' || !Number.isFinite(result.timestamp) || !Number.isFinite(result.total)) continue;
+      const recipe: ForgeDiceHistoryRecipe = {
+        engine: 'atlas', source,
+        ...(snapshot.mapPath ? { mapPath: snapshot.mapPath } : {}),
+        ...(snapshot.viewId ? { viewId: snapshot.viewId } : {}),
+        ...(result.advantage === 'advantage' || result.advantage === 'disadvantage' ? { advantage: result.advantage } : {}),
+      };
+      entries.push({
+        id: result.id,
+        timestamp: Number(result.timestamp),
+        formula: result.formula,
+        total: Number(result.total),
+        statblockPath,
+        ...(source.tokenName ? { tokenName: source.tokenName } : {}),
+        ...(source.abilityName ? { abilityName: source.abilityName } : {}),
+        ...(recipe.advantage ? { advantage: recipe.advantage } : {}),
+        repeatable: snapshot.visible && !!snapshot.mapPath,
+        engine: 'atlas',
+        recipe,
+      });
+    }
+  }
+  return entries;
+}
+
+function findHistoryEntryById(app: App, id: string): ForgeDiceHistoryEntry | null {
+  if (typeof id !== 'string' || !id.trim()) return null;
+  let saved: ForgeDiceHistoryEntry | null = null;
+  try {
+    saved = historyPlugin(app)?.getForgeDiceHistoryEntry?.(id) ?? null;
+    if (saved?.repeatable) return saved;
+  } catch { /* continue with live Atlas snapshots */ }
+  for (const snapshot of getAtlasDiceHistorySnapshots(app)) {
+    for (const result of [...snapshot.persistedHistory, ...snapshot.inMemoryHistory]) {
+      if (result.id !== id) continue;
+      const source = sourceFromUnknown(result.source);
+      if (!source || typeof result.formula !== 'string' || !Number.isFinite(result.timestamp) || !Number.isFinite(result.total)) return null;
+      const recipe: ForgeDiceHistoryRecipe = {
+        engine: 'atlas', source,
+        ...(snapshot.mapPath ? { mapPath: snapshot.mapPath } : {}),
+        ...(snapshot.viewId ? { viewId: snapshot.viewId } : {}),
+        ...(result.advantage === 'advantage' || result.advantage === 'disadvantage' ? { advantage: result.advantage } : {}),
+      };
+      return {
+        id, timestamp: Number(result.timestamp), formula: result.formula, total: Number(result.total),
+        statblockPath: source.statblockPath,
+        ...(source.tokenName ? { tokenName: source.tokenName } : {}),
+        ...(source.abilityName ? { abilityName: source.abilityName } : {}),
+        ...(recipe.advantage ? { advantage: recipe.advantage } : {}),
+        repeatable: snapshot.visible && !!snapshot.mapPath,
+        engine: 'atlas', recipe,
+      };
+    }
+  }
+  return saved;
+}
+
+function localRepeat(app: App, entry: ForgeDiceHistoryEntry, recipe: ForgeDiceHistoryRecipe): AtlasRestDiceAttempt {
+  if (!recipe.diceSet) return { available: false, engine: 'forge', roll: null, error: 'The original Dice Set is unavailable.' };
+  const source: ForgeOffMapRollSource = { type: 'statblock', ...recipe.source };
+  const attempt = rollForgeOffMapDiceFormula(entry.formula, recipe.diceSet, source, recipe.advantage);
+  if (!attempt.ok) return { available: true, engine: 'forge', roll: null, error: attempt.error };
+  const result = attempt.result;
+  const nextRecipe = recipeFor('forge', rollSourceOf(recipe.source), recipe.diceSet, recipe.advantage);
+  recordSuccessfulRoll(app, result, rollSourceOf(recipe.source), nextRecipe, 'forge');
+  return {
+    available: true,
+    engine: 'forge',
+    details: result,
+    roll: { id: result.id, formula: result.formula, total: result.total },
+  };
+}
+
+function visibleMapForHistory(app: App, recipe: ForgeDiceHistoryRecipe): AtlasDiceRuntimeContext | null {
+  const contexts = getAtlasDiceRuntimeContexts(app).filter((context) => context.visible && context.mapPath === recipe.mapPath);
+  if (recipe.viewId) {
+    const exact = contexts.find((context) => context.viewId === recipe.viewId);
+    if (exact) return exact;
+  }
+  if (contexts.length === 1) return contexts[0]!;
+  if (contexts.length > 1) {
+    const activeLeaf = (app as unknown as { workspace?: { activeLeaf?: unknown } }).workspace?.activeLeaf;
+    const active = contexts.filter((context) => context.leaf === activeLeaf);
+    if (active.length === 1) return active[0]!;
+  }
+  return null;
+}
+
+/** The active dice rules, written as a default bonus formula (for example `1d20+1d6`). */
 export function forgeStatblockDefaultRollFormula(
   app: App,
   explicitSet?: ForgeRestDiceSet | null,
   statblockPath = 'statblock-forge:unknown',
+  rollContext?: ForgeAtlasRollContext,
+  offMapSet?: ForgeRestDiceSet | null,
 ): string | null {
-  const tool = findAtlasDiceTool(app);
+  const target = resolveAtlasDiceRollTarget(app, rollContext?.viewId, rollContext?.originContext?.mapPath);
+  const tool = target.status === 'ready' ? target.context.diceTool : null;
+  if (target.status !== 'ready' && target.status !== 'none') return null;
   try {
+    const localSet = explicitSet ?? offMapSet ?? null;
     const rules = tool?.rollingDice
       ? tool.rollingDice(explicitSet ? diceSetForAtlas(explicitSet) : undefined)
-      : findAtlasPublicDiceAPI(app)?.rollingDiceForStatblock?.({
-          source: rollSourceOf({ statblockPath }),
-          ...(explicitSet ? { set: diceSetForAtlas(explicitSet) } : {}),
-        });
+      : target.status === 'none' && localSet ? localSet : null;
     if (!rules) return null;
     const dice = Array.isArray(rules.dice) ? rules.dice : [];
     const formula = dice
@@ -230,63 +287,158 @@ export function forgeStatblockRollMenuSides(
   formula: string,
   explicitSet?: ForgeRestDiceSet | null,
   statblockPath = 'statblock-forge:unknown',
+  rollContext?: ForgeAtlasRollContext,
+  offMapSet?: ForgeRestDiceSet | null,
 ): ForgeAdvantageSide[] {
-  const tool = findAtlasDiceTool(app);
+  const target = resolveAtlasDiceRollTarget(app, rollContext?.viewId, rollContext?.originContext?.mapPath);
+  const tool = target.status === 'ready' ? target.context.diceTool : null;
+  if (target.status !== 'ready' && target.status !== 'none') return [];
   try {
+    const localSet = explicitSet ?? offMapSet ?? null;
     const rules = tool?.rollingDice
       ? tool.rollingDice(explicitSet ? diceSetForAtlas(explicitSet) : undefined)
-      : findAtlasPublicDiceAPI(app)?.rollingDiceForStatblock?.({
-          source: rollSourceOf({ statblockPath }),
-          ...(explicitSet ? { set: diceSetForAtlas(explicitSet) } : {}),
-        });
+      : target.status === 'none' && localSet ? localSet : null;
     return rules ? forgeStatblockAdvantageSides(formula, rules) : [];
   } catch {
     return [];
   }
 }
 
-/**
- * Sends a statblock formula through Atlas. When the history capability exists,
- * Atlas owns routing between a visible map DiceTool and its app-wide roller.
- * Older fork builds retain the compatible map-tool/public-roll fallback.
- */
+/** Returns recent Forge statblock rolls from Forge persistence and open Atlas map logs. */
+export function hasForgeStatblockRollHistory(app: App): boolean {
+  return typeof historyPlugin(app)?.getForgeDiceHistoryEntries === 'function';
+}
+
+export function getForgeStatblockRollHistory(app: App, statblockPath: string, limit = 10): AtlasRestDiceRollHistoryEntry[] {
+  if (typeof statblockPath !== 'string' || !statblockPath.trim()) return [];
+  const requestedLimit = Number.isInteger(limit) ? Math.max(1, Math.min(50, limit)) : 10;
+  const saved = historyPlugin(app)?.getForgeDiceHistoryEntries?.(statblockPath, 20) ?? [];
+  const merged = new Map<string, ForgeDiceHistoryEntry>();
+  for (const entry of mapHistoryEntries(app, statblockPath)) merged.set(entry.id, entry);
+  // Saved entries carry the full replay recipe. However, a legacy saved entry
+  // that lacked a Dice Set can still be replayable while its original map is open.
+  for (const entry of saved) {
+    const live = merged.get(entry.id);
+    if (!live || entry.repeatable || !live.repeatable) merged.set(entry.id, entry);
+  }
+  return [...merged.values()].sort((a, b) => b.timestamp - a.timestamp).slice(0, requestedLimit);
+}
+
+/** Repeats an Atlas map roll in its map when still available, otherwise locally from its saved Dice Set. */
+export function repeatForgeStatblockRollFromHistory(app: App, id: string): AtlasRestDiceAttempt {
+  const entry = findHistoryEntryById(app, id);
+  if (!entry || !entry.repeatable || !entry.recipe) return { available: false, roll: null };
+  const recipe = entry.recipe;
+
+  if (recipe.engine === 'atlas') {
+    const context = recipe.mapPath ? visibleMapForHistory(app, recipe) : null;
+    if (context) {
+      try {
+        const source = { type: 'statblock' as const, ...recipe.source };
+        const origin = atlasDiceRollOriginForToken(context, recipe.source.tokenId);
+        const options = recipe.diceSet || recipe.advantage
+          ? { ...(recipe.diceSet ? { set: diceSetForAtlas(recipe.diceSet) } : {}), ...(recipe.advantage ? { advantage: recipe.advantage } : {}) }
+          : undefined;
+        const result = options
+          ? context.diceTool.rollDice(entry.formula, source, origin, options)
+          : context.diceTool.rollDice(entry.formula, source, origin);
+        if (!result || !Number.isFinite(result.total)) return { available: true, engine: 'atlas', roll: null };
+        const nextRecipe = recipeFor('atlas', source, recipe.diceSet ?? null, recipe.advantage, context);
+        recordSuccessfulRoll(app, result, source, nextRecipe, 'atlas');
+        return {
+          available: true,
+          engine: 'atlas',
+          roll: {
+            id: typeof result.id === 'string' ? result.id : undefined,
+            formula: typeof result.formula === 'string' ? result.formula : entry.formula,
+            total: Math.trunc(result.total),
+          },
+        };
+      } catch (error) {
+        return { available: true, engine: 'atlas', roll: null, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  }
+
+  return localRepeat(app, entry, recipe);
+}
+
+/** Rolls on the map that owns the statblock, or through Forge's local engine when no map is open. */
 export function rollForgeStatblockWithAtlasDiceTool(
   app: App,
   formula: string,
-  source: { statblockPath: string; tokenName?: string; abilityName?: string },
+  source: {
+    statblockPath: string;
+    viewId?: string;
+    tokenId?: string;
+    tokenImagePath?: string;
+    tokenName?: string;
+    abilityName?: string;
+    originContext?: AtlasDiceTokenRollContextLike;
+  },
   explicitSet?: ForgeRestDiceSet | null,
   advantage?: 'advantage' | 'disadvantage' | null,
+  offMapSet?: ForgeRestDiceSet | null,
 ): AtlasRestDiceAttempt {
-  const historyDice = findAtlasPublicDiceHistoryAPI(app);
-  const tool = historyDice ? null : findAtlasDiceTool(app);
-  const publicDice = historyDice ?? (tool ? null : findAtlasPublicDiceAPI(app));
-  if (!tool && !publicDice) return { available: false, roll: null };
+  const target = resolveAtlasDiceRollTarget(app, source.viewId, source.originContext?.mapPath);
+  if (target.status === 'origin-unavailable' || target.status === 'origin-hidden') {
+    return {
+      available: true,
+      roll: null,
+      error: target.status === 'origin-hidden'
+        ? 'The originating Atlas map is hidden. Bring that map to the foreground before rolling.'
+        : 'The originating Atlas map is no longer available.',
+    };
+  }
+  if (target.status === 'ambiguous') {
+    return { available: true, roll: null, error: 'More than one Atlas map is visible. Activate the intended map before rolling.' };
+  }
 
   const rollSource = rollSourceOf(source);
+  const effectiveSet = explicitSet ?? offMapSet ?? null;
+  const effectiveAdvantage = combineWrittenAdvantage(writtenAdvantage(formula.trim()).side, advantage);
   const options = explicitSet || advantage
     ? { ...(explicitSet ? { set: diceSetForAtlas(explicitSet) } : {}), ...(advantage ? { advantage } : {}) }
     : undefined;
   try {
-    const result = publicDice
-      ? publicDice.rollStatblock?.({ formula, source: rollSource, ...(explicitSet ? { set: diceSetForAtlas(explicitSet) } : {}), ...(advantage ? { advantage } : {}) }) ?? null
-      : tool
-        ? (options ? tool.rollDice(formula, rollSource, undefined, options) : tool.rollDice(formula, rollSource))
-        : null;
-    if (!result || !Number.isFinite(result.total)) return { available: true, roll: null };
+    let result: AtlasDiceRollResultLike | null;
+    if (target.status === 'ready') {
+      const origin = atlasDiceRollOriginForToken(target.context, source.tokenId, source.originContext);
+      result = options
+        ? target.context.diceTool.rollDice(formula, rollSource, origin, options)
+        : target.context.diceTool.rollDice(formula, rollSource, origin);
+      if (!result || !Number.isFinite(result.total)) return { available: true, engine: 'atlas', roll: null };
+      const recipe = recipeFor('atlas', rollSource, effectiveSet, effectiveAdvantage, target.context);
+      recordSuccessfulRoll(app, result, rollSource, recipe, 'atlas');
+      return {
+        available: true,
+        engine: 'atlas',
+        roll: {
+          formula: typeof result.formula === 'string' ? result.formula : formula,
+          total: Math.trunc(result.total),
+          ...(typeof result.id === 'string' ? { id: result.id } : {}),
+        },
+      };
+    }
+
+    const localSet = effectiveSet;
+    if (!localSet) return { available: false, engine: 'forge', roll: null };
+    const local = rollForgeOffMapDiceFormula(formula, localSet, rollSource, advantage);
+    if (!local.ok) return { available: true, engine: 'forge', roll: null, error: local.error };
+    const recipe = recipeFor('forge', rollSource, localSet, effectiveAdvantage);
+    recordSuccessfulRoll(app, local.result, rollSource, recipe, 'forge');
     return {
       available: true,
-      roll: {
-        formula: typeof result.formula === 'string' ? result.formula : formula,
-        total: Math.trunc(result.total),
-        ...(typeof result.id === 'string' ? { id: result.id } : {}),
-      },
+      engine: 'forge',
+      details: local.result,
+      roll: { id: local.result.id, formula: local.result.formula, total: local.result.total },
     };
   } catch (error) {
     return { available: true, roll: null, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-/** Backwards-compatible adapter used by the Rest flow. */
+/** Adapter used by the Rest flow; map rolls use Atlas and standalone rolls use Forge. */
 export function rollForgeRestWithAtlasDiceTool(
   app: App,
   formula: string,

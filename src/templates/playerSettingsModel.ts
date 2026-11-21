@@ -30,12 +30,12 @@ function fieldByKey(template: ForgeTemplate, key: string): ForgeField | undefine
   return template.fields.find((field) => field.key === key);
 }
 
-/** Spell lists are read-only by default; other field types are editable by default. */
+/** Groups retain Atlas' native read-only player-access behavior; other fields default to editable. */
 export function defaultPlayerAccess(field: ForgeField): PlayerAccess {
   return field.type === 'spells' ? 'read' : 'edit';
 }
 
-/** A spell-list-only setting cannot offer Edit because Atlas never lets players edit spell lists. */
+/** A Groups-only setting mirrors Atlas' native restriction on editing these values as a player. */
 export function playerAccessChoices(fields: readonly ForgeField[]): PlayerAccess[] {
   return fields.length > 0 && fields.every((field) => field.type === 'spells')
     ? ['read', 'hidden']
@@ -51,7 +51,7 @@ function fixedReadField(template: ForgeTemplate, field: ForgeField): boolean {
   return fixedKeys.has(field.key) || field.type === 'image';
 }
 
-/** Effective access Atlas applies to a field, including fixed header/image and spell-list rules. */
+/** Effective access Atlas applies to a field, including fixed header/image and Groups rules. */
 export function effectivePlayerAccess(template: ForgeTemplate, key: string): PlayerAccess {
   const field = fieldByKey(template, key);
   if (!field) return 'hidden';

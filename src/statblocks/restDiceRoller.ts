@@ -48,6 +48,23 @@ const BUILT_IN_REST_DICE_SETS: readonly ForgeRestDiceSet[] = [
 ];
 
 const DEFAULT_REST_DICE_SET = BUILT_IN_REST_DICE_SETS[0]!;
+
+/** Returns a copy of a built-in Atlas-compatible Dice Set by its stable id. */
+export function forgeRestDiceSetById(id: string): ForgeRestDiceSet | null {
+  const set = BUILT_IN_REST_DICE_SETS.find((candidate) => candidate.id === id);
+  return set ? {
+    ...set,
+    dice: set.dice.map((die) => ({ ...die })),
+    ...(set.explode ? { explode: { ...set.explode } } : {}),
+    ...(set.advantage ? { advantage: { ...set.advantage } } : {}),
+    ...(set.disadvantage ? { disadvantage: { ...set.disadvantage } } : {}),
+  } : null;
+}
+
+/** Immutable copies of the built-in sets, for Atlas collection/preset resolution. */
+export function forgeRestBuiltInDiceSets(): ForgeRestDiceSet[] {
+  return BUILT_IN_REST_DICE_SETS.map((set) => forgeRestDiceSetById(set.id)!).filter(Boolean);
+}
 const VALID_CRITS = new Set(['natural', 'roll-under', 'doubles', 'high-total', 'none']);
 
 function parseAdvantageRule(value: unknown): ForgeRestAdvantageRule | undefined {

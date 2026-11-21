@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { numericFieldTracks, setNumericFieldMaximum, setNumericFieldTracking } from '../src/templates/numericTrackingModel.ts';
 import { setValueDisplayMode } from '../src/templates/valueEditorModel.ts';
-import { serializeAtlasTemplateFile } from '../src/templates/forgeFileFormat.ts';
 import { parseTemplateFileText } from '../src/templates/forgeFileFormat.ts';
 import { trackedNumberDisplayForField } from '../src/statblocks/trackedNumberDisplayModel.ts';
 import { FORGE_RESOURCE_VALUES_KEY } from '../src/statblocks/forgeResourceValues.ts';
@@ -70,12 +69,13 @@ test('changing a Track presentation back to Number keeps the Field tracked', () 
   assert.deepEqual(numericFieldTracks(template.fields[0]), { counts: 'down' });
 });
 
-test('tracked Number configuration survives Atlas export and re-open', () => {
+test('tracked Number configuration survives Atlas template import', () => {
   const template = makeTemplate();
   setNumericFieldTracking(template, 'hp', 'down');
   setNumericFieldMaximum(template, 'hp', 'hpMax');
-  const serialized = serializeAtlasTemplateFile(template);
-  const reopened = parseTemplateFileText(serialized, 'atlastemplate');
+  const serializedAtlasSource = JSON.stringify(template);
+  const reopened = parseTemplateFileText(serializedAtlasSource, 'atlastemplate');
+  assert.equal(reopened.canOverwrite, false);
   assert.equal(reopened.template.fields[0].type, 'number');
   assert.deepEqual(reopened.template.fields[0].tracks, { counts: 'down', max: 'hpMax' });
   assert.equal(reopened.template.layout.blocks[0].type, 'stat');

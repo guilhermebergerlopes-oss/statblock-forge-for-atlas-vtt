@@ -22,7 +22,7 @@ Esta parte explica como a organização visual funciona. Para entender a diferen
 | **Dense Layout** | Alterna entre o encaixe compacto e o posicionamento estável/manual dos blocos. Consulte [[14 - Dense Layout]]. |
 | **Background grid** | Exibe ou oculta as guias visuais das Grids configuráveis do Canvas principal e das Sections. É apenas uma referência visual; não muda o posicionamento salvo. |
 | **More options** | Expande ou recolhe as configurações secundárias, como quantidade de colunas, Dense Layout, largura da ficha e opções de seleção. |
-| **Add block** | Reúne opções de conteúdo e apresentação. Heading pode ser fixo ou vinculado a um Text Field; Divider escolhe orientação; Collections e Resources selecionam o bloco correspondente ao tipo do Field. Opções que não possuem um Field compatível ficam ocultas. |
+| **Add block** | Reúne opções de conteúdo e apresentação. Heading pode ser fixo ou vinculado a um In-line Field; Divider escolhe orientação; Collections e Resources selecionam o bloco correspondente ao tipo do Field. Opções que não possuem um Field compatível ficam ocultas. |
 | **Add container** | Cria uma Section, Row ou Tabs, conforme as restrições do container selecionado. |
 | **↑ / ↓** | Move o bloco selecionado uma posição na ordem dos irmãos dentro do mesmo container. |
 | **Ungroup** | Remove o invólucro de uma Row selecionada e mantém seus filhos. |

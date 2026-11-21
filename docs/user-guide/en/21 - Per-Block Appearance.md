@@ -16,7 +16,7 @@ Per-block appearance lets an individual block inherit the Template's global them
 ## Open the inspector
 
 1. Open a Template in the editor.
-2. Select a block on the Canvas or in the **Structure** tree.
+2. Select a block on the Canvas or in the **Data** tree.
 3. Expand **Block appearance** in the sidebar inspector.
 4. Enable **Custom appearance** to edit the individual controls.
 

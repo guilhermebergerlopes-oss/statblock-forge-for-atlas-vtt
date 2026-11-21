@@ -14,7 +14,7 @@ parte: 3
 A opção **Token border** controla a moldura decorativa ao redor da arte de Token reservada no cabeçalho do statblock. Ela é independente da moldura externa da ficha e das molduras aplicadas a blocos comuns.
 
 > [!important] Token art não é um Image Field comum
-> O Field reservado `image` é integrado ao fluxo de Tokens do Atlas. Ele recebe um Token vinculado pelo Atlas; não recebe uma imagem arbitrária selecionada no Vault. Para retratos, ilustrações e mapas, crie um Field separado do tipo **Image**. Consulte [[22 - Fields de imagem e enquadramento]].
+> O Field reservado `image` é integrado ao fluxo de Tokens do Atlas. Em uma ficha Forge v2, você pode escolher uma imagem local do Vault e criar um TokenAsset nativo do Atlas vinculado à nota. O Forge copia a imagem para `atlas-vtt/assets`; a imagem original e a nota do statblock não são modificadas. Também é possível vincular Characters já existentes no Atlas. Para retratos, ilustrações e mapas que não devam virar tokens, crie um Field separado do tipo **Image**. Consulte [[22 - Fields de imagem e enquadramento]].
 
 ## Onde configurar
 
@@ -59,12 +59,14 @@ A moldura de Token não:
 
 - escolhe ou substitui o Token vinculado;
 - cria um Token no mapa;
-- converte uma imagem comum em Token;
+- converte um Image Field comum em Token;
+- atualiza um TokenAsset existente quando o Value de Token art da nota Forge muda;
+- altera o TokenAsset ou sua imagem ao mudar a espessura ou o formato do aro;
 - altera o enquadramento de um Field `image` comum;
 - muda a moldura externa do statblock;
 - altera a aparência individual de outro bloco.
 
-Para vincular um Token existente ou criar um Token a partir da nota, use as ações de Token oferecidas pelo fluxo de integração com Atlas no Field reservado. A aparência do aro é apenas apresentação visual.
+Para criar um TokenAsset a partir da arte local ou vincular um Token existente, use as ações de Atlas oferecidas pelo Field reservado. Alterar a moldura não modifica o TokenAsset nem sua imagem. A aparência do aro é apenas apresentação visual.
 
 ## Onde a configuração é salva
 

@@ -1,5 +1,5 @@
 /**
- * Vault-agnostic persistence for native Atlas templates and Forge sidecars.
+ * Vault-agnostic persistence for Forge-owned Templates and imported Atlas sources.
  * The repository is intentionally expressed as a tiny storage interface so
  * creation, backups, conflict handling, and optimistic concurrency can be
  * tested without loading Obsidian or the Atlas plugin.
@@ -10,13 +10,11 @@ import {
   createForgeLayout,
   newTemplateId,
   isRecord,
-  serializeForgeLayout,
-  slugify,
   type ForgeLayoutDocument,
   type ForgeTemplate,
 } from './forgeTemplate.ts';
-import { isForgeTemplatePath, serializeAtlasTemplateFile, serializeForgeTemplateFile } from './forgeFileFormat.ts';
-import { analyzeAtlasTemplateCompatibility, type AtlasTemplateCompatibilityReport } from '../atlas/atlasTemplateAdapter.ts';
+import { isForgeTemplatePath, serializeForgeTemplateFile } from './forgeFileFormat.ts';
+import { createTemplateBackupEnvelope, serializeTemplateBackup } from './templateBackup.ts';
 
 export interface TemplateFileReference {
   path: string;
@@ -34,6 +32,8 @@ export interface TemplateStorage {
   ensureFolder(path: string): Promise<void>;
   /** Read IDs from every native/Forge template in the Vault for collision-safe creation. */
   listTemplateIds(): Promise<Array<{ path: string; id: string }>>;
+  /** List Forge-owned backup files in one folder, newest metadata included when available. */
+  listBackupFiles(folder: string): Promise<Array<{ path: string; basename: string; size: number; mtime: number }>>;
 }
 
 export interface SaveTemplateRequest {
@@ -60,8 +60,6 @@ export interface SaveTemplateResult {
   layout: ForgeLayoutDocument;
   serializedTemplate: string;
   backupPath?: string;
-  sidecarPath?: string;
-  sidecarWarning?: string;
   createdCopy: boolean;
   overwrittenExisting?: boolean;
   /** A Save collision wrote to the approved destination without deleting the open source file. */
@@ -138,7 +136,7 @@ function sameTemplateName(left: string, right: string): boolean {
   return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 }
 
-async function uniqueTemplateId(storage: TemplateStorage, name: string): Promise<string> {
+export async function generateUniqueTemplateId(storage: TemplateStorage, name: string): Promise<string> {
   const existing = await storage.listTemplateIds();
   const used = new Set(existing.map((entry) => entry.id.toLowerCase()));
   for (let attempt = 0; attempt < 1000; attempt += 1) {
@@ -159,29 +157,7 @@ async function assertTemplateIdAvailable(storage: TemplateStorage, id: string, e
   }
 }
 
-async function writeSidecar(
-  storage: TemplateStorage,
-  templateFolder: string,
-  template: ForgeTemplate,
-  layout: ForgeLayoutDocument,
-): Promise<{ path: string; warning?: string }> {
-  const folder = normalizePath(`${templateFolder}/.statblock-forge/layouts`);
-  const path = `${folder}/${template.id}.json`;
-  try {
-    await storage.ensureFolder(folder);
-    const contents = serializeForgeLayout(layout);
-    if (storage.exists(path)) await storage.modify(path, contents);
-    else await storage.create(path, contents);
-    return { path };
-  } catch (error) {
-    return {
-      path,
-      warning: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-/** Save like Atlas: same name updates; a different name creates a new template and leaves the source intact. */
+/** Save Forge Templates in place; Atlas-native sources are always preserved and copied into Forge format. */
 export async function saveTemplateDocument(request: SaveTemplateRequest): Promise<SaveTemplateResult> {
   const storage = request.storage;
   const templateFolder = normalizePath(request.templateFolder);
@@ -193,10 +169,10 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
   const layout = cloneJson(request.layout);
   const sourcePath = request.sourcePath ? normalizePath(request.sourcePath) : null;
   const sourceNameChanged = sourcePath !== null && !sameTemplateName(fileBaseName(sourcePath), name);
-  const isCopy = request.saveAsCopy === true || sourcePath === null || sourceNameChanged;
   const sourceIsForge = sourcePath !== null && isForgeTemplatePath(sourcePath);
-  const outputFormat = sourcePath === null || request.saveAsCopy === true || sourceIsForge ? 'forge' : 'atlas';
-  const extension = outputFormat === 'forge' ? '.forgetemplate' : '.atlastemplate';
+  // Atlas sources are always read-only. Importing one creates a Forge-owned copy.
+  const isCopy = request.saveAsCopy === true || sourcePath === null || sourceNameChanged || !sourceIsForge;
+  const extension = '.forgetemplate';
   let file: TemplateFileReference;
   let serializedTemplate: string;
   let backupPath: string | undefined;
@@ -206,8 +182,8 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
       throw new Error('O template atual não possui um arquivo de origem válido. Reabra-o antes de salvar.');
     }
 
-    // Keep the identity currently stored in the source, even if an edited JSON
-    // draft accidentally changed it. The Atlas session never changes IDs on Update.
+    // Keep the identity stored in the Forge source, even if an edited JSON
+    // draft accidentally changed it.
     try {
       const sourceDocument: unknown = JSON.parse(request.originalText);
       if (isRecord(sourceDocument) && typeof sourceDocument.id === 'string'
@@ -220,11 +196,9 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
     await assertTemplateIdAvailable(storage, template.id, sourcePath);
     layout.templateId = template.id;
 
-    // Atlas uses Vault.process as a compare-and-swap. A separate read followed
-    // by modify could overwrite a change made in the gap between those calls.
-    serializedTemplate = outputFormat === 'forge'
-      ? serializeForgeTemplateFile(template, layout)
-      : serializeAtlasTemplateFile(template);
+    // Use compare-and-swap so an external edit cannot be overwritten between
+    // the read and write operations.
+    serializedTemplate = serializeForgeTemplateFile(template, layout);
     let writeResult: { written: boolean; currentText: string };
     try {
       writeResult = await storage.compareAndSwap(sourcePath, request.originalText, serializedTemplate);
@@ -237,14 +211,12 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
     // A saved-as-new template receives a fresh identity; the original remains
     // untouched so existing statblocks continue to refer to their old source.
     const sourceTemplateId = sourcePath ? template.id : null;
-    template.id = await uniqueTemplateId(storage, name);
+    template.id = await generateUniqueTemplateId(storage, name);
     if (sourceTemplateId) template.derivedFrom = { templateId: sourceTemplateId };
     layout.templateId = template.id;
-    serializedTemplate = outputFormat === 'forge'
-      ? serializeForgeTemplateFile(template, layout)
-      : serializeAtlasTemplateFile(template);
+    serializedTemplate = serializeForgeTemplateFile(template, layout);
 
-    const targetFolder = sourcePath ? parentPath(sourcePath) || templateFolder : templateFolder;
+    const targetFolder = sourceIsForge && sourcePath ? parentPath(sourcePath) || templateFolder : templateFolder;
     await storage.ensureFolder(targetFolder);
     let path = `${targetFolder}/${templateFileStem}${extension}`;
     let overwrittenExisting = false;
@@ -277,8 +249,12 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
         await storage.ensureFolder(backupFolder);
         const stamp = (request.now ?? new Date()).toISOString().replace(/[:.]/g, '-');
         backupPath = uniquePath(storage, backupFolder, `${fileBaseName(path)}-${stamp}`, '.forgetemplate.bak');
-        await storage.create(backupPath, currentText);
-        await storage.modify(path, serializedTemplate);
+        const backupEnvelope = createTemplateBackupEnvelope(path, currentText, request.now ?? new Date());
+        await storage.create(backupPath, serializeTemplateBackup(backupEnvelope));
+        const replacement = await storage.compareAndSwap(path, currentText, serializedTemplate);
+        if (!replacement.written) {
+          throw new TemplateConflictError('O template foi alterado durante a criação do backup. O arquivo atual foi preservado e o backup permanece disponível.');
+        }
         file = { path, basename: fileBaseName(path) };
         overwrittenExisting = true;
         return {
@@ -300,17 +276,6 @@ export async function saveTemplateDocument(request: SaveTemplateRequest): Promis
     // when two template copies are created almost simultaneously.
     await assertTemplateIdAvailable(storage, template.id);
     file = await storage.create(path, serializedTemplate);
-  }
-
-  if (outputFormat === 'atlas') {
-    const sidecar = await writeSidecar(storage, templateFolder, template, layout);
-    return {
-      file, template, layout, serializedTemplate,
-      ...(backupPath ? { backupPath } : {}),
-      sidecarPath: sidecar.path,
-      ...(sidecar.warning ? { sidecarWarning: sidecar.warning } : {}),
-      createdCopy: isCopy,
-    };
   }
 
   return {
@@ -336,36 +301,4 @@ export async function createNewForgeTemplateDocument(
     saveAsCopy: true,
     allowUniqueNameOnConflict: true,
   });
-}
-
-export interface ExportAtlasTemplateRequest {
-  storage: TemplateStorage;
-  templateFolder: string;
-  name: string;
-  template: ForgeTemplate;
-  /** Forge layout metadata used to export Total Hidden blocks as Hidden from players in Atlas. */
-  layout?: ForgeLayoutDocument;
-}
-
-export interface ExportAtlasTemplateResult {
-  file: TemplateFileReference;
-  serializedTemplate: string;
-  compatibilityReport: AtlasTemplateCompatibilityReport;
-}
-
-/** Export a Forge template as a clean native Atlas file, without Forge metadata. */
-export async function exportAtlasTemplateFile(
-  request: ExportAtlasTemplateRequest,
-): Promise<ExportAtlasTemplateResult> {
-  const folder = normalizePath(request.templateFolder);
-  if (!folder) throw new Error('A pasta de exportação do Atlas não pode ficar vazia.');
-  await request.storage.ensureFolder(folder);
-  const path = uniquePath(request.storage, folder, slugify(request.name.trim() || 'Template'), '.atlastemplate');
-  const template = cloneJson(request.template);
-  template.id = await uniqueTemplateId(request.storage, request.name.trim() || 'Template');
-  const compatibilityReport = analyzeAtlasTemplateCompatibility(template);
-  const serializedTemplate = serializeAtlasTemplateFile(template, request.layout);
-  await assertTemplateIdAvailable(request.storage, template.id);
-  const file = await request.storage.create(path, serializedTemplate);
-  return { file, serializedTemplate, compatibilityReport };
 }

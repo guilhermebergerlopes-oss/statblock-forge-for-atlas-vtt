@@ -4,7 +4,7 @@ Statblock Forge is a community extension. It is not made, endorsed or supported 
 
 **Statblock Forge** is an independent tool for building reusable tabletop RPG statblocks. Create a Template, define the data it needs, arrange that data in a visual editor, and then use the Template to create individual character, creature, or NPC sheets. Each sheet keeps its own values while sharing the Template's structure and presentation.
 
-Forge can be used on its own. It also supports compatible workflows with Atlas VTT and can be paired with the **Forked Atlas VTT Compatibility for Statblock Forge** fork for expanded integration.
+Forge can be used on its own and integrates directly with the original Atlas VTT 0.17.0 and newer versions; a separate compatibility-fork plugin is not required. The exact 0.17.0 and 0.18.0 source snapshots are inspected baselines, but newer Atlas versions are not blocked by an exact-version allowlist: Forge attempts forward compatibility and checks the runtime methods and service capabilities required by each feature. Because this integration uses Atlas internal services rather than a stable public plugin API, a changed or removed API can make an individual feature unavailable until Forge is updated. Forge uses the original Atlas Dice Tool for rolls attached to open maps and its own dice engine for rolls made without an Atlas map. It also maintains per-statblock roll history, combining open Atlas map logs with Forge-owned persistent entries, and can repeat rolls without a separate compatibility fork.
 
 **Creator and maintainer:** Guilherme Berger Lopes  
 **Support and issue reporting:** [GitHub Issues](https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues)
@@ -22,6 +22,7 @@ Forge can be used on its own. It also supports compatible workflows with Atlas V
 - Use a configurable **4–24 column Canvas Grid** (12 columns by default).
 - Compose layouts with blocks and nested containers, including Sections, Rows, and Tabs.
 - Resize and reorder blocks, adjust their placement, and use Dense Layout for more compact arrangements.
+- Build Tables from compatible Fields: each Field becomes a column, or a labeled row when **Show Field labels in rows** is enabled. Pairs Fields remain standalone Collections.
 - Use the **More options** panel for secondary Canvas controls.
 
 ### Customize the appearance
@@ -57,26 +58,30 @@ A Template defines the reusable structure and presentation. A statblock note sto
 
 ## Dice links
 
-With a compatible Atlas integration available, click a dice link to roll its formula. To prepare a roll with additional modifiers:
+With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover preview to roll through that exact map's native DiceTool. Other Forge surfaces use an unambiguous visible Atlas map when one is available. To prepare a roll with additional modifiers:
 
 - Hold **N** and click a dice link to add or remove its formula from that statblock's next-roll queue.
 - Alternatively, right-click a dice link and choose **Add to next roll** or **Remove from next roll**.
-- Right-click also provides the roll menu and, when available, access to that statblock's roll history.
+- Right-click also provides the roll menu and access to that statblock's roll history. With Atlas 0.18.0 or newer, choose **Save roll to Atlas collection** to create a named roll in the collection. When the formula can be represented as a Dice Lab look, the save dialog offers to make it an individual roll with its own dice and rules: a matching active Dice Set is copied (including names, colours, critical, explosion, advantage, and disadvantage), while other simple additive dice formulas start with their written dice and natural criticals. You can further edit the saved roll in Atlas' native Dice Lab saved-roll editor. Written `adv`/`dis` and formulas with unsupported modifiers stay as formula presets to preserve their meaning. Right-click the source formula again to **Pin** or **Unpin** matching saved rolls in Atlas' native dice row. The row holds up to 10 positions (including its standard dice); use Atlas' own row editor to reorder or remove entries. Forge retains up to 20 history entries per statblock (500 total) in plugin data; it also reads Atlas map history while the originating map is open. Repeating an Atlas roll uses its original visible map when available, or the saved Dice Set through Forge's local engine after the map closes.
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
 
 ## Working with Atlas VTT
 
-Atlas integration is optional for creating Templates and editing Forge statblocks. When a compatible Atlas installation and API are available, Forge can use Atlas-supported workflows for dice rolls, roll history, token links, and compatible Resources.
+Atlas integration is optional for creating Templates and editing Forge statblocks. Forge detects the original Atlas plugin (`atlas-vtt`) through the live plugin registry and resolves each map's runtime services in one central runtime context using the inspected Atlas 0.17.0/0.18.0 baselines and forward-compatible capability checks. Token readers and token-link actions consume that same context rather than performing separate Workspace or ServiceManager discovery. These are intentional internal-runtime dependencies; newer versions are allowed, but each feature checks for the methods it needs and may remain unavailable if Atlas changes its internal APIs.
 
 The projects have separate responsibilities:
 
 - **Forge** manages its Template editor, statblock notes, Fields, formulas, appearance settings, Compendium, and Rest rules.
-- **Atlas VTT** manages maps, scenes, Tokens, collection Resources, and Token Conditions.
+- **Atlas VTT** manages maps, scenes, Tokens, collection Resources, Token Conditions, and its native dice tools.
 
 Forge does not maintain a second Conditions catalog or apply Token Conditions through Rest. Configure and manage Conditions in Atlas.
 
-For expanded integration, Forge can be used with the separate **Statblock Forge: Forked Atlas VTT Compatibility** project. Compatibility depends on the versions and public API capabilities available in the installed projects.
+Forge's reserved **Token art** field can create an Atlas **TokenAsset** directly from a supported local image on a Forge v2 statblock, copying it into Atlas' shared `atlas-vtt/assets` folder and linking the new asset to the Forge note. This operation requires an initialized Atlas map so Forge can obtain Atlas' `AssetService`; changing the note's Token art later does not update an already registered TokenAsset. The same field can link or unlink existing Atlas **Character** tokens: select one or more Characters in a scene and choose **Link selected Atlas tokens** or **Unlink selected Atlas tokens** from the statblock's Token art actions. Generic map tokens are not accepted for direct linking because Atlas emits Ctrl-hover previews only for Character tokens. Asset persistence and cross-map synchronization remain Atlas-owned.
+
+For Forge v2 notes linked to Atlas Characters, Forge keeps the matching Atlas **Resources** in step with the statblock Fields. Each map follows the active campaign's Resource rules when one applies, otherwise its collection's rules; legacy campaign and collection definitions inherit their built-in preset Resources. Changes update linked Characters in open GM maps through Atlas' own token store, allowing Atlas' PartySync to observe them. Current values are preserved and clamped, manually overridden maxima remain untouched, and newly added Resources start according to their `drains` or `fills` direction. An explicitly emptied Field removes that Resource; a missing or non-numeric Field does not erase it. Closed maps are synchronized when opened, and player views are not directly modified. Rest rules update Atlas-owned Resources through the original token stores, with compensating rollback when the linked note cannot be saved.
+
+> **Integration:** Ctrl-hover previews, token links, Resources, Rest, in-map rolls, scene-independent rolls, statblock history, and roll repetition use the original Atlas 0.17.0/0.18.0 runtime baselines. Newer Atlas versions are attempted through capability checks rather than blocked by their version number. The Forge renderer is mounted only for Forge-native v2 token notes; all other previews remain native. No roll, history, or repeat operation calls the compatibility fork API.
 
 ## Installation
 
@@ -110,6 +115,7 @@ npm test
 npm run test:compendium
 npm run test:layout
 npm run typecheck
+npm run audit:release
 ```
 
 To build while watching source files:
@@ -128,13 +134,17 @@ You can also download the documentation from **Settings → Community plugins �
 
 | File or format | Purpose |
 |---|---|
-| `.forgetemplate` | Template saved by Forge, including Forge-specific layout and appearance metadata. |
-| `.atlastemplate` | Atlas-native Template format that Forge can open in supported workflows. |
+| `.forgetemplate` | Forge-owned Template JSON. Uses Forge Field IDs (`inline`, `selection`, `counter`, `groups`) and includes Forge-specific layout and appearance metadata. |
+| `.atlastemplate` | Atlas-native Template format accepted as a read-only import source. Forge creates an editable `.forgetemplate` copy and leaves the original unchanged; Forge no longer exports Atlas Templates. |
 | Markdown (`.md`) | Individual statblock note with its own Values and a link to its Template. |
 | `.forgestyle` | Portable package of reusable custom themes and frames. |
-| `.statblock-forge/layouts/` | Sidecar location for Forge layout metadata associated with Atlas-format Templates, when needed. |
+| `.statblock-forge/layouts/` | Legacy sidecar location. Existing valid sidecars can be read when importing `.atlastemplate` files; Forge does not create or update Atlas sidecars. |
+
+Confirmed `.forgetemplate` replacements create versioned backups under `<templateFolder>/.statblock-forge/backups/`. Use **Recover Forge template backup…** in the Command Palette to inspect and restore a validated backup. Replacing an existing Template requires a second confirmation and creates a safety backup; concurrent edits are preserved. Older raw `.forgetemplate.bak` files are still recognized when their contents are valid.
 
 Back up Templates and statblock notes before bulk edits, conversions, or manual changes to their JSON/frontmatter data.
+
+For the tested compatibility boundaries, legacy migration behavior, sidecar rules, backup restoration, and backlink recovery, see [`TEMPLATE-COMPATIBILITY-MATRIX-0.5.0.md`](TEMPLATE-COMPATIBILITY-MATRIX-0.5.0.md).
 
 ## Support
 

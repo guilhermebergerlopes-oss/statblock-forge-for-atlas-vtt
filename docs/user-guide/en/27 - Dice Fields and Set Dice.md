@@ -124,8 +124,8 @@ A Dice Field follows the normal Field-to-block relationship. Confirmed contexts 
 
 - **Stat:** displays the formula as an individual roll link.
 - **Line:** displays the formula alongside other Fields.
-- **Metric:** a slot linked to Dice can display the resolved expression as a link; a formula configured directly on the Metric slot takes precedence over the Field's Dice Formula.
-- **Text inside Entries, Lists, Pairs, and Spells:** dice expressions recognized in text can become links through the text roll scanner. This does not turn the text into a Dice Field and does not by itself create `{fieldKey}` dependencies.
+- **Metric Container:** a Dice Field inside the Container can display the resolved expression as a link; a formula configured directly on that Metric slot takes precedence over the Field's Dice Formula.
+- **Text inside Entries, Lists, Pairs, and Groups:** dice expressions recognized in text can become links through the text roll scanner. This does not turn the text into a Dice Field and does not by itself create `{fieldKey}` dependencies.
 
 A block controls presentation. The Dice type controls the data. A dynamic formula is applied when the renderer is displaying the associated Dice Field.
 
@@ -146,6 +146,10 @@ The grammar is shared with Atlas's dice parser. Examples:
 | Drop | `4d6dh1`, `4d6dl1` | Drops higher/lower dice according to the modifier. |
 | Count successes/failures | `8d10cs>=8`, `8d10cf<2` | Counts dice meeting the comparison. |
 | Label | `2d6[fire]` | Names the dice group in the result. |
+| Written advantage/disadvantage | `1d20+5 adv`, `1d20+5 dis` | Requests advantage (`adv`) or disadvantage (`dis`) for the roll. |
+
+> [!note] Statblock roll-link suffix
+> `adv` and `dis` are interpreted by the statblock roll-link system, not by the general arithmetic grammar. The suffix must be the final word and does not apply to Number/Rating or Rest Formula.
 
 Modifiers can have their own comparison rules and limits. Not every combination is valid. Start with a simple example and check the editor's validation feedback.
 
@@ -214,18 +218,27 @@ Invalid JSON does not appear in the selector. If a Template points to a `diceSet
 
 ## Advantage, disadvantage, and next-roll queue
 
-Roll links in the statblock route the roll through Atlas when its dice integration is available.
+Roll links in the statblock use the original Atlas Dice Tool when the statblock belongs to an open map. Without an open map, Forge rolls locally using the Template Dice Set or the same collection Dice Set the verified Atlas runtime would select.
 
 - Click the link to roll normally.
 - `Shift` + click requests advantage when the set/rules allow it.
 - `Alt` + click requests disadvantage when allowed.
+- Right-click a formula and choose **Save roll to Atlas collection**. Name the roll; Forge writes the resolved formula to the owning statblock collection’s `dicePresets`. Atlas allows up to 40 saved rolls, with names up to 40 characters. The formula must be supported by Atlas’s parser and no longer than 100 characters. When the formula is a simple additive roll, the dialog can also save it as an individual Dice Lab look: a matching active Dice Set is copied with its rules and appearance, or the formula's own dice become a natural-critical look. You can edit the saved look later in Atlas' native saved-roll editor. Formulas ending in `adv`/`dis` or using unsupported modifiers remain formula presets without conversion.
+- You can also write `adv` or `dis` as the final word of a formula: `1d20+5 adv`, `1d20+5 dis`, or `Stealth +5 adv`. This works in running-text links and Dice Fields.
+- When the written suffix and the click shortcut request opposite sides, they cancel. For example, `1d20+5 adv` clicked with `Alt` rolls with neither advantage nor disadvantage.
+- The active Dice Set must define a rule for the written side; otherwise, Forge does not silently perform a normal off-map roll.
+- You can also write `adv` or `dis` as the final word of a formula: `1d20+5 adv`, `1d20+5 dis`, or `Stealth +5 adv`. This works in running-text links and Dice Fields.
+- When the written suffix and the click shortcut request opposite sides, they cancel. For example, `1d20+5 adv` clicked with `Alt` rolls with neither advantage nor disadvantage.
+- The active Dice Set must define a rule for the written side; otherwise, Forge does not silently perform a normal off-map roll.
 - Right-click opens the roll context menu.
 - **Add to next roll** queues the formula without rolling it immediately.
 - As a shortcut, hold `N` and click the link to add/remove the formula from the queue.
 
 Queued formulas are added to the next successful roll for the same statblock. The queue is session-only and is not saved in the Template or note. A failed/unavailable roll does not consume pending modifiers.
 
-When the fork's `dice.statblock-history` API capability is available, the context menu can also show the sheet's roll history and let the user repeat a previous roll. See the Atlas integration documentation for the history's persistence limits.
+The context menu includes **Roll history** without requiring the fork. Forge combines persisted `diceLog` entries and transient `rollHistory` entries from open Atlas maps with its own history saved in the plugin's `data.json`. Forge retains up to 20 rolls per statblock and 500 entries overall.
+
+Rolls made through Forge links store the formula, source, Dice Set, and advantage/disadvantage used. When the original map is still open and visible, repeating a roll uses that map's DiceTool. When the map has been closed, Forge repeats it locally with the saved Dice Set. Older entries read directly from a map remain repeatable while that map is available; they are not copied into Forge's persistent history merely by being displayed.
 
 ## Dice Formula, Number Formula, and Rest Formula are not interchangeable
 

@@ -93,18 +93,18 @@ When a Field is added/dragged to the Canvas, Forge chooses a suitable default bl
 
 | Field type | Default block | Typical use |
 |---|---|---|
-| `text`, `number`, `rating`, `dice`, `choice` | `Stat` | One value, such as type, attribute, level, HP, or a dice formula. |
+| `inline`, `number`, `rating`, `dice`, `selection` | `Stat` | One value, such as type, attribute, level, HP, or a dice formula. |
 | `markdown` | `Text` | Description with Markdown content. |
 | `list` | `Tags` | Compact list of tags or keywords. |
-| `scores` | `Scores` | Table of values arranged in columns. |
+| `scores` | Internal `Table` storage | Row/column data retained in Atlas-native format; not created as an ordinary Field. |
 | `entries` | `Entries` | Collection of named abilities/entries. |
 | `pairs` | `Pairs` | Key/value pairs. |
 | `image` | `Image` | Vault-linked image. |
-| `spells` | `Spells` | Collection of spell groups/entries. |
-| `counters` | `Counters` | Rows with uses, maximum, and recovery. |
+| `groups` | `Groups` | Collection of spell groups/entries (formerly labeled Spells). |
+| `counter` | `Counter` | Rows with uses, maximum, and recovery. |
 | `checkboxes` | `Checkboxes` | Checkable options. |
 
-This is the initial creation mapping, not a promise that each Field can appear only once or that every block is compatible with every type. The inspector filters choices when a block requires a specific type. See [[05 - Fields]] and the individual block notes for detailed rules.
+Forge-owned JSON stores the reorganized IDs `inline`, `selection`, `counter`, and `groups`; templates using the earlier IDs `text`, `choice`, `counters`, and `spells` remain readable. When importing an Atlas `.atlastemplate`, Forge normalizes native Atlas IDs to the current Forge IDs. This is the initial creation mapping, not a promise that each Field can appear only once or that every block is compatible with every type. The inspector filters choices when a block requires a specific type. See [[05 - Fields]] and the individual block notes for detailed rules.
 
 ### Other presentation blocks
 
@@ -113,24 +113,23 @@ The Canvas also offers blocks that do not correspond to one Field:
 | Block | When to use it | Example |
 |---|---|---|
 | `Title` | Give heading hierarchy to an eligible Field | Creature name as a title. |
-| `Metric` | Display several numeric Fields as aligned metrics | HP, AC, and Speed side by side. |
 | `Line` | Present several Fields on one line | `Size · Type · Alignment`. |
 | `Track` | Display a Number with current/maximum tracking | HP, mana, or energy shown as boxes/bar. |
 | `Heading` | Add a static section heading | `Defenses`. |
 | `Text` without a Field | Write static text | A rule note or caption. |
 | `Divider` / `Vertical divider` | Visually separate content | Divider between groups. |
 
-`Metric` and `Line` can reference multiple Fields. `Track` uses a Number Field and tracking settings. Specific rules are covered in layout, Field, and Counter notes.
+`Line` can reference multiple Fields. `Track` uses a Number Field and tracking settings. `Metric` and `Table` are Canvas Block types with data-Container behavior: Metric groups scalar Fields (`inline`, `number`, `rating`, `dice`, and `selection`), while Table groups compatible user Fields. Pairs remains a standalone Collection. Table owns a hidden Atlas-native `scores` storage adapter; it is not a user Field. See [[10 - Containers Overview]].
 
 ## Container
 
-A **container** is a structural block that arranges other blocks. Forge's main containers are:
+A **Container** organizes Fields or layout elements. Forge has two families:
 
-- **Section:** a group with content arranged in an internal Grid; it can have a heading and configured collapsing behavior.
-- **Row:** arranges blocks horizontally in a flexible line; children can wrap into following lines when they do not fit.
-- **Tabs:** presents content in tabs; each tab is structured by internal Sections/blocks.
+- **Section, Row, and Tabs:** structural Containers that arrange layout elements.
+- **Metric:** a data Container for scalar Fields of type `inline`, `number`, `rating`, `dice`, and `selection`.
+- **Table:** a data Container for compatible Fields, with Atlas-native `scores` storage managed internally. Pairs remains a standalone Collection.
 
-Containers do not store Values by themselves. They control the arrangement of descendant blocks. See [[10 - Containers Overview]], [[11 - Section]], [[12 - Row]], and [[13 - Tabs]].
+Metric and Table are Block types, not Field types. They appear and are organized on the Canvas like other Blocks, while also accepting child Fields. Their child Fields remain the source of Values; Table's native `scores` adapter is private implementation storage. See [[10 - Containers Overview]] and the layout notes.
 
 ## Statblock
 

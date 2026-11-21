@@ -56,7 +56,7 @@ Forge does not:
 - execute Rest rules that increase, decrease, or clear Conditions;
 - synchronize Forge Condition IDs with Atlas Condition IDs.
 
-Forge remains compatible with Atlas statblock and Token workflows. After a note is published and linked to a Token, that Token's Conditions are managed by Atlas, independently of the statblock's Fields and Values.
+Forge remains compatible with Atlas statblock and Token workflows. After a compatible note is linked to a Token, that Token's Conditions are managed by Atlas, independently of the statblock's Fields and Values.
 
 ## Legacy Forge Condition data
 

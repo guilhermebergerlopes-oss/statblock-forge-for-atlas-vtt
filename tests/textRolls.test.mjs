@@ -98,3 +98,28 @@ test('binary plus-minus shorthand follows the formula parser while unary signs s
   assert.deepEqual(formulas('Deal + 4 damage.'), []);
   assert.deepEqual(formulas('ATK: + 4 to hit'), []);
 });
+
+test('written advantage and disadvantage remain attached to statblock roll links', () => {
+  assert.deepEqual(rollPieces('Stealth +5 adv'), [
+    { text: 'Stealth ', formula: null },
+    { text: '+5 adv', formula: '+5 adv' },
+  ]);
+  assert.deepEqual(rollPieces('Strike: 1d20+5 dis damage.'), [
+    { text: 'Strike: ', formula: null },
+    { text: '1d20+5 dis', formula: '1d20+5 dis' },
+    { text: ' damage.', formula: null },
+  ]);
+  assert.deepEqual(rollPieces('ATK: +4 ADV'), [
+    { text: 'ATK: +4 ADV', formula: '+4 ADV' },
+  ]);
+  assert.equal(writtenRoll('2d8 + 3 ADV'), '2d8+3 ADV');
+  assert.equal(toRollFormula('(1d8 + 2) × 2 dis'), '(1d8+2)*2 dis');
+});
+
+test('advantage suffix requires its own word boundary', () => {
+  assert.deepEqual(rollPieces('Roll 1d20+5 advantage now.'), [
+    { text: 'Roll ', formula: null },
+    { text: '1d20+5', formula: '1d20+5' },
+    { text: ' advantage now.', formula: null },
+  ]);
+});

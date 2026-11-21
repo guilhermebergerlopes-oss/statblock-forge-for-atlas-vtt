@@ -1,5 +1,6 @@
 import { parseFormula } from './atlasDiceEngine/parseFormula.ts';
 import type { FormulaTerm } from './atlasDiceEngine/formulaTypes.ts';
+import { writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
 
 export type ForgeAdvantageSide = 'advantage' | 'disadvantage';
 
@@ -18,8 +19,8 @@ export function forgeStatblockAdvantageSides(
   formula: string,
   rules: ForgeStatblockRollingRules,
 ): ForgeAdvantageSide[] {
-  const parsed = parseFormula(formula);
-  if (!('ok' in parsed) || rules.dice.length === 0) return [];
+  const parsed = parseFormula(writtenAdvantage(formula.trim()).formula.trim());
+  if (!parsed.ok || rules.dice.length === 0) return [];
 
   // A bare bonus (for example +4) is completed with the active set's dice,
   // just as Atlas' DiceTool.completeFormula does before checking advantage.

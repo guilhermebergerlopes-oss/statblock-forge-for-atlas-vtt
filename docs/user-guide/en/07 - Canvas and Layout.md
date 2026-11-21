@@ -20,7 +20,7 @@ The **Canvas** is the visual area of the template editor. Blocks are positioned,
 | **Dense Layout** | Switches between compact placement and stable/manual block positions. See [[14 - Dense Layout]]. |
 | **Background grid** | Shows or hides guides for the configurable main Grid and the independent Grids inside Sections. It does not change saved placement. |
 | **More options** | Expands or collapses secondary controls such as Grid columns, Dense Layout, sheet width, and selection actions. |
-| **Add block** | Groups content and presentation choices. Heading can be static or linked to a Text Field; Divider selects an orientation; Collections and Resources resolve to the block matching the Field type. Choices without a compatible Field are hidden. |
+| **Add block** | Groups content and presentation choices. Heading can be static or linked to a In-line Field; Divider selects an orientation; Collections and Resources resolve to the block matching the Field type. Choices without a compatible Field are hidden. |
 | **Add container** | Creates a Section, Row, or Tabs where allowed. |
 | **↑ / ↓** | Moves the selected block within its sibling order in the same container. |
 | **Ungroup** | Removes a selected Row wrapper while keeping its children. |

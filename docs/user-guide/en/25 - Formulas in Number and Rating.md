@@ -200,7 +200,7 @@ It can create a derived Metric number without changing the `strength` Field Valu
 
 ## See also
 
-- [[26 - Checkboxes and Boolean References]] — use boolean options as inputs.
+- [[26 - Checkboxes and Boolean References]] — use Checkboxes and Selection options as boolean inputs.
 - [[27 - Dice Fields and Set Dice]] — random expressions and dynamic dice formulas.
 - [[31 - Rest Rules and Formulas]] — `@field` references and recovery expressions.
 - [[05 - Fields]] — Field types and properties.

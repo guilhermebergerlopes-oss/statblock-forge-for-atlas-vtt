@@ -1,7 +1,7 @@
 /**
  * Dice formula implementation adapted from Atlas VTT's formula engine.
  * Original project: Atlas VTT Beta; licensed under GNU AGPL-3.0.
- * The Forge copy is deliberately isolated and exposes only the total needed by Rest.
+ * The Forge copy is self-contained and also powers scene-independent statblock rolls.
  */
 /**
  * Rolls one dice term with its modifiers, in the order they are written:

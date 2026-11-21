@@ -1,4 +1,5 @@
 import { parseFormula } from './atlasDiceEngine/parseFormula.ts';
+import { combineWrittenAdvantage, withWrittenAdvantage, writtenAdvantage, type WrittenAdvantageSide } from './atlasDiceEngine/writtenAdvantage.ts';
 
 /** One formula selected from a statblock roll link for the next successful roll. */
 export interface ForgeNextRollModifier {
@@ -88,7 +89,7 @@ export function restoreNextRollModifiers(
 }
 
 function formulaHasDice(formula: string): boolean {
-  const parsed = parseFormula(formula);
+  const parsed = parseFormula(writtenAdvantage(formula.trim()).formula.trim());
   return 'ok' in parsed && parsed.terms.some((term) => term.kind === 'dice');
 }
 
@@ -100,7 +101,8 @@ function formulaHasDice(formula: string): boolean {
  * Returns null only when a default die is required but could not be resolved.
  */
 function modifierTerm(entry: ForgeNextRollModifier): string {
-  const integer = /^([+-]?\d+)$/.exec(entry.formula.trim());
+  const formula = writtenAdvantage(entry.formula.trim()).formula.trim();
+  const integer = /^([+-]?\d+)$/.exec(formula);
   const label = entry.label
     ?.replace(/[^\p{L}\p{N} '-]/gu, ' ')
     .replace(/\s+/g, ' ')
@@ -111,7 +113,7 @@ function modifierTerm(entry: ForgeNextRollModifier): string {
     const value = Number(integer[1]);
     return `${value < 0 ? '-' : '+'}${Math.abs(value)}[${label}]`;
   }
-  return `+(${entry.formula})`;
+  return `+(${formula})`;
 }
 
 export function formulaWithNextRollModifiers(
@@ -122,15 +124,21 @@ export function formulaWithNextRollModifiers(
   const base = formula.trim();
   if (modifiers.length === 0) return base;
 
-  const baseHasDice = formulaHasDice(base);
+  const writtenBase = writtenAdvantage(base);
+  let side: WrittenAdvantageSide | null = writtenBase.side;
+  for (const modifier of modifiers) {
+    side = combineWrittenAdvantage(side, writtenAdvantage(modifier.formula.trim()).side);
+  }
+  const baseFormula = writtenBase.formula.trim();
+  const baseHasDice = formulaHasDice(baseFormula);
   const addedDice = modifiers.some((entry) => formulaHasDice(entry.formula));
-  let combined = base;
+  let combined = baseFormula;
 
   if (!baseHasDice && addedDice) {
     if (!defaultRoll?.trim()) return null;
-    const bonus = /^[+-]/.test(base) ? base : `+${base}`;
+    const bonus = /^[+-]/.test(baseFormula) ? baseFormula : `+${baseFormula}`;
     combined = `${defaultRoll.trim()}${bonus}`;
   }
 
-  return combined + modifiers.map(modifierTerm).join('');
+  return withWrittenAdvantage(combined + modifiers.map(modifierTerm).join(''), side);
 }

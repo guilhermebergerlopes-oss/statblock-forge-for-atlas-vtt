@@ -1,6 +1,8 @@
 import type { ForgeField, JsonRecord } from '../templates/forgeTemplate.ts';
 import {
+  checkboxFieldAllowsMultiple,
   checkboxFieldOptions,
+  normalizeCheckboxFieldValue,
   checkboxAliasBooleanValue,
   checkboxOptionKeyFromLabel,
   newCheckboxFieldOption,
@@ -10,7 +12,7 @@ import {
   type CheckboxFieldOption,
 } from '../templates/checkboxFieldModel.ts';
 import { normalizeForgeLanguage, translateForgeText } from '../i18n/localization.ts';
-import { button, el, inputText, labeledControl } from './templateEditorDom.ts';
+import { button, el, inputText, labeledControl, toggleControl } from './templateEditorDom.ts';
 import type { TemplateSpecializedFieldEditorContext } from './templateSpecializedFieldEditorContext.ts';
 
 function asRecord(value: unknown): JsonRecord {
@@ -28,6 +30,25 @@ export function renderCheckboxFieldOptions(
   const heading = el('strong', 'statblock-forge__subheading', 'Checkbox options');
   heading.dataset.forgeUiText = 'Checkbox options';
   panel.append(heading);
+  const language = normalizeForgeLanguage(context.language);
+  const multipleChoices = toggleControl(
+    translateForgeText('Multiple choices', language),
+    checkboxFieldAllowsMultiple(field),
+    (enabled) => {
+      field.allowMultiple = enabled;
+      if (!enabled) {
+        const sample = asRecord(context.template.sample);
+        sample[field.key] = normalizeCheckboxFieldValue(field, sample[field.key]);
+        context.template.sample = sample;
+      }
+      context.renderPreviewOnly();
+    },
+  );
+  multipleChoices.classList.add('statblock-forge__checkbox-field-multiple-toggle');
+  panel.append(multipleChoices);
+  panel.append(el('p', 'statblock-forge__hint', translateForgeText(
+    'When enabled, more than one option can be checked in this set. Other Checkbox Fields are independent.', language,
+  )));
   const list = el('div', 'statblock-forge__checkbox-field-option-list');
 
   const persistOptions = (next: CheckboxFieldOption[]): boolean => {
@@ -148,6 +169,5 @@ export function renderCheckboxFieldOptions(
   }, true);
   addOption.classList.add('statblock-forge__properties-add-compact');
   panel.append(addOption);
-  const language = normalizeForgeLanguage(context.language);
   return panel;
 }

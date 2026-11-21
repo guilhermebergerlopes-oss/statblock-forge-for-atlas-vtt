@@ -9,8 +9,13 @@ export interface AtlasTokenSummary {
   readonly assetId: string | null;
   readonly imagePath: string | null;
   readonly name: string | null;
-  /** Atlas-native statblock link, retained so later UI can detect a possible preview conflict. */
+  /** Link written directly on this placed token instance. */
   readonly statblockPath: string | null;
+  /** Shared link inherited from the Atlas library TokenAsset. */
+  readonly assetStatblockPath: string | null;
+  /** Effective target: placed-token link first, then the linked TokenAsset. */
+  readonly resolvedStatblockPath: string | null;
+  readonly linkSource: 'instance' | 'asset' | 'none';
 }
 
 export type AtlasTokenStateStatus =
@@ -72,21 +77,51 @@ function nullableString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-function readToken(id: string, value: unknown): AtlasTokenSummary | null {
+export interface AtlasTokenAssetSummary {
+  readonly id: string;
+  readonly type?: string;
+  readonly imagePath?: string;
+  readonly statblockPath?: string;
+}
+
+function libraryAssetForToken(
+  assetId: string | null,
+  imagePath: string | null,
+  assets: readonly AtlasTokenAssetSummary[],
+): AtlasTokenAssetSummary | null {
+  if (assetId) {
+    const exact = assets.find((asset) => asset.id === assetId && (asset.type === undefined || asset.type === 'token'));
+    if (exact) return exact;
+  }
+  if (!imagePath) return null;
+  return assets.find((asset) => asset.imagePath === imagePath && (asset.type === undefined || asset.type === 'token')) ?? null;
+}
+
+function readToken(id: string, value: unknown, assets: readonly AtlasTokenAssetSummary[]): AtlasTokenSummary | null {
   if (!isRecord(value)) return null;
 
   const kind = readMember(value, 'kind');
   if (kind !== 'token' && kind !== 'character') return null;
 
+  const assetId = nullableString(readMember(value, 'assetId'));
+  const imagePath = nullableString(readMember(value, 'imagePath'));
+  const statblockPath = nullableString(readMember(value, 'statblockPath'));
+  const asset = libraryAssetForToken(assetId, imagePath, assets);
+  const assetStatblockPath = nullableString(asset?.statblockPath);
+  const resolvedStatblockPath = statblockPath ?? assetStatblockPath;
+
   return {
     // The collection key is the ID used by Atlas selection and renderer APIs.
     id,
     kind,
-    assetId: nullableString(readMember(value, 'assetId')),
-    imagePath: nullableString(readMember(value, 'imagePath')),
+    assetId,
+    imagePath,
     name: nullableString(readMember(value, 'name'))
       ?? nullableString(readMember(value, 'statblockName')),
-    statblockPath: nullableString(readMember(value, 'statblockPath')),
+    statblockPath,
+    assetStatblockPath,
+    resolvedStatblockPath,
+    linkSource: statblockPath ? 'instance' : assetStatblockPath ? 'asset' : 'none',
   };
 }
 
@@ -111,7 +146,10 @@ function emptySnapshot(status: AtlasTokenStateStatus): AtlasTokenStateSnapshot {
  * Reads token-related data from an Atlas Zustand store without calling any Atlas write action.
  * Missing or throwing runtime members produce an explicit status instead of an exception.
  */
-export function readAtlasTokenState(atlasStore: unknown): AtlasTokenStateSnapshot {
+export function readAtlasTokenState(
+  atlasStore: unknown,
+  tokenAssets: readonly AtlasTokenAssetSummary[] = [],
+): AtlasTokenStateSnapshot {
   if (typeof readMember(atlasStore, 'getState') !== 'function') {
     return emptySnapshot('store-unavailable');
   }
@@ -143,7 +181,7 @@ export function readAtlasTokenState(atlasStore: unknown): AtlasTokenStateSnapsho
 
   if (tokensAvailable) {
     for (const [id, rawToken] of Object.entries(rawTokens)) {
-      const token = readToken(id, rawToken);
+      const token = readToken(id, rawToken, tokenAssets);
       if (token === null) {
         invalidTokenCount += 1;
         continue;
@@ -185,9 +223,23 @@ export function readAtlasTokenState(atlasStore: unknown): AtlasTokenStateSnapsho
 
 /** Convenience wrapper for callers that already discovered an Atlas view in Etapa 1.1. */
 export function readAtlasTokenStateFromContext(
-  context: Pick<AtlasTokenAdapterContext, 'atlasStore'>,
+  context: Pick<AtlasTokenAdapterContext, 'atlasStore' | 'assetService'>,
 ): AtlasTokenStateSnapshot {
-  return readAtlasTokenState(context.atlasStore);
+  let tokenAssets: AtlasTokenAssetSummary[] = [];
+  const loadedTokenAssets = readMember(context.assetService, 'loadedTokenAssets');
+  if (typeof loadedTokenAssets === 'function') {
+    try {
+      const result = (loadedTokenAssets as (this: unknown) => unknown).call(context.assetService);
+      if (Array.isArray(result)) {
+        tokenAssets = result.filter((asset): asset is AtlasTokenAssetSummary => isRecord(asset)
+          && typeof readMember(asset, 'id') === 'string'
+          && (readMember(asset, 'type') === undefined || readMember(asset, 'type') === 'token'));
+      }
+    } catch {
+      // Token instance links remain readable even if the AssetService snapshot is temporarily unavailable.
+    }
+  }
+  return readAtlasTokenState(context.atlasStore, tokenAssets);
 }
 
 /** Returns the selected token from a snapshot, or null when selection contains no token. */

@@ -31,15 +31,15 @@ import { foldedSectionFooterLabel, isFoldedSectionExpanded, setFoldedSectionExpa
 import { alignTargetAtViewportY } from './foldedSectionPointerAnchor.ts';
 import { DEFAULT_GRID_COLUMN_COUNT, GRID_COLUMN_COUNT, MAX_GRID_COLUMN_COUNT } from '../templates/layoutLimits.ts';
 import { readTemplateGridGeometry } from '../views/templateGridGeometry.ts';
-import { evaluatePreviewFormula, scorePreviewGrid, spellPreviewGroups } from './previewValueModel.ts';
-import { renderInlineScoresTable } from './inlineScoresTableEditor.ts';
+import { evaluatePreviewFormula, groupPreviewGroups } from './previewValueModel.ts';
 import { createStatblockRenderModel, templatePreviewData } from './statblockRenderModel.ts';
 import { calculateNumericFieldValue, hasNumericFieldFormulaSettings, isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 import { DEFAULT_METRIC_SLOTS_PER_ROW, metricPreviewRows, metricSlotFormula, metricSlotFormulaLabel } from '../templates/metricEditorModel.ts';
 import type { ScoreTableEdit } from '../templates/tableEditorModel.ts';
+import { forgeTableCellValue, forgeTableRowLabel, isForgeTableRowDeletable, readForgeTableRows, updateForgeTableRows, FORGE_TABLE_MAX_ROWS } from '../statblocks/tableRowsModel.ts';
 import { translateForgeText, type ForgeLanguage } from '../i18n/localization.ts';
 import { renderCompendiumAbilityPreview } from './compendiumAbilityPreview.ts';
-import { inlineNumericFieldDraftValue, parseInlineNumericFieldDraft } from '../statblocks/inlineNumericFieldEditorModel.ts';
+import { inlineNumericFieldDraftValue, numberFieldAdvantageRollFormula, parseInlineNumericFieldDraft } from '../statblocks/inlineNumericFieldEditorModel.ts';
 import { inlineTextFieldDraftValue, isInlineTextField, parseInlineTextFieldDraft } from '../statblocks/inlineTextFieldEditorModel.ts';
 import { inlineSpellGroupsDraftValue, serializeInlineSpellGroups, type InlineSpellGroupDraft } from '../statblocks/inlineSpellsFieldEditorModel.ts';
 import { isAtlasEmptyFieldValue } from '../statblocks/inlineFieldEmptinessModel.ts';
@@ -51,7 +51,7 @@ import { inlinePairName, inlinePairValueText, inlinePairsFromValue, serializeInl
 import { inlineEntryDraftValue, insertInlineEntryValue, moveInlineEntryValue, removeInlineEntryValue, updateInlineEntriesValue, type InlineEntryDraft } from '../statblocks/inlineEntriesFieldEditorModel.ts';
 import { inlineEntryDropIndex, inlineEntryIndexAfterMove, moveInlineEntryBetweenFields } from '../statblocks/inlineEntryDragModel.ts';
 import { checkboxFieldOptions, checkboxOptionIsEnabled, withCheckboxOptionValue } from '../templates/checkboxFieldModel.ts';
-import { normalizeLegacyCounterPresetName, updateInlineCounterUsedValue } from '../statblocks/inlineCountersFieldEditorModel.ts';
+import { resolveInlineCounterRows, updateInlineCounterUsedValue } from '../statblocks/inlineCountersFieldEditorModel.ts';
 import { counterUsesNumericDisplay, shouldShowCounterNumericValue } from '../statblocks/counterDisplayModel.ts';
 import { DEFAULT_COUNTERS_PER_ROW, normalizeCountersPerRow } from '../templates/counterLayoutModel.ts';
 import { FORGE_RESOURCE_VALUES_KEY, forgeResourceValuesAreValid, forgeTrackedResourceCurrent, setForgeTrackedResourceCurrent } from '../statblocks/forgeResourceValues.ts';
@@ -62,6 +62,7 @@ import { openImageSocketActionsMenu } from './imageSocketActionsMenu.ts';
 import { imageReferenceText } from './vaultImageResolver.ts';
 import { DEFAULT_STATBLOCK_IMAGE_FRAME, normalizeStatblockImageFrame, panStatblockImageFrame, statblockImagePanTranslation, type StatblockImageFrame, type StatblockImageFrames } from '../statblocks/statblockImageFraming.ts';
 import { rollableBonusFormula } from '../statblocks/statblockValueRolls.ts';
+import { tableCellRollFormulas } from '../statblocks/tableCellRollsModel.ts';
 import { appendForgeStatblockDiceText, setForgeStatblockDiceLink } from './statblockDiceLinkElement.ts';
 import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
@@ -447,6 +448,40 @@ function appendFieldCompendiumPicker(
     parent.append(actionRow);
   }
 }
+
+/** Adds an explicit statblock-only editing action to every editable Collection type. */
+function appendCustomCollectionValueAction(
+  actionRow: HTMLElement,
+  field: ForgeField | undefined,
+  runtime: NumericFieldRuntime | undefined,
+  language: ForgeLanguage,
+): void {
+  if (!field || !runtime?.canEdit || !isCollectionFieldType(field.type) || field.type === 'entries') return;
+  const pt = language === 'pt-BR';
+  const add = element('button', 'statblock-forge__entry-action-button statblock-forge__entry-add-trigger', pt ? 'Personalizado' : 'Custom');
+  add.type = 'button';
+  add.dataset.noBlockEdit = 'true';
+  // The card-level capture handler resolves the owning inline-edit region from
+  // this trigger and its enclosing Field slot. This avoids relying on the
+  // event reaching a particular nested Atlas block listener.
+  add.dataset.forgeCustomField = field.key;
+  add.title = pt
+    ? 'Abre o editor para adicionar valores personalizados somente nesta ficha. Eles não serão adicionados ao Compêndio.'
+    : 'Opens the editor to add custom values to this statblock only. They will not be added to the Compendium.';
+  add.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Dispatch from the trigger itself. Resolving the nearest data-block-id
+    // here can target an inner Atlas frame in nested layouts, which is not
+    // necessarily the frame that owns this Field's registered inline editor.
+    add.dispatchEvent(new CustomEvent('forge:edit-field', {
+      bubbles: true,
+      detail: { fieldKey: field.key },
+    }));
+  });
+  actionRow.append(add);
+}
+
 export function readablePreviewValue(value: unknown): string {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -523,17 +558,19 @@ function createNumericFieldRuntime(
   };
   let savingValue = false;
   let navigationHandler: ((fieldKey: string, step: 1 | -1) => Promise<void>) | null = null;
+  const evaluateFormula = (formula: string, sample: Record<string, unknown>, slotValue: unknown): number | null =>
+    evaluatePreviewFormula(formula, sample, slotValue, fields);
   const runtime: NumericFieldRuntime = {
     canEdit: typeof onValueChange === 'function',
     get isSaving() { return savingValue; },
     language,
     value(field, sample) {
       if (!field) return null;
-      return calculateNumericFieldValue(field, sample, evaluatePreviewFormula);
+      return calculateNumericFieldValue(field, sample, evaluateFormula);
     },
     diceFormula(field, sample) {
       return resolveDiceFieldFormula(field, fields, sample, (sourceField) =>
-        calculateNumericFieldValue(sourceField, sample, evaluatePreviewFormula));
+        calculateNumericFieldValue(sourceField, sample, evaluateFormula));
     },
     async setBaseValue(fieldKey, value) {
       if (!onValueChange) throw new Error('A edição contextual não está habilitada nesta visualização.');
@@ -992,6 +1029,31 @@ function bindAtlasInlineBlockEditing(card: HTMLElement, template: ForgeTemplate,
     focusSession(region, fieldKey);
   };
 
+  // Handle Collection custom-value actions at the card boundary in capture
+  // phase. Listening on each block root is unreliable when Atlas inserts
+  // nested block frames: an intermediate frame can own the event path even
+  // though the button belongs to a different inline Field editor. Resolve the
+  // actual slot first, then use the region that registered that exact slot.
+  card.addEventListener('forge:edit-field', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const trigger = target?.closest<HTMLElement>('[data-forge-custom-field]');
+    const fieldKey = trigger?.dataset.forgeCustomField;
+    if (!trigger || !fieldKey) return;
+    const sourceSlot = trigger.closest<HTMLElement>(
+      '.statblock-forge__inline-edit-slot[data-forge-inline-field]',
+    );
+    if (!sourceSlot || sourceSlot.dataset.forgeInlineField !== fieldKey) return;
+    // Match by the exact slot node registered during the first render. Do not
+    // resolve ownership again through data-block-id: Atlas may add nested frame
+    // markers between the slot and its Forge block after rendering.
+    const region = regions.find((candidate) =>
+      candidate.slots.some((slot) => slot.node === sourceSlot && slot.definition.fieldKey === fieldKey));
+    if (!region) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void schedule(() => openRegion(region, fieldKey));
+  }, true);
+
   const openNavigationTarget = async (target: InlineNavigationTarget, direction: 1 | -1): Promise<void> => {
     if (target.region) {
       await openRegion(target.region, target.fieldKey);
@@ -1040,6 +1102,19 @@ function bindAtlasInlineBlockEditing(card: HTMLElement, template: ForgeTemplate,
 
   const ownInteractions = 'a, button, input, textarea, select, [role="switch"], [data-no-block-edit], .atlas-dice-link, .statblock-forge__dice-link, .internal-link';
   for (const region of regions) {
+    region.root.addEventListener('forge:finish-field', (event) => {
+      const detail = (event as CustomEvent<{ fieldKey?: unknown }>).detail;
+      const fieldKey = detail?.fieldKey;
+      if (typeof fieldKey !== 'string'
+        || !region.slots.some((slot) => slot.definition.fieldKey === fieldKey)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void schedule(async () => {
+        if (active !== region) return;
+        if (await closeActive(true)) region.root.focus();
+      });
+    });
+
     // Markdown values are rendered as block-level content and can sit inside
     // Atlas/Obsidian click surfaces that compete with the delegated block
     // handler. Activate their editor at the slot itself, in capture phase, so
@@ -1170,6 +1245,10 @@ function numericFieldDisplayText(
   signed = false,
 ): string {
   const raw = sample[field.key];
+  // A Number can explicitly hold a dice roll ending in adv/dis. Do not pass
+  // that text through numeric formatting or display it as an unavailable value.
+  if (field.type === 'number' && !hasNumericFieldFormulaSettings(field)
+    && numberFieldAdvantageRollFormula(raw)) return String(raw).trim();
   // Plain Rating fields keep their original notation (e.g. 1/4). Once a formula
   // is configured, the displayed value is the evaluated numeric result.
   const numeric = field.type === 'rating' && !hasNumericFieldFormulaSettings(field)
@@ -1189,7 +1268,16 @@ function createInlineNumericFieldValue(
 ): HTMLElement {
   const value = element('span', `statblock-forge__preview-numeric-field-value${extraClass ? ` ${extraClass}` : ''}`);
   const slot = createInlineEditSlot('span', '', value);
-  const redraw = (): void => { value.textContent = displayText(); };
+  const redraw = (): void => {
+    const display = displayText();
+    const rollFormula = field.type === 'number' && !hasNumericFieldFormulaSettings(field)
+      ? numberFieldAdvantageRollFormula(sample[field.key])
+      : null;
+    value.textContent = display;
+    setForgeStatblockDiceLink(value, rollFormula);
+    if (rollFormula) value.dataset.rollName = field.label.trim() || field.key;
+    else delete value.dataset.rollName;
+  };
   redraw();
 
   if (runtime?.canEdit) {
@@ -1197,7 +1285,10 @@ function createInlineNumericFieldValue(
       if (!value.isConnected || runtime.isSaving) return null;
       const input = element('input', 'atlas-sb-pane-input statblock-forge__inline-numeric-editor');
       input.type = 'text';
-      input.inputMode = 'decimal';
+      // Number Values may contain a valid dice expression ending in `adv` or `dis`.
+      // A decimal mobile keyboard hides those letters, so request a text keyboard.
+      input.inputMode = 'text';
+      input.spellcheck = false;
       input.autocomplete = 'off';
       input.value = inlineNumericFieldDraftValue(sample[field.key]);
       input.setAttribute('aria-label', field.label || field.key);
@@ -1272,8 +1363,8 @@ function createInlineTextFieldValue(
       } else {
         display.textContent = '—';
         display.title = runtime?.language === 'pt-BR'
-          ? 'Não foi possível resolver a fórmula. Verifique os Fields Number/Rating referenciados.'
-          : 'Could not resolve this formula. Check its referenced Number/Rating Fields.';
+          ? 'Não foi possível resolver a fórmula. Verifique os Fields referenciados e suas opções de Checkboxes/Selection.'
+          : 'Could not resolve this formula. Check its referenced Fields and their Checkboxes/Selection options.';
       }
     } else if (field.type === 'markdown' && text) renderAtlasMarkdown(app, markdownComponent, sourcePath, display, text);
     else if (field.type === 'dice') appendForgeStatblockDiceText(display, text || '—');
@@ -1943,6 +2034,7 @@ function renderMetric(
   sample: JsonRecord,
   layout: ForgeLayoutDocument,
   numericRuntime?: NumericFieldRuntime,
+  showCanvasDropHint = false,
 ): HTMLElement {
   const wrapper = element('div', 'statblock-forge__preview-metric');
   const heading = isBlockLabelHidden(block) ? '' : (typeof block.heading === 'string' ? block.heading.trim() : '');
@@ -1950,6 +2042,12 @@ function renderMetric(
   if (heading) wrapper.append(element('strong', 'statblock-forge__preview-block-heading', heading));
   const numbers = element('div', 'statblock-forge__preview-metric-rows');
   if (keys.length === 0) {
+    if (showCanvasDropHint) {
+      numbers.append(markForgeUiText(
+        element('div', 'statblock-forge__container-empty is-metric-placeholder', 'Drop a compatible Field here.'),
+        'Drop a compatible Field here.',
+      ));
+    }
   } else {
     let offset = 0;
     const slotsPerRow = layout.blocks[block.id]?.metricSlotsPerRow ?? DEFAULT_METRIC_SLOTS_PER_ROW;
@@ -1967,7 +2065,7 @@ function renderMetric(
           ? (formulaLabel || formula)
           : fieldLabel(field, key);
         const getBaseValue = (): number | null => formula
-          ? evaluatePreviewFormula(formula, sample, undefined)
+          ? evaluatePreviewFormula(formula, sample, undefined, fields)
           : isFormulaCapableNumericField(field) && numericRuntime
             ? numericRuntime.value(field, sample)
             : numberValue(valueOf(sample, key));
@@ -2003,8 +2101,8 @@ function renderMetric(
             metricValue.classList.toggle('is-unresolved-dice-formula', formulaBackedDice);
             metricValue.textContent = '—';
             if (formulaBackedDice) metricValue.title = numericRuntime?.language === 'pt-BR'
-              ? 'Não foi possível resolver a fórmula. Verifique os Fields Number/Rating referenciados.'
-              : 'Could not resolve this formula. Check its referenced Number/Rating Fields.';
+              ? 'Não foi possível resolver a fórmula. Verifique os Fields referenciados e suas opções de Checkboxes/Selection.'
+              : 'Could not resolve this formula. Check its referenced Fields and their Checkboxes/Selection options.';
           }
         };
         const syncRollableMetric = (): void => {
@@ -2015,7 +2113,7 @@ function renderMetric(
         else syncRollableMetric();
         cell.append(metricValue);
         const redraw = (): void => { metricValue.textContent = getMetricDisplay(); syncRollableMetric(); };
-        // Metric formulas can reference Checkboxes Field options directly.
+        // Metric formulas can reference Checkboxes and Selection options directly.
         if (formula) numericRuntime?.subscribeAll(redraw);
         else if (diceField && numericRuntime) {
           if (formulaBackedDice) numericRuntime.subscribeAll(syncDiceMetric);
@@ -2034,379 +2132,548 @@ function renderMetric(
   return wrapper;
 }
 
-function signedScoreValue(value: unknown, signed: boolean): string {
-  const numeric = numberValue(value);
-  if (signed && numeric !== null && numeric > 0) return `+${numeric}`;
-  return readablePreviewValue(value);
+function normalizeTableCellValue(field: ForgeField, value: unknown): unknown {
+  if ((field.type === 'number' || field.type === 'rating') && typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+  return value;
 }
 
-function scorePairValue(raw: unknown, keys: string[], labels: string[]): unknown {
-  const candidates = [...keys, ...labels].filter(Boolean);
-  if (Array.isArray(raw)) {
-    for (const item of raw) {
-      if (!isRecord(item)) continue;
-      for (const candidate of candidates) {
-        if (Object.prototype.hasOwnProperty.call(item, candidate)) return item[candidate];
-      }
-      const lower = new Map(Object.keys(item).map((key) => [key.toLowerCase(), key]));
-      for (const candidate of candidates) {
-        const actual = lower.get(candidate.toLowerCase());
-        if (actual) return item[actual];
-      }
+/** Builds formula text from the value actually shown in a Table cell. */
+function tableCellRollText(
+  field: ForgeField,
+  sample: JsonRecord,
+  runtime: NumericFieldRuntime | undefined,
+  signed: boolean,
+  rollable: boolean,
+): string {
+  const raw = sample[field.key];
+  if (field.type === 'dice' && hasDiceFieldFormula(field)) {
+    return runtime?.diceFormula(field, sample) ?? '';
+  }
+  if (field.type === 'number' || field.type === 'rating') {
+    if (field.type === 'number' && !hasNumericFieldFormulaSettings(field)) {
+      const written = numberFieldAdvantageRollFormula(raw);
+      if (written) return written;
     }
-    return undefined;
+    if (field.type === 'rating' && !hasNumericFieldFormulaSettings(field)) return readablePreviewValue(raw);
+    const numeric = runtime ? runtime.value(field, sample) : numberValue(raw);
+    if (numeric === null) return readablePreviewValue(raw);
+    return `${(signed || rollable) && numeric > 0 ? '+' : ''}${String(Number(numeric.toFixed(4)))}`;
   }
-  if (!isRecord(raw)) return undefined;
-  for (const candidate of candidates) {
-    if (Object.prototype.hasOwnProperty.call(raw, candidate)) return raw[candidate];
-  }
-  const lower = new Map(Object.keys(raw).map((key) => [key.toLowerCase(), key]));
-  for (const candidate of candidates) {
-    const actual = lower.get(candidate.toLowerCase());
-    if (actual) return raw[actual];
-  }
-  return undefined;
+  return readablePreviewValue(raw);
 }
 
-function derivedScoreColumns(block: ForgeBlock, field: ForgeField | undefined, sample: JsonRecord, labels: string[], rows: unknown[][]): Array<{ label: string; values: string[] }> {
-  if (rows.length !== 1 || !Array.isArray(block.columns)) return [];
-  const slotKeys = Array.isArray(field?.slotKeys) ? field.slotKeys : [];
-  return block.columns.filter(isRecord).map((column) => {
-    const label = typeof column.label === 'string' ? column.label : '';
-    const values = labels.map((slotLabel, index) => {
-      const slotValue = rows[0]?.[index];
-      if (typeof column.field === 'string') {
-        const paired = scorePairValue(sample[column.field], [String(slotKeys[index] ?? '')], [slotLabel]);
-        if (paired !== undefined && paired !== null && paired !== '') {
-          const text = readablePreviewValue(paired);
-          if (column.display === 'signed') {
-            const numeric = numberValue(paired);
-            return numeric !== null && numeric > 0 ? `+${numeric}` : text;
-          }
-          return text;
-        }
-      }
-      if (typeof column.formula === 'string') {
-        const numeric = evaluatePreviewFormula(column.formula, sample, slotValue);
-        if (numeric === null) return '';
-        return column.display === 'signed' && numeric > 0 ? `+${numeric}` : String(numeric);
-      }
-      return '';
-    });
-    return { label, values };
-  });
-}
-
-function renderEditableScores(
-  block: ForgeBlock,
-  field: ForgeField | undefined,
-  columns: string[],
-  rows: unknown[][],
-  onEdit: (edit: ScoreTableEdit) => void,
-): HTMLElement {
-  const editor = element('div', `statblock-forge__score-editor${block.orientation === 'table' ? ' is-lines' : ''}`);
-  const controls = element('div', 'statblock-forge__score-editor-actions');
-  const addColumn = markForgeUiText(element('button', undefined, 'Add column'), 'Add column');
-  addColumn.type = 'button';
-  addColumn.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'add-column' }); });
-  const addRow = markForgeUiText(element('button', undefined, 'Add row'), 'Add row');
-  addRow.type = 'button';
-  addRow.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'add-row' }); });
-  addColumn.disabled = columns.length >= 12;
-  controls.append(addColumn, addRow);
-  editor.append(controls);
-
-  if (block.orientation === 'table') {
-    const lines = element('div', 'statblock-forge__score-editor-lines');
-    const effectiveRows = rows.length > 0 ? rows : [Array.from({ length: columns.length }, () => null)];
-    const perLine = Math.max(1, Math.floor(Number(block.perLine) || 1));
-
-    const renderLineRecord = (rowIndex: number, columnIndexes: number[]): HTMLElement => {
-      const record = element('div', 'statblock-forge__score-editor-line-record');
-      const recordActions = element('div', 'statblock-forge__score-editor-line-actions');
-      if (rows.length > 1) {
-        recordActions.append(element('strong', '', `Row ${rowIndex + 1}`));
-        const up = element('button', 'statblock-forge__score-editor-icon', '↑');
-        up.type = 'button'; up.title = 'Move row up'; up.dataset.forgeUiTitle = 'Move row up'; up.disabled = rowIndex === 0;
-        up.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-row', index: rowIndex, direction: -1 }); });
-        const down = element('button', 'statblock-forge__score-editor-icon', '↓');
-        down.type = 'button'; down.title = 'Move row down'; down.dataset.forgeUiTitle = 'Move row down'; down.disabled = rowIndex === rows.length - 1;
-        down.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-row', index: rowIndex, direction: 1 }); });
-        const remove = element('button', 'statblock-forge__score-editor-icon is-danger', '×');
-        remove.type = 'button'; remove.title = 'Remove row'; remove.dataset.forgeUiTitle = 'Remove row'; remove.disabled = rows.length <= 1;
-        remove.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'remove-row', index: rowIndex }); });
-        recordActions.append(up, down, remove);
-      }
-      if (recordActions.childElementCount > 0) record.append(recordActions);
-      const table = element('div', 'statblock-forge__score-editor-line-table');
-      columnIndexes.forEach((columnIndex) => {
-        const line = element('div', 'statblock-forge__score-editor-line');
-        const label = element('span', 'statblock-forge__score-editor-line-label', columns[columnIndex] || `Column ${columnIndex + 1}`);
-        const input = element('input', 'statblock-forge__score-editor-input');
-        input.type = 'text';
-        const value = effectiveRows[rowIndex]?.[columnIndex];
-        input.value = value === undefined || value === null ? '' : String(value);
-        input.setAttribute('aria-label', `Row ${rowIndex + 1}, column ${columnIndex + 1}`);
-        input.dataset.forgeUiAriaLabel = `Row ${rowIndex + 1}, column ${columnIndex + 1}`;
-        input.addEventListener('change', () => onEdit({ type: 'set-cell', row: rowIndex, column: columnIndex, value: input.value }));
-        line.append(label, input);
-        table.append(line);
-      });
-      record.append(table);
-      return record;
-    };
-
-    if (effectiveRows.length === 1) {
-      const count = Math.max(1, Math.min(columns.length || 1, perLine));
-      const groups = Array.from({ length: count }, (_item, groupIndex) =>
-        columns.map((_column, index) => index).filter((index) => index % count === groupIndex));
-      lines.setCssStyles({ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` });
-      groups.forEach((indexes) => lines.append(renderLineRecord(0, indexes)));
-    } else {
-      const count = Math.max(1, Math.min(effectiveRows.length, perLine));
-      lines.setCssStyles({ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` });
-      effectiveRows.forEach((_row, rowIndex) => lines.append(renderLineRecord(rowIndex, columns.map((_column, index) => index))));
-    }
-    editor.append(lines);
-    return editor;
-  }
-
-  const table = element('div', 'statblock-forge__score-editor-grid');
-  // Keep every data column at a predictable width and reserve the same action
-  // gutter used by body rows. This prevents header controls from shifting the
-  // table columns or being pushed outside the editor viewport.
-  const columnTemplate = `repeat(${Math.max(1, columns.length)}, minmax(5.25rem, 7.5rem))`;
-  const editorRowTemplate = `${columnTemplate} 4.45rem`;
-  const header = element('div', 'statblock-forge__score-editor-row is-header');
-  header.setCssStyles({ gridTemplateColumns: editorRowTemplate });
-  columns.forEach((column, index) => {
-    const cell = element('div', 'statblock-forge__score-editor-header-cell');
-    const input = element('input', 'statblock-forge__score-editor-input');
-    input.type = 'text';
-    input.value = column;
-    input.placeholder = `Column ${index + 1}`;
-    input.dataset.forgeUiPlaceholder = `Column ${index + 1}`;
-    input.setAttribute('aria-label', `Column ${index + 1} name`);
-    input.dataset.forgeUiAriaLabel = `Column ${index + 1} name`;
-    input.addEventListener('change', () => onEdit({ type: 'set-column', index, value: input.value }));
-    const actions = element('div', 'statblock-forge__score-editor-cell-actions');
-    const up = element('button', 'statblock-forge__score-editor-icon', '←');
-    up.type = 'button'; up.title = 'Move column left'; up.dataset.forgeUiTitle = 'Move column left'; up.disabled = index === 0;
-    up.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-column', index, direction: -1 }); });
-    const down = element('button', 'statblock-forge__score-editor-icon', '→');
-    down.type = 'button'; down.title = 'Move column right'; down.dataset.forgeUiTitle = 'Move column right'; down.disabled = index === columns.length - 1;
-    down.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-column', index, direction: 1 }); });
-    const remove = element('button', 'statblock-forge__score-editor-icon is-danger', '×');
-    remove.type = 'button'; remove.title = 'Remove column'; remove.dataset.forgeUiTitle = 'Remove column'; remove.disabled = columns.length <= 1;
-    remove.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'remove-column', index }); });
-    actions.append(up, down, remove);
-    cell.append(actions, input);
-    header.append(cell);
-  });
-  const headerActionsSpacer = element('div', 'statblock-forge__score-editor-header-spacer');
-  headerActionsSpacer.setAttribute('aria-hidden', 'true');
-  header.append(headerActionsSpacer);
-  table.append(header);
-
-  rows.forEach((row, rowIndex) => {
-    const rowNode = element('div', 'statblock-forge__score-editor-row');
-    rowNode.setCssStyles({ gridTemplateColumns: editorRowTemplate });
-    columns.forEach((_column, columnIndex) => {
-      const input = element('input', 'statblock-forge__score-editor-input');
-      input.type = 'text';
-      const value = row[columnIndex];
-      input.value = value === undefined || value === null ? '' : String(value);
-      input.setAttribute('aria-label', `Row ${rowIndex + 1}, column ${columnIndex + 1}`);
-      input.dataset.forgeUiAriaLabel = `Row ${rowIndex + 1}, column ${columnIndex + 1}`;
-      input.addEventListener('change', () => onEdit({ type: 'set-cell', row: rowIndex, column: columnIndex, value: input.value }));
-      rowNode.append(input);
-    });
-    const actions = element('div', 'statblock-forge__score-editor-row-actions');
-    const up = element('button', 'statblock-forge__score-editor-icon', '↑');
-    up.type = 'button'; up.title = 'Move row up'; up.dataset.forgeUiTitle = 'Move row up'; up.disabled = rowIndex === 0;
-    up.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-row', index: rowIndex, direction: -1 }); });
-    const down = element('button', 'statblock-forge__score-editor-icon', '↓');
-    down.type = 'button'; down.title = 'Move row down'; down.dataset.forgeUiTitle = 'Move row down'; down.disabled = rowIndex === rows.length - 1;
-    down.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'move-row', index: rowIndex, direction: 1 }); });
-    const remove = element('button', 'statblock-forge__score-editor-icon is-danger', '×');
-    remove.type = 'button'; remove.title = 'Remove row'; remove.dataset.forgeUiTitle = 'Remove row'; remove.disabled = rows.length <= 1;
-    remove.addEventListener('click', (event) => { event.stopPropagation(); onEdit({ type: 'remove-row', index: rowIndex }); });
-    actions.append(up, down, remove);
-    rowNode.append(actions);
-    table.append(rowNode);
-  });
-  editor.append(table);
-  return editor;
-}
-
-function appendRollableScoreValue(cell: HTMLElement, value: string, rollable: boolean, rollName?: string): void {
-  if (rollable && rollName?.trim()) cell.dataset.rollName = rollName.trim();
-  const content = element('span');
-  appendForgeStatblockDiceText(content, value || '—', rollable);
-  cell.append(content);
-}
-
-function renderScores(block: ForgeBlock, field: ForgeField | undefined, sample: JsonRecord, onEdit?: (edit: ScoreTableEdit) => void, runtime?: NumericFieldRuntime): HTMLElement {
-  const wrapper = element('div', `statblock-forge__preview-scores${block.orientation === 'table' ? ' is-lines' : ''}`);
-  const grid = scorePreviewGrid(valueOf(sample, block.field), field);
-  if (grid.mismatchedValue !== undefined) {
-    if (onEdit) {
-      wrapper.append(markForgeUiText(element('span', 'statblock-forge__preview-score-mismatch', 'Stored value is not a table. Add a row or column to replace it.'), 'Stored value is not a table. Add a row or column to replace it.'));
-      wrapper.append(renderEditableScores(block, field, grid.columns, [], onEdit));
-    } else {
-      wrapper.append(element('span', 'statblock-forge__preview-score-mismatch', readablePreviewValue(grid.mismatchedValue)));
-    }
-    return wrapper;
-  }
-  if (grid.columns.length === 0) {
-    if (onEdit) wrapper.append(renderEditableScores(block, field, grid.columns, [], onEdit));
-    return wrapper;
-  }
-
-  const rows = grid.rows.length ? grid.rows : [Array.from({ length: grid.columns.length }, () => null)];
-  const signed = block.display === 'signed';
-  const derived = derivedScoreColumns(block, field, sample, grid.columns, rows);
-  if (onEdit) {
-    wrapper.append(renderEditableScores(block, field, grid.columns, rows, onEdit));
-    return wrapper;
-  }
-  const derivedRollable = block.rollable === true || block.legacyModifierRollable === true;
-  if (field?.type === 'scores' && runtime?.canEdit) {
-    return renderInlineScoresTable({
+function renderTableSlotValue(
+  cell: HTMLTableCellElement,
+  field: ForgeField,
+  sample: JsonRecord,
+  app: App,
+  markdownComponent: Component,
+  sourcePath: string,
+  fields: readonly ForgeField[],
+  layout: ForgeLayoutDocument,
+  resolveImage?: (path: string) => string | undefined,
+  runtime?: NumericFieldRuntime,
+  signed = false,
+  rollable = false,
+  onValueEdit?: (value: unknown) => void | Promise<void>,
+  counterRowIndex?: number,
+): void {
+  const current = sample[field.key];
+  // Structured Fields use their native renderer. The callback belongs to this
+  // particular table cell, so additional rows never overwrite the base Field.
+  if (field.type === 'counters') {
+    const counterBlockId = `table-slot-counter-${field.key}`;
+    const counterBlock = {
+      id: counterBlockId,
+      type: 'counters',
+      field: field.key,
+      label: '',
+      labelPlacement: 'none',
+    } as ForgeBlock;
+    const counterLayout = {
+      ...layout,
+      blocks: {
+        ...layout.blocks,
+        [counterBlockId]: { countersPerRow: 1 },
+      },
+    } as ForgeLayoutDocument;
+    cell.append(renderCounters(
+      counterBlock,
       field,
       sample,
-      signed,
+      counterLayout,
+      runtime?.language ?? 'en',
       runtime,
-      look: block.orientation === 'table' ? 'lines' : 'grid',
-      perLine: block.perLine,
-      rollable: block.rollable === true,
-      derivedRollable,
-      derived: () => {
-        const latest = scorePreviewGrid(sample[field.key], field);
-        const currentRows = latest.rows.length ? latest.rows : [Array.from({ length: latest.columns.length }, () => null)];
-        return derivedScoreColumns(block, field, sample, latest.columns, currentRows);
-      },
-    });
+      onValueEdit,
+      counterRowIndex,
+    ));
+    return;
   }
-  if (block.orientation === 'table') {
-    const perLine = Math.max(1, Math.floor(Number(block.perLine) || 1));
-    const lines = element('div', `statblock-forge__preview-score-lines${rows.length > 1 ? ' is-records' : ''}`);
-    if (rows.length > 1) {
-      const recordColumns = Math.max(1, Math.min(rows.length, perLine));
-      lines.setCssStyles({ gridTemplateColumns: `repeat(${recordColumns}, minmax(0, 1fr))` });
-      rows.forEach((rawRow) => {
-        const table = element('table', 'statblock-forge__preview-score-lines-table is-record');
-        const body = element('tbody');
-        grid.columns.forEach((column, index) => {
-          const row = element('tr');
-          const label = element('th', '', column || (runtime?.language === 'pt-BR' ? `Coluna ${index + 1}` : `Column ${index + 1}`));
-          label.scope = 'row';
-          const value = element('td');
-          const alignment = grid.align[index];
-          if (alignment === 'center' || alignment === 'end') value.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
-          appendRollableScoreValue(value, signedScoreValue(rawRow[index], signed), block.rollable === true, column);
-          row.append(label, value);
-          body.append(row);
-        });
-        table.append(body);
-        lines.append(table);
-      });
-      wrapper.append(lines);
-      return wrapper;
+
+  const nativeSlotBlockType: Record<string, string> = {
+    checkboxes: 'checkboxes',
+    list: 'tags',
+    entries: 'entries',
+    spells: 'spells',
+    image: 'image',
+  };
+  const nativeBlockType = nativeSlotBlockType[field.type];
+  if (nativeBlockType) {
+    const slotBlock: ForgeBlock = {
+      id: `table-slot-${field.key}`,
+      type: nativeBlockType,
+      field: field.key,
+      label: '',
+      heading: '',
+      labelPlacement: 'none',
+    };
+    const onFieldValueChange = onValueEdit
+      ? (_fieldKey: string, value: unknown) => onValueEdit(value)
+      : runtime?.canEdit
+        ? (fieldKey: string, value: unknown) => runtime.setBaseValue(fieldKey, value)
+        : undefined;
+    cell.append(renderLeafBlock(
+      app,
+      markdownComponent,
+      sourcePath,
+      slotBlock,
+      fields,
+      sample,
+      layout,
+      resolveImage,
+      undefined,
+      false,
+      false,
+      runtime?.language ?? 'en',
+      undefined,
+      runtime,
+      onFieldValueChange,
+    ));
+    return;
+  }
+
+  const isFormulaBackedDice = field.type === 'dice' && hasDiceFieldFormula(field);
+  const isPrimitiveValue = current === undefined || current === null
+    || ['string', 'number', 'boolean'].includes(typeof current);
+
+  // Live statblocks use one shared Table-cell editor for the first row and all
+  // additional rows. This avoids the first row falling back to the normal Field
+  // overlay while later rows use a differently styled Table input.
+  if (onValueEdit && runtime?.canEdit && !isFormulaBackedDice && isPrimitiveValue) {
+    const valueNode = element('span', 'statblock-forge__preview-numeric-field-value statblock-forge__table-row-cell-value');
+    let rollText = '';
+    let displayText = readablePreviewValue(current);
+
+    if (field.type === 'number' || field.type === 'rating') {
+      rollText = tableCellRollText(field, sample, runtime, signed, rollable);
+      // Match the normal Field display, including calculated Number/Rating values
+      // and plain Rating notations such as 1/4. The editor still starts from the
+      // stored raw value so formula-backed Fields retain their source data.
+      displayText = numericFieldDisplayText(field, sample, runtime, signed);
+      const formulas = tableCellRollFormulas(rollText, rollable);
+      if (formulas.length === 1) setForgeStatblockDiceLink(valueNode, formulas[0]);
+      else if (formulas.length > 1) appendForgeStatblockDiceText(valueNode, rollText, rollable);
+      else valueNode.textContent = displayText;
+    } else if (field.type === 'dice') {
+      rollText = runtime.diceFormula(field, sample);
+      displayText = rollText || '—';
+      appendForgeStatblockDiceText(valueNode, displayText, rollable);
+    } else if (field.type === 'choice') {
+      displayText = readablePreviewValue(current) || '—';
+      valueNode.textContent = displayText;
+    } else {
+      rollText = readablePreviewValue(current);
+      displayText = rollText || '—';
+      appendForgeStatblockDiceText(valueNode, displayText, rollable);
     }
-    const groupCount = Math.max(1, Math.min(grid.columns.length, perLine));
-    const groups = Array.from({ length: groupCount }, (_, groupIndex) =>
-      grid.columns.map((_column, index) => index).filter((index) => index % groupCount === groupIndex));
-    lines.setCssStyles({ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` });
-    groups.forEach((indices) => {
-      const table = element('table', 'statblock-forge__preview-score-lines-table');
-      if (derived.some((column) => column.label)) {
-        const head = element('thead');
-        const headRow = element('tr');
-        headRow.append(element('td', 'statblock-forge__preview-score-corner', ''));
-        headRow.append(element('td', 'statblock-forge__preview-score-corner', ''));
-        for (const column of derived) headRow.append(element('th', 'statblock-forge__preview-score-derived-heading', column.label));
-        head.append(headRow);
-        table.append(head);
-      }
-      const body = element('tbody');
-      for (const index of indices) {
-        const row = element('tr');
-        const label = element('th', '', grid.columns[index] || (runtime?.language === 'pt-BR' ? `Coluna ${index + 1}` : `Column ${index + 1}`));
-        label.scope = 'row';
-        const value = element('td');
-        const alignment = grid.align[index];
-        if (alignment === 'center' || alignment === 'end') value.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
-        appendRollableScoreValue(value, signedScoreValue(rows[0]?.[index], signed), block.rollable === true, grid.columns[index]);
-        row.append(label, value);
-        derived.forEach((column, columnIndex) => {
-          const derivedCell = element('td', 'statblock-forge__preview-score-derived');
-          const renderDerived = (text: string): void => {
-            derivedCell.replaceChildren();
-            appendRollableScoreValue(derivedCell, text, derivedRollable, grid.columns[index]);
-          };
-          renderDerived(column.values[index] || '—');
-          const redrawDerived = (): void => {
-            const latest = derivedScoreColumns(block, field, sample, grid.columns, rows)[columnIndex]?.values[index] ?? '';
-            renderDerived(latest || '—');
-          };
-          runtime?.subscribeAll(redrawDerived);
-          row.append(derivedCell);
+
+    if (valueNode.childNodes.length === 0) valueNode.textContent = displayText;
+    valueNode.dataset.rollName = field.label.trim() || field.key;
+    valueNode.tabIndex = 0;
+    valueNode.dataset.noBlockEdit = 'true';
+    valueNode.setAttribute('aria-keyshortcuts', 'F2');
+    valueNode.title = runtime.language === 'pt-BR'
+      ? 'Clique no espaço livre da célula ou pressione F2 para editar; clique no valor para rolar.'
+      : 'Click the empty cell area or press F2 to edit; click the value to roll.';
+    cell.append(valueNode);
+
+    const openEditor = (): void => {
+      if (!cell.isConnected || cell.querySelector('input, select, textarea')) return;
+      let control: HTMLInputElement | HTMLSelectElement;
+      if (field.type === 'choice' && Array.isArray(field.options)) {
+        const select = element('select', 'statblock-forge__table-sample-cell-editor') as HTMLSelectElement;
+        const currentText = current === undefined || current === null ? '' : String(current);
+        const placeholder = element('option');
+        placeholder.value = '';
+        placeholder.textContent = runtime.language === 'pt-BR' ? '— Selecione —' : '— Select —';
+        select.append(placeholder);
+        const options = field.options.filter((option): option is string => typeof option === 'string');
+        if (currentText && !options.includes(currentText)) {
+          const legacy = element('option');
+          legacy.value = currentText;
+          legacy.textContent = currentText;
+          select.append(legacy);
+        }
+        options.forEach((optionValue) => {
+          const option = element('option');
+          option.value = optionValue;
+          option.textContent = optionValue;
+          select.append(option);
         });
-        body.append(row);
+        select.value = currentText;
+        control = select;
+      } else {
+        const input = element('input', 'statblock-forge__table-sample-cell-editor') as HTMLInputElement;
+        input.type = field.type === 'rating' ? 'number' : 'text';
+        if (field.type === 'number') input.inputMode = 'text';
+        input.value = current === undefined || current === null ? '' : String(current);
+        control = input;
       }
-      table.append(body);
-      lines.append(table);
+      control.setAttribute('aria-label', field.label.trim() || field.key);
+      cell.replaceChildren(control);
+      control.focus();
+      if (control instanceof HTMLInputElement) control.select();
+      let committed = false;
+      const commit = (): void => {
+        if (committed) return;
+        committed = true;
+        const next = control.value;
+        if (String(next ?? '') !== String(current ?? '')) {
+          void Promise.resolve(onValueEdit(normalizeTableCellValue(field, next))).catch((error) => {
+            committed = false;
+            console.error('[Statblock Forge] Could not save Table cell:', error);
+          });
+        } else {
+          cell.replaceChildren(valueNode);
+        }
+      };
+      control.addEventListener('change', commit);
+      control.addEventListener('blur', commit);
+      control.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          control.blur();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          committed = true;
+          cell.replaceChildren(valueNode);
+          valueNode.focus();
+        }
+      });
+    };
+
+    valueNode.addEventListener('keydown', (event) => {
+      if (event.key !== 'F2') return;
+      event.preventDefault();
+      event.stopPropagation();
+      openEditor();
     });
-    wrapper.append(lines);
+    valueNode.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('.statblock-forge__dice-link')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openEditor();
+    });
+    cell.addEventListener('click', (event) => {
+      if (event.target !== cell) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openEditor();
+    });
+    return;
+  }
+
+  // Template Editor previews have an edit callback but no live statblock runtime.
+  // Keep their direct sample controls, now shared by the first and later rows.
+  if (onValueEdit && !runtime?.canEdit && isPrimitiveValue) {
+    if (field.type === 'choice' && Array.isArray(field.options)) {
+      const select = element('select', 'statblock-forge__table-sample-cell-editor') as HTMLSelectElement;
+      const currentText = current === undefined || current === null ? '' : String(current);
+      const placeholder = element('option');
+      placeholder.value = '';
+      placeholder.textContent = '—';
+      select.append(placeholder);
+      const options = field.options.filter((option): option is string => typeof option === 'string');
+      if (currentText && !options.includes(currentText)) {
+        const legacy = element('option');
+        legacy.value = currentText;
+        legacy.textContent = currentText;
+        select.append(legacy);
+      }
+      options.forEach((optionValue) => {
+        const option = element('option');
+        option.value = optionValue;
+        option.textContent = optionValue;
+        select.append(option);
+      });
+      select.value = currentText;
+      select.setAttribute('aria-label', field.label.trim() || field.key);
+      select.addEventListener('change', () => onValueEdit(select.value));
+      cell.append(select);
+    } else {
+      const input = element('input', 'statblock-forge__table-sample-cell-editor') as HTMLInputElement;
+      input.type = field.type === 'rating' ? 'number' : 'text';
+      if (field.type === 'number') input.inputMode = 'text';
+      input.value = current === undefined || current === null ? '' : String(current);
+      input.setAttribute('aria-label', field.label.trim() || field.key);
+      input.addEventListener('change', () => onValueEdit(normalizeTableCellValue(field, input.value)));
+      cell.append(input);
+    }
+    return;
+  }
+
+  if (field.type === 'number' || field.type === 'rating') {
+    const numeric = renderNumericFieldValue(field, sample, runtime, signed);
+    const formula = tableCellRollFormulas(tableCellRollText(field, sample, runtime, signed, rollable), rollable)[0];
+    const valueNode = numeric.querySelector<HTMLElement>('.statblock-forge__preview-numeric-field-value');
+    if (formula && valueNode) {
+      setForgeStatblockDiceLink(valueNode, formula);
+      valueNode.dataset.rollName = field.label.trim() || field.key;
+    }
+    cell.append(numeric);
+    return;
+  }
+  if (field.type === 'dice' || field.type === 'choice' || isInlineTextField(field)) {
+    cell.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, field, sample, runtime));
+    return;
+  }
+  const value = readablePreviewValue(current);
+  cell.append(element('span', 'statblock-forge__table-slot-value', value || '—'));
+}
+
+function renderTableFields(
+  block: ForgeBlock,
+  storageFieldKey: string,
+  sample: JsonRecord,
+  childFields: readonly ForgeField[],
+  app: App,
+  markdownComponent: Component,
+  sourcePath: string,
+  fields: readonly ForgeField[],
+  layout: ForgeLayoutDocument,
+  resolveImage?: (path: string) => string | undefined,
+  runtime?: NumericFieldRuntime,
+  onEdit?: (edit: ScoreTableEdit) => void,
+): HTMLElement {
+  const editable = Boolean(onEdit || runtime?.canEdit);
+  const wrapper = element('div', `statblock-forge__preview-scores statblock-forge__preview-table-block${editable ? ' statblock-forge__score-editor' : ''}`);
+  const currentData = (): JsonRecord => runtime?.getCurrentData() ?? sample;
+  const tableStorage = (): unknown => currentData()[storageFieldKey];
+
+  if (childFields.length === 0) {
+    const table = element('table', 'statblock-forge__preview-score-table statblock-forge__preview-table-grid');
+    const body = element('tbody');
+    const row = element('tr');
+    const message = runtime?.language === 'pt-BR'
+      ? 'Adicione Fields a esta Table para começar.'
+      : 'Add Fields to this Table to begin.';
+    row.append(markForgeUiText(element('td', 'statblock-forge__table-empty-cell', message), message));
+    body.append(row);
+    table.append(body);
+    wrapper.append(table);
     return wrapper;
   }
 
-  const table = element('table', 'statblock-forge__preview-score-table');
-  table.setAttribute('aria-label', field?.label.trim() || field?.key || 'Tabular Data');
-  const hasDerivedLabels = derived.some((column) => column.label.trim().length > 0);
-  if (grid.header && (grid.columns.some(Boolean) || hasDerivedLabels)) {
-    const head = element('thead');
-    const row = element('tr');
-    if (hasDerivedLabels) row.append(element('td', 'statblock-forge__preview-score-corner', ''));
-    if (grid.header) {
-      grid.columns.forEach((column, index) => {
-        const cell = element('th', '', column || (runtime?.language === 'pt-BR' ? `Coluna ${index + 1}` : `Column ${index + 1}`));
-        cell.scope = 'col';
+  const showColumnLabels = block.showColumnLabels !== false;
+  const showRowLabels = block.showRowLabels === true;
+  const editableRows = editable && block.allowRowAdd === true;
+  const language = runtime?.language ?? 'en';
+  const rowLabelHeader = language === 'pt-BR' ? 'Linha' : 'Row';
+  const addRowLabel = language === 'pt-BR' ? '＋ Adicionar linha' : '＋ Add row';
+  const removeRowLabel = language === 'pt-BR' ? 'Excluir linha' : 'Delete row';
+
+  const dispatchEdit = async (edit: ScoreTableEdit): Promise<void> => {
+    if (onEdit) {
+      onEdit(edit);
+      return;
+    }
+    if (!runtime?.canEdit) return;
+    if (edit.type === 'set-slot-value') {
+      const field = childFields.find((candidate) => candidate.key === edit.fieldKey);
+      await runtime.setBaseValue(edit.fieldKey, field ? normalizeTableCellValue(field, edit.value) : edit.value);
+      return;
+    }
+    const previous = tableStorage();
+    let normalizedEdit = edit;
+    if (edit.type === 'set-row-cell') {
+      const field = childFields.find((candidate) => candidate.key === edit.fieldKey);
+      if (field) normalizedEdit = { ...edit, value: normalizeTableCellValue(field, edit.value) };
+    }
+    const next = updateForgeTableRows(previous, normalizedEdit);
+    if (JSON.stringify(previous) !== JSON.stringify(next)) await runtime.setBaseValue(storageFieldKey, next);
+  };
+
+  const draw = (): void => {
+    wrapper.replaceChildren();
+    const table = element('table', `statblock-forge__preview-score-table statblock-forge__preview-table-grid${editable ? ' is-editable' : ''}${showColumnLabels ? '' : ' is-column-labels-hidden'}`);
+    table.setAttribute('aria-label', 'Table');
+    const current = currentData();
+    const stored = readForgeTableRows(current[storageFieldKey]);
+    const counterFields = childFields.filter((field) => field.type === 'counters');
+    const counterRowCount = counterFields.reduce((count, field) =>
+      Math.max(count, counterRows(valueOf(current, field.key), field)?.length ?? 0), 0);
+    const rowCount = Math.min(FORGE_TABLE_MAX_ROWS, Math.max(1 + stored.extraRows.length, counterRowCount));
+
+    if (showColumnLabels || showRowLabels || editableRows) {
+      const head = element('thead');
+      const header = element('tr');
+      if (showRowLabels) {
+        // The row-label column remains structurally present, but its header
+        // follows the same visibility setting as every other column label.
+        const th = element('th', 'statblock-forge__preview-table-row-label-heading', showColumnLabels ? rowLabelHeader : '');
+        th.scope = 'col';
+        if (!showColumnLabels) th.setAttribute('aria-label', rowLabelHeader);
+        header.append(th);
+      }
+      if (showColumnLabels) childFields.forEach((field) => {
+        const th = element('th', 'statblock-forge__preview-table-column-label', field.label.trim() || field.key);
+        th.dataset.tableColumnLabel = field.key;
+        th.scope = 'col';
+        header.append(th);
+      });
+      if (editableRows) {
+        const actionsHeading = element('th', 'statblock-forge__preview-table-row-actions-heading');
+        actionsHeading.scope = 'col';
+        // The action column keeps its structural header cell for alignment,
+        // but its visible heading follows the Table's column-label setting.
+        if (showColumnLabels) actionsHeading.textContent = language === 'pt-BR' ? 'Ações' : 'Actions';
+        header.append(actionsHeading);
+      }
+      head.append(header);
+      table.append(head);
+    }
+
+    const body = element('tbody');
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+      const row = element('tr');
+      if (showRowLabels) {
+        const labelCell = element('th', 'statblock-forge__preview-table-row-label');
+        labelCell.scope = 'row';
+        const storedLabel = forgeTableRowLabel(current[storageFieldKey], rowIndex);
+        const counterLabel = counterFields
+          .map((field) => counterRows(valueOf(current, field.key), field)?.[rowIndex]?.name.trim() ?? '')
+          .find((name) => name.length > 0) ?? '';
+        const label = storedLabel || counterLabel;
+        if (onEdit) {
+          // Template Editor previews must allow authors to configure row Labels.
+          // Live statblocks deliberately keep these labels read-only.
+          const editor = element('input', 'statblock-forge__table-row-label-editor') as HTMLInputElement;
+          editor.type = 'text';
+          editor.value = storedLabel;
+          editor.placeholder = label || `${rowLabelHeader} ${rowIndex + 1}`;
+          editor.setAttribute('aria-label', `${language === 'pt-BR' ? 'Rótulo da linha' : 'Row label'} ${rowIndex + 1}`);
+          editor.addEventListener('change', () => {
+            const value = editor.value;
+            void dispatchEdit({ type: 'set-row-label', row: rowIndex, value });
+          });
+          editor.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') editor.blur();
+          });
+          labelCell.append(editor);
+        } else {
+          labelCell.textContent = label || `${rowLabelHeader} ${rowIndex + 1}`;
+        }
+        row.append(labelCell);
+      }
+      childFields.forEach((field) => {
+        const cell = element('td');
+        // Counter Fields are row-oriented collections: their Nth configured
+        // Counter is rendered on Table row N and keeps its own shared Field value.
+        const isCounterField = field.type === 'counters';
+        const rowSample = isCounterField || rowIndex === 0
+          ? current
+          : { ...current, [field.key]: forgeTableCellValue(current[storageFieldKey], rowIndex, field.key) };
+        // Every editable row uses the same Table cell interaction and visual editor.
+        // Row zero writes the base Field; later rows write their own cell values.
+        const onValueEdit = editable
+          ? (value: unknown): Promise<void> => {
+            const edit: ScoreTableEdit = isCounterField || rowIndex === 0
+              ? { type: 'set-slot-value', fieldKey: field.key, value }
+              : { type: 'set-row-cell', row: rowIndex, fieldKey: field.key, value };
+            // Redraw after every committed edit so derived roll links always
+            // reflect the latest persisted value.
+            return dispatchEdit(edit).then(draw);
+          }
+          : undefined;
+        renderTableSlotValue(
+          cell, field, rowSample, app, markdownComponent, sourcePath, fields, layout,
+          resolveImage, runtime, block.display === 'signed', block.rollable === true, onValueEdit,
+          isCounterField ? rowIndex : undefined,
+        );
         row.append(cell);
       });
+      if (editableRows) {
+        const actionCell = element('td', 'statblock-forge__preview-table-row-actions-cell');
+        if (isForgeTableRowDeletable(rowIndex, counterRowCount, stored.extraRows.length)) {
+          const removeRow = element('button', 'statblock-forge__inline-scores-table-action', '×') as HTMLButtonElement;
+          removeRow.type = 'button';
+          removeRow.title = removeRowLabel;
+          removeRow.setAttribute('aria-label', `${removeRowLabel} ${rowIndex + 1}`);
+          removeRow.addEventListener('click', () => {
+            removeRow.disabled = true;
+            void dispatchEdit({ type: 'remove-row', row: rowIndex }).then(draw).catch((error) => {
+              removeRow.disabled = false;
+              console.error('[Statblock Forge] Could not remove Table row:', error);
+            });
+          });
+          actionCell.append(removeRow);
+        }
+        row.append(actionCell);
+      }
+      body.append(row);
     }
-    head.append(row);
-    table.append(head);
-  }
-  const body = element('tbody');
-  rows.forEach((rawRow) => {
-    const row = element('tr');
-    if (hasDerivedLabels) row.append(element('td', 'statblock-forge__preview-score-corner', ''));
-    grid.columns.forEach((_column, index) => {
-      const cell = element('td');
-      const alignment = grid.align[index];
-      if (alignment === 'center' || alignment === 'end') cell.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
-      appendRollableScoreValue(cell, signedScoreValue(rawRow[index], signed), block.rollable === true, grid.columns[index]);
-      row.append(cell);
-    });
-    body.append(row);
-  });
-  derived.forEach((column) => {
-    const row = element('tr', 'statblock-forge__preview-score-worked');
-    if (hasDerivedLabels) row.append(element('th', 'statblock-forge__preview-score-derived-label', column.label));
-    column.values.forEach((text, index) => {
-      const cell = element('td', 'statblock-forge__preview-score-derived');
-      const alignment = grid.align[index];
-      if (alignment === 'center' || alignment === 'end') cell.setCssStyles({ textAlign: alignment === 'end' ? 'right' : 'center' });
-      appendRollableScoreValue(cell, text || '—', derivedRollable, grid.columns[index]);
-      row.append(cell);
-    });
-    body.append(row);
-  });
-  table.append(body);
-  wrapper.append(table);
+    table.append(body);
+    wrapper.append(table);
+
+    if (editableRows) {
+      const actions = element('div', 'statblock-forge__table-row-actions');
+      const addRow = element('button', 'statblock-forge__inline-scores-table-action', addRowLabel) as HTMLButtonElement;
+      addRow.type = 'button';
+      addRow.disabled = rowCount >= FORGE_TABLE_MAX_ROWS;
+      addRow.addEventListener('click', () => {
+        addRow.disabled = true;
+        void dispatchEdit({ type: 'add-row', row: rowCount }).then(draw).catch((error) => {
+          addRow.disabled = false;
+          console.error('[Statblock Forge] Could not add Table row:', error);
+        });
+      });
+      actions.append(addRow);
+      wrapper.append(actions);
+    }
+  };
+
+  draw();
   return wrapper;
+}
+
+function renderScores(
+  app: App,
+  markdownComponent: Component,
+  sourcePath: string,
+  block: ForgeBlock,
+  sample: JsonRecord,
+  fields: readonly ForgeField[],
+  layout: ForgeLayoutDocument,
+  resolveImage?: (path: string) => string | undefined,
+  onEdit?: (edit: ScoreTableEdit) => void,
+  runtime?: NumericFieldRuntime,
+): HTMLElement {
+  const linkedKeys = Array.isArray(block.fields)
+    ? block.fields.filter((key): key is string => typeof key === 'string')
+    : [];
+  const childFields = [...new Set(linkedKeys)]
+    .map((key) => fields.find((candidate) => candidate.key === key))
+    .filter((candidate): candidate is ForgeField => Boolean(candidate)
+      && candidate.type !== 'pairs' && candidate.type !== 'scores');
+  const storageFieldKey = typeof block.field === 'string' ? block.field : '';
+  return renderTableFields(
+    block, storageFieldKey, sample, childFields, app, markdownComponent, sourcePath,
+    fields, layout, resolveImage, runtime, onEdit,
+  );
 }
 
 function tagItems(raw: unknown): string[] {
@@ -2611,7 +2878,10 @@ function renderTags(
     drawTagDisplay(display, block.look, tagItems(valueOf(sample, block.field)));
     wrapper.append(display);
   }
-  appendFieldCompendiumPicker(wrapper, field, layout, sample, numericRuntime, language);
+  const actions = element('div', 'statblock-forge__entry-actions');
+  appendCustomCollectionValueAction(actions, field, numericRuntime, language);
+  appendFieldCompendiumPicker(actions, field, layout, sample, numericRuntime, language);
+  if (actions.childElementCount > 0) wrapper.append(actions);
   return wrapper;
 }
 
@@ -4005,7 +4275,7 @@ function renderEntries(
   }
   const actions = element('div', 'statblock-forge__entry-actions');
   if (field?.type === 'entries' && numericRuntime?.canEdit) {
-    const add = element('button', 'statblock-forge__entry-action-button statblock-forge__entry-add-trigger', 'Custom');
+    const add = element('button', 'statblock-forge__entry-action-button statblock-forge__entry-add-trigger', language === 'pt-BR' ? 'Personalizado' : 'Custom');
     add.type = 'button';
     add.dataset.noBlockEdit = 'true';
     add.title = language === 'pt-BR'
@@ -4235,7 +4505,10 @@ function renderPairs(
     display.textContent = value || '—';
     wrapper.append(display);
   }
-  appendFieldCompendiumPicker(wrapper, field, layout, sample, runtime, language);
+  const actions = element('div', 'statblock-forge__entry-actions');
+  appendCustomCollectionValueAction(actions, field, runtime, language);
+  appendFieldCompendiumPicker(actions, field, layout, sample, runtime, language);
+  if (actions.childElementCount > 0) wrapper.append(actions);
   return wrapper;
 }
 
@@ -4469,47 +4742,15 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
 }
 
 function counterRows(raw: unknown, field: ForgeField | undefined): Array<{ name: string; max: number; used: number; remaining: number; reset: string | null; regain?: string }> | null {
-  const presetRows = Array.isArray(field?.counterRows) ? field.counterRows.filter(isRecord) : [];
-  const isEmpty = raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0);
-  const read = (item: unknown): { name: string; max: number; used: number; reset: string | null; regain?: string } | null => {
-    if (!isRecord(item) || typeof item.name !== 'string' || !Number.isInteger(item.max) || Number(item.max) < 0) return null;
-    const used = item.used === undefined ? 0 : item.used;
-    if (!Number.isInteger(used) || Number(used) < 0 || Number(used) > Number(item.max)) return null;
-    if (item.reset !== undefined && item.reset !== null && typeof item.reset !== 'string') return null;
-    if (item.regain !== undefined && item.regain !== null && typeof item.regain !== 'string') return null;
-    return {
-      name: item.name,
-      max: Number(item.max),
-      used: Number(used),
-      reset: typeof item.reset === 'string' ? item.reset : null,
-      ...(typeof item.regain === 'string' ? { regain: item.regain } : {}),
-    };
-  };
-  // Preset rows start without a per-character recovery choice, as in Atlas.
-  const presets = presetRows.map((preset) => read({ ...preset, used: 0, reset: null }));
-  if (presets.some((row) => row === null)) return null;
-  const own = isEmpty ? [] : Array.isArray(raw) ? raw.map(read) : null;
-  if (own === null || own.some((row) => row === null)) return null;
-  const rows = (own as Array<NonNullable<ReturnType<typeof read>>>).map((row) => ({ ...row }));
-  rows.forEach((row, index) => {
-    const preset = presets[index];
-    if (preset) row.name = normalizeLegacyCounterPresetName(row.name, index, preset.name);
-  });
-  const namesPreset = (row: NonNullable<ReturnType<typeof read>>): boolean => presets.some((preset) =>
-    preset !== null && preset.name.trim().toLowerCase() === row.name.trim().toLowerCase());
-  const holds = (preset: NonNullable<ReturnType<typeof read>>, index: number): boolean =>
-    rows.some((row) => row.name.trim().toLowerCase() === preset.name.trim().toLowerCase())
-    || (rows[index] !== undefined && !namesPreset(rows[index]!));
-  presets.forEach((preset, index) => {
-    if (preset && preset.max > 0 && !holds(preset, index)) rows.push({ ...preset });
-  });
+  const rows = resolveInlineCounterRows(raw, field);
+  if (!rows) return null;
   return rows.filter((row) => row.max > 0).map((row) => ({
     name: row.name,
     max: row.max,
     used: row.used,
     remaining: Math.max(0, row.max - row.used),
-    reset: row.reset,
-    ...(row.regain ? { regain: row.regain } : {}),
+    reset: typeof row.reset === 'string' ? row.reset : null,
+    ...(typeof row.regain === 'string' && row.regain ? { regain: row.regain } : {}),
   }));
 }
 
@@ -4521,6 +4762,8 @@ function renderCounters(
   layout: ForgeLayoutDocument,
   language: ForgeLanguage,
   numericRuntime?: NumericFieldRuntime,
+  onCounterValueChange?: (value: unknown) => void,
+  onlyRowIndex?: number,
 ): HTMLElement {
   const wrapper = element('div', 'statblock-forge__preview-counters atlas-sb-counters');
   const heading = visibleFieldBlockLabel(block, block.label, field, block.field, true, false);
@@ -4528,18 +4771,31 @@ function renderCounters(
   if (heading) wrapper.append(element('strong', 'statblock-forge__preview-block-heading', heading));
   const body = element('span', 'atlas-sb-counters__body');
   const cells = element('span', 'atlas-sb-counters__cells');
-  cells.setCssProps({ ['--forge-counters-per-row']: String(normalizeCountersPerRow(layout.blocks[block.id]?.countersPerRow ?? DEFAULT_COUNTERS_PER_ROW)) });
+  const countersPerRow = normalizeCountersPerRow(layout.blocks[block.id]?.countersPerRow ?? DEFAULT_COUNTERS_PER_ROW);
+  // Apply the column template inline on the grid itself. The editor Canvas and
+  // live statblock share this renderer but may sit under different stylesheet
+  // scopes; the layout must not depend on a scoped custom-property rule.
+  cells.setCssStyles({
+    display: 'grid',
+    gridTemplateColumns: `repeat(${countersPerRow}, minmax(0, 1fr))`,
+    width: '100%',
+    minWidth: '0',
+  });
   body.append(cells);
   wrapper.append(body);
   const blockMeta = layout.blocks[block.id];
   const appearance = blockMeta?.appearanceMode === 'custom' ? blockMeta.appearance ?? {} : {};
-  const isEditable = Boolean(field?.type === 'counters' && numericRuntime?.canEdit);
+  const isEditable = Boolean(field?.type === 'counters' && (numericRuntime?.canEdit || onCounterValueChange));
 
   const persistUsed = (displayedIndex: number, used: number): void => {
-    if (!field || !numericRuntime?.canEdit) return;
+    if (!field || field.type !== 'counters') return;
     const next = updateInlineCounterUsedValue(sample[field.key], field, displayedIndex, used);
     if (Object.is(next, sample[field.key])) return;
-    void numericRuntime.setBaseValue(field.key, next).catch(() => undefined);
+    if (onCounterValueChange) {
+      onCounterValueChange(next);
+      return;
+    }
+    if (numericRuntime?.canEdit) void numericRuntime.setBaseValue(field.key, next).catch(() => undefined);
   };
   const draw = (): void => {
     cells.replaceChildren();
@@ -4552,8 +4808,15 @@ function renderCounters(
       cells.append(markForgeUiText(element('span', 'statblock-forge__hint', 'Nenhum Counter configurado.'), 'Nenhum Counter configurado.'));
       return;
     }
+    const rowsToRender = onlyRowIndex === undefined
+      ? rows.map((rowData, rowIndex) => ({ rowData, rowIndex }))
+      : rows[onlyRowIndex] ? [{ rowData: rows[onlyRowIndex]!, rowIndex: onlyRowIndex }] : [];
+    if (onlyRowIndex !== undefined && rowsToRender.length === 0) {
+      cells.append(element('span', 'statblock-forge__table-slot-value', '—'));
+      return;
+    }
 
-    rows.forEach((rowData, rowIndex) => {
+    rowsToRender.forEach(({ rowData, rowIndex }) => {
       const row = element('span', 'atlas-sb-counter statblock-forge__preview-counter-row');
       const main = element('span', 'statblock-forge__preview-counter-main');
       // Each Counter occupies one grid cell: its name is the first line and
@@ -4567,13 +4830,9 @@ function renderCounters(
       main.setCssStyles({ width: '100%' });
       main.setCssStyles({ minWidth: '0' });
       main.setCssStyles({ maxWidth: '100%' });
-      // Keep the first row identifiable without reintroducing Atlas' numbered
-      // placeholder. A blank first row or the legacy “Counter 1” name becomes
-      // the neutral label “Counter”; user-defined names remain untouched.
-      const rawCounterName = rowData.name.trim();
-      const counterName = rowIndex === 0 && (!rawCounterName || /^counter\s+1$/i.test(rawCounterName))
-        ? translateForgeText('Counter', language)
-        : rawCounterName;
+      // Counter names are optional. An empty name must remain visually empty;
+      // the generic text below is used only for accessible control labels.
+      const counterName = rowData.name.trim();
       if (counterName) {
         const name = element('span', 'statblock-forge__preview-counter-name', counterName);
         name.setCssStyles({ display: 'block' });
@@ -4849,37 +5108,37 @@ function renderImage(
   return wrapper;
 }
 
-function renderSpellsDisplay(block: ForgeBlock, field: ForgeField | undefined, sample: JsonRecord, fields: readonly ForgeField[], language: ForgeLanguage = 'en', canEdit = false): HTMLElement {
+function renderGroupsDisplay(block: ForgeBlock, field: ForgeField | undefined, sample: JsonRecord, fields: readonly ForgeField[], language: ForgeLanguage = 'en', canEdit = false): HTMLElement {
   const wrapper = element('div', 'statblock-forge__preview-spells');
   const heading = visibleFieldBlockLabel(block, block.heading, field, block.field, true, false);
   if (heading) wrapper.append(element('strong', 'statblock-forge__preview-block-heading', heading));
   const nameField = headerFieldForPart(fields, 'name');
   const sourceCreatureName = readablePreviewValue(valueOf(sample, nameField?.key ?? 'name'));
   const creatureName = sourceCreatureName || translateForgeText('Creature', language);
-  const groups = spellPreviewGroups(valueOf(sample, block.field), creatureName);
+  const groups = groupPreviewGroups(valueOf(sample, block.field), creatureName);
   if (!sourceCreatureName && language === 'pt-BR') {
     for (const group of groups) {
-      if (group.header === `${creatureName} knows the following spells:`) group.header = `${creatureName} conhece as seguintes magias:`;
+      if (group.header === `${creatureName} has the following values:`) group.header = `${creatureName} possui os seguintes valores:`;
     }
   }
   if (!groups.length) {
     const emptyText = language === 'pt-BR'
-      ? (canEdit ? 'Nenhuma magia configurada. Clique para adicionar um grupo de conjuração.' : 'Nenhuma magia configurada.')
-      : (canEdit ? 'No spells configured. Click to add a spellcasting group.' : 'No spells configured.');
+      ? (canEdit ? 'Nenhum grupo configurado. Clique para adicionar um grupo.' : 'Nenhum grupo configurado.')
+      : (canEdit ? 'No groups configured. Click to add a group.' : 'No groups configured.');
     wrapper.append(markForgeUiText(element('span', 'statblock-forge__hint', emptyText), emptyText));
     return wrapper;
   }
 
-  const appendSpellLine = (list: HTMLElement, text: string, level?: string): void => {
+  const appendGroupValue = (list: HTMLElement, text: string, level?: string): void => {
     const names = splitInlineListText(text);
     const visibleNames = names.length > 0 ? names : [text];
-    for (const spellName of visibleNames) {
+    for (const valueName of visibleNames) {
       const item = element('li', 'statblock-forge__preview-spell-item');
-      item.dataset.rollName = spellName;
+      item.dataset.rollName = valueName;
       if (level) item.append(element('strong', 'statblock-forge__preview-spell-level', `${level}: `));
       const name = element('span', 'statblock-forge__preview-spell-name');
-      applyTextWithBasicMarkdown(name, spellName);
-      // Spell names may include damage/effect formulas (e.g. `Fireball (8d6)`).
+      applyTextWithBasicMarkdown(name, valueName);
+      // Group values may include damage/effect formulas (e.g. `Fireball (8d6)`).
       // Keep the roll link local so it also survives a spell editor redraw.
       linkForgeStatblockDice(name);
       item.append(name);
@@ -4891,13 +5150,13 @@ function renderSpellsDisplay(block: ForgeBlock, field: ForgeField | undefined, s
     const groupNode = element('section', 'statblock-forge__preview-spell-group');
     if (group.header) groupNode.append(element('strong', 'statblock-forge__preview-spell-header', group.header));
     if (block.look === 'tabs') {
-      const loose = group.spells.filter((spell) => !spell.level);
+      const loose = group.values.filter((spell) => !spell.level);
       if (loose.length) {
         const listNode = element('ul', 'statblock-forge__preview-spell-list');
-        loose.forEach((spell) => appendSpellLine(listNode, spell.text));
+        loose.forEach((spell) => appendGroupValue(listNode, spell.text));
         groupNode.append(listNode);
       }
-      const levels = [...new Set(group.spells.flatMap((spell) => spell.level ? [spell.level] : []))];
+      const levels = [...new Set(group.values.flatMap((spell) => spell.level ? [spell.level] : []))];
       if (levels.length) {
         const tabs = element('div', 'statblock-forge__preview-spell-tabs');
         const strip = element('div', 'statblock-forge__preview-tab-strip');
@@ -4913,7 +5172,7 @@ function renderSpellsDisplay(block: ForgeBlock, field: ForgeField | undefined, s
           const panel = element('ul', 'statblock-forge__preview-spell-list');
           panel.setAttribute('role', 'tabpanel');
           panel.hidden = index !== 0;
-          group.spells.filter((spell) => spell.level === level).forEach((spell) => appendSpellLine(panel, spell.text));
+          group.values.filter((spell) => spell.level === level).forEach((spell) => appendGroupValue(panel, spell.text));
           tabButton.addEventListener('click', () => {
             buttons.forEach((candidate) => {
               const active = candidate === tabButton;
@@ -4932,16 +5191,16 @@ function renderSpellsDisplay(block: ForgeBlock, field: ForgeField | undefined, s
       }
     } else {
       const listNode = element('ul', 'statblock-forge__preview-spell-list');
-      group.spells.forEach((spell) => appendSpellLine(listNode, spell.text, spell.level));
-      if (group.spells.length) groupNode.append(listNode);
+      group.values.forEach((spell) => appendGroupValue(listNode, spell.text, spell.level));
+      if (group.values.length) groupNode.append(listNode);
     }
     wrapper.append(groupNode);
   });
   return wrapper;
 }
 
-/** Atlas-compatible structured editor for spellcasting groups and spell levels. */
-function renderSpells(
+/** Atlas-compatible structured editor for Groups, categories and values. */
+function renderGroups(
   block: ForgeBlock,
   field: ForgeField | undefined,
   sample: JsonRecord,
@@ -4950,23 +5209,26 @@ function renderSpells(
   language: ForgeLanguage = 'en',
   runtime?: NumericFieldRuntime,
 ): HTMLElement {
-  const display = renderSpellsDisplay(block, field, sample, fields, language, runtime?.canEdit === true);
+  const display = renderGroupsDisplay(block, field, sample, fields, language, runtime?.canEdit === true);
   if (!field || field.type !== 'spells' || !runtime?.canEdit) {
     appendFieldCompendiumPicker(display, field, layout, sample, runtime, language);
     return display;
   }
 
   const slot = createInlineEditSlot('div', 'statblock-forge__preview-inline-text-field is-markdown', display, true);
-  // Keep the picker outside `display`: spell redraws replace the display's
-  // children, but the Compendium control must remain available while editing.
-  appendFieldCompendiumPicker(slot.slot, field, layout, sample, runtime, language);
+  // Keep the actions outside `display`: Groups redraws replace the display's
+  // children, but custom editing and the Compendium picker must remain available.
+  const actions = element('div', 'statblock-forge__entry-actions');
+  appendCustomCollectionValueAction(actions, field, runtime, language);
+  appendFieldCompendiumPicker(actions, field, layout, sample, runtime, language);
+  if (actions.childElementCount > 0) slot.slot.append(actions);
   const redraw = (): void => {
-    const next = renderSpellsDisplay(block, field, sample, fields, language, runtime?.canEdit === true);
+    const next = renderGroupsDisplay(block, field, sample, fields, language, runtime?.canEdit === true);
     display.replaceChildren(...Array.from(next.childNodes));
   };
 
   const pt = language === 'pt-BR';
-  const defaultLevel = pt ? 'À vontade' : 'At will';
+  const defaultLevel = pt ? 'Geral' : 'General';
   const buttonText = (node: HTMLButtonElement, text: string): HTMLButtonElement => {
     node.textContent = text;
     node.dataset.noBlockEdit = 'true';
@@ -4988,14 +5250,19 @@ function renderSpells(
 
     const layer = element('div', 'atlas-sb-pane-editor atlas-sb-value statblock-forge__spell-editor');
     const groupsRoot = element('div', 'statblock-forge__spell-editor-groups');
-    const addGroup = buttonText(element('button', 'statblock-forge__spell-editor-add'), pt ? '+ Adicionar grupo de conjuração' : '+ Add spellcasting group');
+    const addGroup = buttonText(element('button', 'statblock-forge__spell-editor-add'), pt ? '+ Adicionar grupo' : '+ Add group');
+    const editorActions = element('div', 'statblock-forge__spell-editor-actions');
+    const saveGroups = buttonText(element('button', 'statblock-forge__spell-editor-save'), pt ? 'Concluir' : 'Done');
+    saveGroups.setAttribute('aria-label', pt ? 'Salvar valores dos grupos' : 'Save Groups values');
     const error = element('span', 'statblock-forge__inline-field-editor-error');
     error.hidden = true;
-    layer.append(groupsRoot, addGroup, error);
+    editorActions.append(saveGroups);
+    layer.append(groupsRoot, addGroup, editorActions, error);
 
     let primaryControl: HTMLInputElement | null = null;
     let lastCommitted = JSON.stringify(serializeInlineSpellGroups(inlineSpellGroupsDraftValue(sample[field.key]), defaultLevel));
     let inFlight: Promise<boolean> | null = null;
+    let requireGroupValue = false;
 
     const renderGroups = (focus?: { group: number; line?: number; control: 'heading' | 'level' | 'spells' }): void => {
       groupsRoot.replaceChildren();
@@ -5004,25 +5271,25 @@ function renderSpells(
         const card = element('section', 'statblock-forge__spell-editor-group');
         const groupHead = element('div', 'statblock-forge__spell-editor-group-heading');
         const headingLabel = element('label', 'statblock-forge__spell-editor-control statblock-forge__spell-editor-heading-control');
-        headingLabel.append(makeEditorLabel(pt ? 'Grupo de conjuração' : 'Spellcasting group'));
+        headingLabel.append(makeEditorLabel(pt ? 'Nome do grupo' : 'Group name'));
         const headingInput = groupIndex === 0 && primaryControl
           ? primaryControl
           : element('input', 'atlas-sb-pane-input');
         headingInput.type = 'text';
         headingInput.value = group.heading;
-        headingInput.placeholder = pt ? 'Ex.: Conjuração inata' : 'e.g. Innate Spellcasting';
-        headingInput.setAttribute('aria-label', pt ? 'Título do grupo de conjuração' : 'Spellcasting group heading');
+        headingInput.placeholder = pt ? 'Ex.: Habilidades ofensivas' : 'e.g. Offensive abilities';
+        headingInput.setAttribute('aria-label', pt ? 'Nome do grupo' : 'Group name');
         headingInput.dataset.spellGroupIndex = String(groupIndex);
         headingInput.dataset.spellControl = 'heading';
         if (groupIndex === 0) {
           primaryControl = headingInput;
-          headingInput.oninput = () => { if (groups[0]) groups[0].heading = headingInput.value; };
+          headingInput.oninput = () => { if (groups[0]) groups[0].heading = headingInput.value; error.hidden = true; primaryControl?.removeAttribute('aria-invalid'); };
         } else {
-          headingInput.addEventListener('input', () => { group.heading = headingInput.value; });
+          headingInput.addEventListener('input', () => { group.heading = headingInput.value; error.hidden = true; primaryControl?.removeAttribute('aria-invalid'); });
         }
         headingLabel.append(headingInput);
         const removeGroup = buttonText(element('button', 'statblock-forge__spell-editor-remove'), '×');
-        removeGroup.setAttribute('aria-label', pt ? 'Remover grupo de conjuração' : 'Remove spellcasting group');
+        removeGroup.setAttribute('aria-label', pt ? 'Remover grupo' : 'Remove group');
         removeGroup.title = removeGroup.getAttribute('aria-label') ?? '';
         removeGroup.addEventListener('click', () => {
           groups.splice(groupIndex, 1);
@@ -5035,43 +5302,43 @@ function renderSpells(
         group.lines.forEach((line, lineIndex) => {
           const row = element('div', 'statblock-forge__spell-editor-line');
           const levelLabel = element('label', 'statblock-forge__spell-editor-control statblock-forge__spell-editor-level-control');
-          levelLabel.append(makeEditorLabel(pt ? 'Uso / nível' : 'Use / level'));
+          levelLabel.append(makeEditorLabel(pt ? 'Uso / categoria' : 'Use / category'));
           const levelInput = element('input', 'atlas-sb-pane-input');
           levelInput.type = 'text';
           levelInput.value = line.level;
-          levelInput.placeholder = pt ? 'Ex.: À vontade, 1º círculo, 1/dia' : 'e.g. At will, 1st level, 1/day';
-          levelInput.setAttribute('aria-label', pt ? 'Uso ou nível da magia' : 'Spell use or level');
+          levelInput.placeholder = pt ? 'Ex.: 3 usos/dia, Fase 1, Recarga 5–6' : 'e.g. 3 uses/day, Phase 1, Recharge 5–6';
+          levelInput.setAttribute('aria-label', pt ? 'Categoria ou frequência do valor' : 'Value category or frequency');
           levelInput.dataset.spellGroupIndex = String(groupIndex);
           levelInput.dataset.spellLineIndex = String(lineIndex);
           levelInput.dataset.spellControl = 'level';
-          levelInput.addEventListener('input', () => { line.level = levelInput.value; });
+          levelInput.addEventListener('input', () => { line.level = levelInput.value; error.hidden = true; primaryControl?.removeAttribute('aria-invalid'); });
           levelLabel.append(levelInput);
 
-          const spellsLabel = element('label', 'statblock-forge__spell-editor-control statblock-forge__spell-editor-names-control');
-          spellsLabel.append(makeEditorLabel(pt ? 'Magias' : 'Spells'));
-          const spellsInput = element('input', 'atlas-sb-pane-input');
-          spellsInput.type = 'text';
-          spellsInput.value = line.spells;
-          spellsInput.placeholder = pt ? 'Ex.: escudo, mísseis mágicos' : 'e.g. shield, magic missile';
-          spellsInput.setAttribute('aria-label', pt ? 'Nomes das magias, separados por vírgula' : 'Spell names, separated by commas');
-          spellsInput.dataset.spellGroupIndex = String(groupIndex);
-          spellsInput.dataset.spellLineIndex = String(lineIndex);
-          spellsInput.dataset.spellControl = 'spells';
-          spellsInput.addEventListener('input', () => { line.spells = spellsInput.value; });
-          spellsLabel.append(spellsInput);
+          const valuesLabel = element('label', 'statblock-forge__spell-editor-control statblock-forge__spell-editor-names-control');
+          valuesLabel.append(makeEditorLabel(pt ? 'Valores' : 'Values'));
+          const valuesInput = element('input', 'atlas-sb-pane-input');
+          valuesInput.type = 'text';
+          valuesInput.value = line.spells;
+          valuesInput.placeholder = pt ? 'Ex.: Furtividade, Escalada, Natação' : 'e.g. Stealth, Climbing, Swimming';
+          valuesInput.setAttribute('aria-label', pt ? 'Nomes dos valores, separados por vírgula' : 'Value names, separated by commas');
+          valuesInput.dataset.spellGroupIndex = String(groupIndex);
+          valuesInput.dataset.spellLineIndex = String(lineIndex);
+          valuesInput.dataset.spellControl = 'spells';
+          valuesInput.addEventListener('input', () => { line.spells = valuesInput.value; error.hidden = true; primaryControl?.removeAttribute('aria-invalid'); });
+          valuesLabel.append(valuesInput);
 
           const removeLine = buttonText(element('button', 'statblock-forge__spell-editor-remove'), '×');
-          removeLine.setAttribute('aria-label', pt ? 'Remover linha de magias' : 'Remove spell line');
+          removeLine.setAttribute('aria-label', pt ? 'Remover linha de valores' : 'Remove value row');
           removeLine.title = removeLine.getAttribute('aria-label') ?? '';
           removeLine.addEventListener('click', () => {
             group.lines.splice(lineIndex, 1);
             renderGroups({ group: groupIndex, control: 'heading' });
           });
-          row.append(levelLabel, spellsLabel, removeLine);
+          row.append(levelLabel, valuesLabel, removeLine);
           card.append(row);
         });
 
-        const addLine = buttonText(element('button', 'statblock-forge__spell-editor-add-line'), pt ? '+ Adicionar nível / uso' : '+ Add level / use');
+        const addLine = buttonText(element('button', 'statblock-forge__spell-editor-add-line'), pt ? '+ Adicionar categoria / uso' : '+ Add category / use');
         addLine.addEventListener('click', () => {
           group.lines.push({ level: defaultLevel, spells: '' });
           renderGroups({ group: groupIndex, line: group.lines.length - 1, control: 'spells' });
@@ -5087,9 +5354,18 @@ function renderSpells(
     };
 
     renderGroups();
+    saveGroups.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      requireGroupValue = true;
+      saveGroups.dispatchEvent(new CustomEvent('forge:finish-field', {
+        bubbles: true,
+        detail: { fieldKey: field.key },
+      }));
+    });
     addGroup.addEventListener('click', () => {
       groups.push({
-        heading: pt ? 'Conjuração adicional' : 'Additional spellcasting',
+        heading: pt ? 'Grupo adicional' : 'Additional group',
         lines: [{ level: defaultLevel, spells: '' }],
       });
       renderGroups({ group: groups.length - 1, control: 'heading' });
@@ -5098,9 +5374,17 @@ function renderSpells(
     const persist = (): Promise<boolean> => {
       if (inFlight) return inFlight.then((saved) => saved ? persist() : false);
       const nextValue = serializeInlineSpellGroups(groups, defaultLevel);
+      if (!groups.some((group) => group.lines.some((line) => line.spells.trim().length > 0))) {
+        if (!requireGroupValue) return Promise.resolve(true);
+        error.textContent = pt ? 'Adicione pelo menos um valor antes de concluir.' : 'Add at least one value before finishing.';
+        error.hidden = false;
+        primaryControl?.setAttribute('aria-invalid', 'true');
+        return Promise.resolve(false);
+      }
       const serialized = JSON.stringify(nextValue);
       if (serialized === lastCommitted) return Promise.resolve(true);
       error.hidden = true;
+      primaryControl?.removeAttribute('aria-invalid');
       inFlight = runtime.setBaseValue(field.key, nextValue).then(() => {
         lastCommitted = serialized;
         return true;
@@ -5174,11 +5458,17 @@ function renderCheckboxes(
     return wrapper;
   }
   const list = element('div', 'statblock-forge__preview-checkboxes-list');
+  const syncCheckboxInputs = (): void => {
+    for (const input of Array.from(list.querySelectorAll<HTMLInputElement>('input[data-checkbox-option-key]'))) {
+      const optionKey = input.dataset.checkboxOptionKey;
+      if (optionKey) input.checked = checkboxOptionIsEnabled(data, field, optionKey);
+    }
+  };
   for (const option of options) {
     const optionLabel = element('label', 'statblock-forge__preview-checkbox-option');
     const checkbox = element('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = checkboxOptionIsEnabled(data, field.key, option.key);
+    checkbox.checked = checkboxOptionIsEnabled(data, field, option.key);
     checkbox.dataset.checkboxFieldKey = field.key;
     checkbox.dataset.checkboxOptionKey = option.key;
     checkbox.setAttribute('aria-label', `${option.label} (${field.key}.${option.key})`);
@@ -5187,6 +5477,7 @@ function renderCheckboxes(
       const previous = data[field.key];
       const next = withCheckboxOptionValue(data, field, option.key, checkbox.checked);
       data[field.key] = next;
+      syncCheckboxInputs();
       numericRuntime?.refreshAll();
       try {
         const result = onFieldValueChange?.(field.key, next);
@@ -5194,14 +5485,14 @@ function renderCheckboxes(
           void (result as Promise<void>).catch(() => {
             if (hadPrevious) data[field.key] = previous;
             else delete data[field.key];
-            checkbox.checked = checkboxOptionIsEnabled(data, field.key, option.key);
+            syncCheckboxInputs();
             numericRuntime?.refreshAll();
           });
         }
       } catch {
         if (hadPrevious) data[field.key] = previous;
         else delete data[field.key];
-        checkbox.checked = checkboxOptionIsEnabled(data, field.key, option.key);
+        syncCheckboxInputs();
         numericRuntime?.refreshAll();
       }
     });
@@ -5295,8 +5586,8 @@ function renderLeafBlock(
       return line;
     }
     case 'stat': return renderStat(app, markdownComponent, sourcePath, block, fields, sample, layout, sourceBlocks, header, numericRuntime);
-    case 'metric': return renderMetric(block, fields, sample, layout, numericRuntime);
-    case 'scores': return renderScores(block, field, sample, onScoreTableEdit
+    case 'metric': return renderMetric(block, fields, sample, layout, numericRuntime, Boolean(onScoreTableEdit));
+    case 'scores': return renderScores(app, markdownComponent, sourcePath, block, sample, fields, layout, resolveImage, onScoreTableEdit
       ? (edit) => onScoreTableEdit(block.id, edit)
       : undefined, numericRuntime);
     case 'tags': return renderTags(block, field, sample, layout, numericRuntime, language);
@@ -5332,7 +5623,7 @@ function renderLeafBlock(
         y: Number(appearance.imagePositionY ?? 50),
       });
     }
-    case 'spells': return renderSpells(block, field, sample, fields, layout, language, numericRuntime);
+    case 'spells': return renderGroups(block, field, sample, fields, layout, language, numericRuntime);
     case 'script': return markForgeUiText(element('span', 'statblock-forge__hint', 'Bloco Script preservado; código não é executado na prévia independente.'), 'Bloco Script preservado; código não é executado na prévia independente.');
     case 'opaque': { const message = `Bloco desconhecido preservado: ${String(block.type ?? 'opaque')}.`; return markForgeUiText(element('span', 'statblock-forge__hint', message), message); }
     case 'section':
@@ -5358,7 +5649,8 @@ const ATLAS_FIT_BLOCK_TYPES = new Set(['stat', 'track', 'image']);
 
 function atlasBlockLook(block: ForgeBlock): string | undefined {
   if (['stat', 'tags', 'track'].includes(block.type) && typeof block.look === 'string') return block.look;
-  if (block.type === 'scores' && typeof block.orientation === 'string') return block.orientation;
+  // Table orientation was a legacy second presentation. Forge Tables now use
+  // the same grid presentation regardless of saved legacy orientation values.
   if (block.type === 'image' && typeof block.shape === 'string') return block.shape;
   return undefined;
 }

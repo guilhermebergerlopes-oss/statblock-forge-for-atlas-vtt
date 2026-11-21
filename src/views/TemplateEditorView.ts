@@ -7,14 +7,14 @@ import {
   createForgeLayout,
   isRecord,
   parseForgeLayout,
-  serializeTemplate,
+  serializeForgeEditorTemplate,
   type ForgeBlock,
   type ForgeField,
   type ForgeLayoutDocument,
   type ForgeTemplate,
 } from '../templates/forgeTemplate';
+import { ensureForgeContainers, isContainerDataField } from '../templates/containerEditorModel';
 import {
-  exportAtlasTemplateFile,
   saveTemplateDocument,
   TemplateNameConflictError,
   type TemplateOverwriteConfirmation,
@@ -74,7 +74,7 @@ import { UnsavedTemplateChangesModal } from './UnsavedTemplateChangesModal.ts';
 import { DestructiveActionConfirmationModal } from './DestructiveActionConfirmationModal.ts';
 import { createTemplateEditorRecoveryDraftId, type ClosedTemplateEditorDraft } from './closedTemplateEditorDraft.ts';
 import { shouldPersistTemplateEditorDraftContent, templateEditorDraftContentSnapshot } from '../templates/templateEditorDraftPersistence.ts';
-import { editScoresTable, validateScoresFieldSlotKeys } from '../templates/tableEditorModel';
+import { editScoresTable } from '../templates/tableEditorModel';
 import { validateCheckboxFieldOptions } from '../templates/checkboxFieldModel.ts';
 import { readTemplateJson, reconcileLayoutAfterJsonEdit } from '../templates/jsonEditorModel';
 import {
@@ -227,7 +227,7 @@ export class TemplateEditorView extends FileView {
   private compendiumEditingItemId: string | null = null;
   private selectedTemplateFieldKey: string | null = null;
   private addFieldFormOpen = false;
-  private addFieldCategory: ForgeFieldCategory = 'value';
+  private addFieldCategory: ForgeFieldCategory = 'values';
   private addFieldType = 'number';
   private headerFieldsOpen = false;
   private readonly propertiesDisclosureOpen = new Map<string, boolean>();
@@ -686,7 +686,7 @@ export class TemplateEditorView extends FileView {
       createTab('appearance', 'Appearance'),
     );
     secondary.append(
-      createTab('structure', 'Structure'),
+      createTab('structure', 'Data'),
       createTab('properties', 'Properties'),
     );
     navigation.append(primary, secondary);
@@ -714,13 +714,13 @@ export class TemplateEditorView extends FileView {
     const add = (value: unknown): void => {
       if (typeof value === 'string' && value.trim() && !keys.includes(value)) keys.push(value);
     };
-    add(block.field);
+    if (block.type !== 'scores') add(block.field);
     add(block.headingField);
     add(block.rollFrom);
     add(block.introField);
     if (Array.isArray(block.fields)) block.fields.forEach(add);
     if (isRecord(block.showWhen)) add(block.showWhen.field);
-    if (Array.isArray(block.columns)) {
+    if (block.type !== 'scores' && Array.isArray(block.columns)) {
       for (const column of block.columns) if (isRecord(column)) add(column.field);
     }
     return keys;
@@ -958,7 +958,7 @@ export class TemplateEditorView extends FileView {
       : ['', ''];
     let spellGroups = field.type === 'spells' ? inlineSpellGroupsDraftValue(existing?.value ?? []) : [];
     if (field.type === 'spells' && spellGroups.length === 0) {
-      spellGroups = [{ heading: '', lines: [{ level: pt ? 'À vontade' : 'At will', spells: '' }] }];
+      spellGroups = [{ heading: '', lines: [{ level: pt ? 'Geral' : 'General', spells: '' }] }];
     }
     const entryInputs: Array<{ key: string; input: HTMLInputElement | HTMLTextAreaElement }> = [];
     let description: HTMLTextAreaElement | null = null;
@@ -1009,31 +1009,31 @@ export class TemplateEditorView extends FileView {
             renderSpellGroups();
           }, true));
           groupCard.append(groupHeading);
-          const headingInput = inputText(group.heading, pt ? 'Ex.: Conjuração inata' : 'e.g. Innate Spellcasting');
+          const headingInput = inputText(group.heading, pt ? 'Ex.: Habilidades ofensivas' : 'e.g. Offensive abilities');
           headingInput.addEventListener('input', () => { group.heading = headingInput.value; });
           groupCard.append(labeledControl(pt ? 'Nome do grupo' : 'Group name', headingInput));
           const linesRoot = el('div', 'statblock-forge__compendium-spell-lines');
           group.lines.forEach((line, lineIndex) => {
             const lineCard = el('div', 'statblock-forge__compendium-spell-line');
             const lineHeading = el('div', 'statblock-forge__compendium-spell-line-heading');
-            lineHeading.append(el('span', '', `${pt ? 'Nível / uso' : 'Level / use'} ${lineIndex + 1}`));
+            lineHeading.append(el('span', '', `${pt ? 'Categoria / uso' : 'Category / use'} ${lineIndex + 1}`));
             lineHeading.append(button(pt ? 'Remover' : 'Remove', () => {
               group.lines = group.lines.filter((_item, index) => index !== lineIndex);
-              if (group.lines.length === 0) group.lines.push({ level: pt ? 'À vontade' : 'At will', spells: '' });
+              if (group.lines.length === 0) group.lines.push({ level: pt ? 'Geral' : 'General', spells: '' });
               renderSpellGroups();
             }, true));
-            const levelInput = inputText(line.level, pt ? 'Ex.: 1º círculo (3 espaços)' : 'e.g. 1st level (3 slots)');
+            const levelInput = inputText(line.level, pt ? 'Ex.: 3 usos/dia, Fase 1, Recarga 5–6' : 'e.g. 3 uses/day, Phase 1, Recharge 5–6');
             levelInput.addEventListener('input', () => { line.level = levelInput.value; });
-            const spellsInput = textareaInput(line.spells, pt ? 'Magias separadas por vírgula' : 'Comma-separated spells', 2);
+            const spellsInput = textareaInput(line.spells, pt ? 'Valores separados por vírgula' : 'Comma-separated values', 2);
             spellsInput.addEventListener('input', () => { line.spells = spellsInput.value; });
             lineCard.append(lineHeading,
-              labeledControl(pt ? 'Nível / frequência' : 'Level / frequency', levelInput),
-              labeledControl(pt ? 'Magias' : 'Spells', spellsInput));
+              labeledControl(pt ? 'Categoria / uso' : 'Category / use', levelInput),
+              labeledControl(pt ? 'Valores' : 'Values', spellsInput));
             linesRoot.append(lineCard);
           });
           groupCard.append(linesRoot);
-          groupCard.append(button(pt ? '+ Adicionar nível / uso' : '+ Add level / use', () => {
-            group.lines.push({ level: pt ? 'À vontade' : 'At will', spells: '' });
+          groupCard.append(button(pt ? '+ Adicionar categoria / uso' : '+ Add category / use', () => {
+            group.lines.push({ level: pt ? 'Geral' : 'General', spells: '' });
             renderSpellGroups();
           }, true));
           spellGroupsRoot?.append(groupCard);
@@ -1042,7 +1042,7 @@ export class TemplateEditorView extends FileView {
       renderSpellGroups();
       form.append(spellGroupsRoot);
       form.append(button(pt ? '+ Adicionar grupo' : '+ Add group', () => {
-        spellGroups.push({ heading: '', lines: [{ level: pt ? 'À vontade' : 'At will', spells: '' }] });
+        spellGroups.push({ heading: '', lines: [{ level: pt ? 'Geral' : 'General', spells: '' }] });
         renderSpellGroups();
       }, true));
     }
@@ -1093,12 +1093,12 @@ export class TemplateEditorView extends FileView {
             heading: group.heading.trim(),
             lines: group.lines.map((line) => ({ level: line.level.trim(), spells: line.spells.trim() })),
           }));
-          const serialized = serializeInlineSpellGroups(groups, pt ? 'À vontade' : 'At will');
-          if (!serialized?.length) throw new Error(pt ? 'Informe pelo menos uma magia.' : 'Enter at least one spell.');
+          const serialized = serializeInlineSpellGroups(groups, pt ? 'Geral' : 'General');
+          if (!serialized?.length) throw new Error(pt ? 'Informe pelo menos um valor.' : 'Enter at least one value.');
           value = serialized;
           const firstGroup = groups.find((group) => group.heading || group.lines.some((line) => line.spells));
           const firstLine = firstGroup?.lines.find((line) => line.spells);
-          itemName = itemName || firstGroup?.heading || firstLine?.spells.split(',')[0]?.trim() || 'Spells';
+          itemName = itemName || firstGroup?.heading || firstLine?.spells.split(',')[0]?.trim() || (pt ? 'Grupo' : 'Group');
         } else {
           throw new Error(pt ? 'Não foi possível preparar este conteúdo.' : 'Could not prepare this content.');
         }
@@ -1123,7 +1123,7 @@ export class TemplateEditorView extends FileView {
     panel.classList.add('statblock-forge__properties-panel');
     const selectedBlock = this.selectedBlockId ? findLayoutBlock(template, this.selectedBlockId) : null;
     const fieldKeys = this.fieldKeysForBlock(selectedBlock);
-    if (this.selectedTemplateFieldKey && template.fields.some((field) => field.key === this.selectedTemplateFieldKey)
+    if (this.selectedTemplateFieldKey && template.fields.some((field) => field.key === this.selectedTemplateFieldKey && field.type !== 'scores' && field.forgeInternal !== 'table-storage')
       && (this.sidebarMode === 'field' || !selectedBlock || fieldKeys.includes(this.selectedTemplateFieldKey))
       && !fieldKeys.includes(this.selectedTemplateFieldKey)) {
       fieldKeys.unshift(this.selectedTemplateFieldKey);
@@ -1346,7 +1346,6 @@ export class TemplateEditorView extends FileView {
     toolActions.append(button('Set Dice', () => { void this.openDiceSidebar(); }, true));
     if (this.file) {
       if (this.file.extension === FORGE_TEMPLATE_EXTENSION) {
-        toolActions.append(button('Exportar para Atlas', () => { void this.exportToAtlas(); }, true));
       }
     }
     tools.append(toolActions);
@@ -1623,7 +1622,7 @@ export class TemplateEditorView extends FileView {
 
   private openJsonSidebar(): void {
     if (!this.template) return;
-    this.jsonDraftText = serializeTemplate(this.template);
+    this.jsonDraftText = serializeForgeEditorTemplate(this.template);
     this.jsonAppliedText = this.jsonDraftText;
     this.jsonStatus = '';
     this.setSidebarMode('json');
@@ -1675,7 +1674,7 @@ export class TemplateEditorView extends FileView {
       }
     }
 
-    const canonical = serializeTemplate(nextTemplate);
+    const canonical = serializeForgeEditorTemplate(nextTemplate);
     this.jsonDraftText = canonical;
     this.jsonAppliedText = canonical;
     const notices = [...reading.warnings];
@@ -1700,7 +1699,7 @@ export class TemplateEditorView extends FileView {
 
   private renderJsonSidebar(): HTMLElement {
     const template = this.template as ForgeTemplate;
-    const panel = section('Edit JSON', 'Edit the native Atlas template JSON. Typing does not refresh the preview; select Apply JSON when ready.');
+    const panel = section('Edit JSON', 'Edit the Forge Template JSON. Field types use the reorganized Forge IDs; Apply JSON normalizes them for the editor and Forge JSON save. Typing does not refresh the preview.');
     panel.classList.add('statblock-forge__json-panel');
     const header = el('div', 'statblock-forge__json-header');
     const heading = panel.querySelector<HTMLElement>('.statblock-forge__panel-title');
@@ -1708,7 +1707,7 @@ export class TemplateEditorView extends FileView {
       panel.prepend(header);
       header.append(heading);
     }
-    const canonical = serializeTemplate(template);
+    const canonical = serializeForgeEditorTemplate(template);
     if (this.jsonDraftText === null || this.jsonDraftText === this.jsonAppliedText) {
       this.jsonDraftText = canonical;
       this.jsonAppliedText = canonical;
@@ -1720,7 +1719,7 @@ export class TemplateEditorView extends FileView {
       ? 'Buscar palavras no JSON' : 'Search words in JSON';
     search.setAttribute('aria-label', search.placeholder);
 
-    const editor = textareaInput(this.jsonDraftText, 'Atlas template JSON', 24);
+    const editor = textareaInput(this.jsonDraftText, 'Forge template JSON', 24);
     editor.classList.add('statblock-forge__json-editor');
     editor.spellcheck = false;
     editor.setAttribute('autocapitalize', 'off');
@@ -1847,7 +1846,7 @@ export class TemplateEditorView extends FileView {
     actions.append(button('Reset draft', () => {
       const language = normalizeForgeLanguage(this.plugin.settings.language);
       new DestructiveActionConfirmationModal(this.app, language, 'JSON draft', () => {
-        const fresh = serializeTemplate(this.template as ForgeTemplate);
+        const fresh = serializeForgeEditorTemplate(this.template as ForgeTemplate);
         this.jsonDraftText = fresh;
         this.jsonAppliedText = fresh;
         this.jsonStatus = '';
@@ -2107,7 +2106,7 @@ export class TemplateEditorView extends FileView {
         most.addEventListener('change', () => update({ most: most.value === '' ? undefined : most.valueAsNumber } as Partial<RecoveryRule>));
         card.append(labeledControl('Maximum spent (optional)', most));
       }
-      if (fieldOptions.length === 0) card.append(el('small', 'statblock-forge__warning', 'Add a Counters field, a tracked Number field, or use a field read by a Resource in the Atlas collection.'));
+      if (fieldOptions.length === 0) card.append(el('small', 'statblock-forge__warning', 'Add a Counter field, a tracked Number field, or use a field read by a Resource in the Atlas collection.'));
       return card;
     };
 
@@ -2685,6 +2684,7 @@ export class TemplateEditorView extends FileView {
       getDisclosureOpen: (key: string) => this.propertiesDisclosureOpen.get(key) ?? false,
       setDisclosureOpen: (key: string, open: boolean) => this.propertiesDisclosureOpen.set(key, open),
       setTemplate: (next: ForgeTemplate) => { this.template = next; },
+      renderFieldCard: (field: ForgeField, showRemoveButton = false) => this.renderFieldCard(field, showRemoveButton),
     };
     renderScoresBlockInspector(blockInspectorContext, panel);
     renderMetricBlockInspector(blockInspectorContext, panel);
@@ -2738,10 +2738,11 @@ export class TemplateEditorView extends FileView {
         this.blockAppearanceSectionsOpen.set(block.id, { ...current, [section]: open });
       },
     }));
-    const deleteBlock = button('Delete', () => this.removeSelectedBlocks([block.id]), true);
+    const deleteBlockLabel = translateForgeText('Delete Block', inspectorLanguage);
+    const deleteBlock = button(deleteBlockLabel, () => this.removeSelectedBlocks([block.id]), true);
     deleteBlock.classList.add('is-danger', 'statblock-forge__block-delete-button', 'statblock-forge__property-delete-button');
-    deleteBlock.title = `Delete block: ${blockLabel(block, template.fields)}`;
-    deleteBlock.setAttribute('aria-label', `Delete block: ${blockLabel(block, template.fields)}`);
+    deleteBlock.title = `${deleteBlockLabel}: ${blockLabel(block, template.fields)}`;
+    deleteBlock.setAttribute('aria-label', `${deleteBlockLabel}: ${blockLabel(block, template.fields)}`);
     panel.append(deleteBlock);
     return panel;
   }
@@ -2766,7 +2767,8 @@ export class TemplateEditorView extends FileView {
     const template = this.template as ForgeTemplate;
     const language = normalizeForgeLanguage(this.plugin.settings.language);
     const panel = section('Fields', 'Drag the handle to reorder Fields; drag a Field name onto the canvas to place it.');
-    const fields = templateFields(template);
+    if (this.layout) ensureForgeContainers(template, this.layout);
+    const fields = templateFields(template).filter((field) => !this.layout || !isContainerDataField(this.layout, field.key));
     const customField = el('details', 'statblock-forge__field-definitions statblock-forge__add-field-disclosure');
     customField.open = this.addFieldFormOpen;
     customField.addEventListener('toggle', () => { this.addFieldFormOpen = customField.open; });
@@ -2816,14 +2818,10 @@ export class TemplateEditorView extends FileView {
       chip.draggable = true;
       chip.dataset.fieldKey = field.key;
       chip.append(el('span', 'statblock-forge__field-chip-name statblock-forge__user-content', field.label.trim() || field.key));
-      // In the Structure palette, a tabular Field is shown as the Table
-      // element users can place on the Canvas. Its data type stays Tabular
-      // Data in the Properties inspector.
-      const fieldKind = this.layout?.fieldKinds?.[field.key] ?? field.type;
-      const structureFieldTypeLabel = field.type === 'scores' || fieldKind === 'table'
-        ? 'Table'
-        : fieldTypeLabel(field.type);
-      chip.append(el('small', 'statblock-forge__field-chip-type', translateForgeText(structureFieldTypeLabel, language)));
+      // The palette labels a Field by its real value type. Legacy saved
+      // categories such as `table` are normalized by the Field editor and
+      // must never make an ordinary Field appear to be a Table Block.
+      chip.append(el('small', 'statblock-forge__field-chip-type', translateForgeText(fieldTypeLabel(field.type), language)));
       const isPlaced = template.layout.blocks.some((block) => this.treeUsesField(block, field.key));
       if (isPlaced) chip.classList.add('is-placed');
       const isSelected = this.selectedTemplateFieldKey === field.key;
@@ -2867,8 +2865,9 @@ export class TemplateEditorView extends FileView {
       });
       const removeField = button('×', () => this.removeField(field.key), true);
       removeField.classList.add('statblock-forge__field-delete-button', 'statblock-forge__destructive-icon-button', 'is-danger');
-      removeField.title = `Delete Field: ${field.label.trim() || field.key}`;
-      removeField.setAttribute('aria-label', `Delete Field: ${field.label.trim() || field.key}`);
+      const removeFieldLabel = translateForgeText('Remove Field', language);
+      removeField.title = `${removeFieldLabel}: ${field.label.trim() || field.key}`;
+      removeField.setAttribute('aria-label', `${removeFieldLabel}: ${field.label.trim() || field.key}`);
       removeField.addEventListener('click', (event) => event.stopPropagation());
       row.append(handle, chip, removeField);
       chips.append(row);
@@ -2898,7 +2897,7 @@ export class TemplateEditorView extends FileView {
   private renderSelectedTemplateFieldProperties(field: ForgeField): HTMLElement {
     const content = el('div', 'statblock-forge__properties-content statblock-forge__field-properties-content');
     content.append(this.renderFieldCard(field, false));
-    const remove = button('Remover', () => this.removeField(field.key), true);
+    const remove = button(translateForgeText('Remove Field', normalizeForgeLanguage(this.plugin.settings.language)), () => this.removeField(field.key), true);
     remove.classList.add('statblock-forge__field-remove', 'statblock-forge__property-delete-button', 'is-danger');
     content.append(remove);
     return content;
@@ -3043,7 +3042,13 @@ export class TemplateEditorView extends FileView {
         // Template samples may contain Vault-root paths, encoded spaces,
         // wiki links or Markdown image references depending on their origin.
         resolveImage,
-        onScoreTableEdit: (blockId, edit) => { if (editScoresTable(template, blockId, edit)) this.render(); },
+        onScoreTableEdit: (blockId, edit) => {
+          try {
+            if (editScoresTable(template, blockId, edit)) this.render();
+          } catch (error) {
+            this.showNotice(error instanceof Error ? error.message : String(error));
+          }
+        },
         onImageFieldAction: (fieldKey, socket) => this.openImageSampleActions(template, fieldKey, socket),
         onImageBlockSelect: (blockId) => {
           this.selectedBlockId = blockId;
@@ -3667,11 +3672,47 @@ export class TemplateEditorView extends FileView {
 
   private performRemoveSelectedBlocks(selectedIds: readonly string[]): void {
     if (!this.template || !this.layout) return;
+    const tableDataFields = new Set<string>();
+    const collectTableDataFields = (block: ForgeBlock): void => {
+      if (block.type === 'scores' && typeof block.field === 'string' && block.field) {
+        tableDataFields.add(block.field);
+      }
+      if (Array.isArray(block.blocks)) {
+        block.blocks.filter(isRecord).forEach((child) => collectTableDataFields(child as ForgeBlock));
+      }
+    };
     let removedCount = 0;
     for (const id of selectedIds) {
-      if (removeLayoutBlock(this.template, this.layout, id)) removedCount += 1;
+      const removed = removeLayoutBlock(this.template, this.layout, id);
+      if (!removed) continue;
+      removedCount += 1;
+      collectTableDataFields(removed);
     }
     if (removedCount === 0) return;
+
+    const remainingTableDataFields = new Set<string>();
+    const collectRemainingTableDataFields = (blocks: ForgeBlock[]): void => {
+      for (const block of blocks) {
+        if (block.type === 'scores' && typeof block.field === 'string' && block.field) {
+          remainingTableDataFields.add(block.field);
+        }
+        if (Array.isArray(block.blocks)) collectRemainingTableDataFields(block.blocks.filter(isRecord) as ForgeBlock[]);
+      }
+    };
+    collectRemainingTableDataFields(this.template.layout.blocks);
+    for (const fieldKey of tableDataFields) {
+      if (remainingTableDataFields.has(fieldKey)) continue;
+      try {
+        removeTemplateField(this.template, fieldKey);
+        removeFieldCompendium(this.layout, fieldKey);
+        if (this.layout.fieldKinds) delete this.layout.fieldKinds[fieldKey];
+      } catch (error) {
+        // Keep an unbound backing Field rather than losing dependent data if a
+        // legacy template has explicitly referenced this internal storage key.
+        this.showNotice(error instanceof Error ? error.message : String(error));
+      }
+    }
+
     for (const [tabsId, activeTabId] of this.activeTabsById) {
       if (!findLayoutBlock(this.template, activeTabId)) this.activeTabsById.delete(tabsId);
     }
@@ -3790,16 +3831,14 @@ export class TemplateEditorView extends FileView {
       const issues = validateTemplateFields(template);
       const partIssues = validateAbilityParts(template.fields);
       const checkboxIssues = validateCheckboxFieldOptions(template.fields);
-      const slotKeyIssues = validateScoresFieldSlotKeys(template.fields);
       const recoveryIssues = validateRecoveryButtons(recoveryButtonsForEditing(template));
       const layoutIssues = validateLayoutDocument(template, layout);
-      if (issues.length > 0 || partIssues.length > 0 || checkboxIssues.length > 0 || slotKeyIssues.length > 0
+      if (issues.length > 0 || partIssues.length > 0 || checkboxIssues.length > 0
         || recoveryIssues.length > 0 || layoutIssues.length > 0) {
         const messages = [
           ...issues.map((issue) => issue.message),
           ...partIssues.map((issue) => issue.message),
           ...checkboxIssues.map((issue) => issue.message),
-          ...slotKeyIssues.map((issue) => issue.message),
           ...recoveryIssues.map((issue) => issue.message),
           ...layoutIssues.map((issue) => issue.message),
         ];
@@ -3855,41 +3894,14 @@ export class TemplateEditorView extends FileView {
         this.render();
       }
       if (wasRecoveryDraft) this.plugin.continueEditorDraftRecovery();
-      this.showNotice(result.sidecarWarning
-        ? `Template salvo. Atenção: ${result.sidecarWarning}`
-        : result.createdCopy
-          ? `Novo template salvo: ${savedAbstract.name}`
-          : `Template atualizado: ${savedAbstract.name}`);
+      this.showNotice(result.createdCopy
+        ? `Novo template salvo: ${savedAbstract.name}`
+        : `Template atualizado: ${savedAbstract.name}`);
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     } finally {
       this.saving = false;
-    }
-  }
-
-  private async exportToAtlas(): Promise<void> {
-    if (!this.template || this.file?.extension !== FORGE_TEMPLATE_EXTENSION) return;
-    if (this.jsonDraftText !== null && this.jsonDraftText !== this.jsonAppliedText && !this.applyJsonDraft()) return;
-    try {
-      const result = await exportAtlasTemplateFile({
-        storage: createTemplateVaultStorage(this.app),
-        templateFolder: this.plugin.settings.templateFolder,
-        name: this.displayName,
-        template: cloneJson(this.template),
-        layout: cloneJson(this.layout),
-      });
-      this.plugin.refreshOpenViews();
-      const compatibilityWarnings = result.compatibilityReport.issues
-        .filter((issue) => issue.severity === 'warning')
-        .map((issue) => issue.message);
-      const warningText = compatibilityWarnings.length > 0
-        ? ` Avisos de compatibilidade: ${compatibilityWarnings.join(' ')}`
-        : ' Os tipos de campos e Ability Parts foram reconhecidos pelo formato Atlas verificado.';
-      this.showNotice(`Exportação concluída: ${result.file.path}. Grid, Dense e aparência exclusivos do Forge não são transferidos para o Atlas.${warningText}`, 12000);
-    } catch (error) {
-      console.error('Statblock Forge: falha ao exportar para Atlas.', error);
-      this.showNotice(`Statblock Forge: falha ao exportar para Atlas: ${error instanceof Error ? error.message : String(error)}`, 8000);
     }
   }
 

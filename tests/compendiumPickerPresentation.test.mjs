@@ -6,7 +6,7 @@ const source = await readFile(new URL('../src/render/statblockPreviewRenderer.ts
 
 test('Entries actions use the concise Custom and Compendium labels', () => {
   assert.match(source, /const trigger = element\('button', 'statblock-forge__entry-action-button', 'Compendium'\)/);
-  assert.match(source, /const add = element\('button', 'statblock-forge__entry-action-button statblock-forge__entry-add-trigger', 'Custom'\)/);
+  assert.match(source, /const add = element\('button', 'statblock-forge__entry-action-button statblock-forge__entry-add-trigger', language === 'pt-BR' \? 'Personalizado' : 'Custom'\)/);
   assert.doesNotMatch(source, /\+ Custom ability|\+ Habilidade customizada|\+ Add from\.\.\.|\+ Adicionar de\.\.\./);
 });
 
@@ -76,4 +76,33 @@ test('Compendium create and edit form is rendered above the existing item list',
   assert.ok(headerAppend >= 0, 'Compendium heading should be rendered');
   assert.ok(formRender > headerAppend, 'create/edit form should follow the Compendium heading');
   assert.ok(itemListRender > formRender, 'create/edit form should appear before the existing item list');
+});
+
+
+test('every editable Collection exposes a statblock-only Custom action', async () => {
+  assert.match(source, /function appendCustomCollectionValueAction\([\s\S]*?isCollectionFieldType\(field\.type\) \|\| field\.type === 'entries'/);
+  assert.match(source, /case 'tags': return renderTags\([\s\S]*?case 'pairs': return renderPairs\([\s\S]*?case 'spells': return renderGroups\(/);
+  assert.match(source, /appendCustomCollectionValueAction\(actions, field, numericRuntime, language\)/);
+  assert.match(source, /appendCustomCollectionValueAction\(actions, field, runtime, language\)/);
+  assert.match(source, /card\.addEventListener\('forge:edit-field',[\s\S]*?\}, true\)/);
+  assert.match(source, /void schedule\(\(\) => openRegion\(region, fieldKey\)\)/);
+  assert.match(source, /if \(field\?\.type === 'entries' && numericRuntime\?\.canEdit\)/);
+});
+
+test('Groups replaces the old Spells label in Field and block selectors', async () => {
+  const toolbar = await readFile(new URL('../src/views/templateCanvasToolbar.ts', import.meta.url), 'utf8');
+  const layout = await readFile(new URL('../src/templates/layoutEditorModel.ts', import.meta.url), 'utf8');
+  assert.match(toolbar, /spells: 'Groups'/);
+  assert.match(layout, /value: 'spells', label: 'Groups'/);
+  assert.doesNotMatch(toolbar, /spells: 'Spells'/);
+  assert.doesNotMatch(layout, /label: 'Spells'/);
+});
+
+test('Groups editors use neutral value/category placeholders rather than spell terminology', async () => {
+  const templateEditor = await readFile(new URL('../src/views/TemplateEditorView.ts', import.meta.url), 'utf8');
+  const help = await readFile(new URL('../src/views/componentHelp.ts', import.meta.url), 'utf8');
+  assert.match(templateEditor, /e\.g\. 3 uses\/day, Phase 1, Recharge 5–6/);
+  assert.match(templateEditor, /Comma-separated values/);
+  assert.doesNotMatch(templateEditor, /1st level \(3 slots\)|1º círculo \(3 espaços\)|Comma-separated spells|Magias separadas por vírgula/);
+  assert.doesNotMatch(help, /5th-level spellcaster|Magic missile|Cantrips|Mísseis mágicos/);
 });

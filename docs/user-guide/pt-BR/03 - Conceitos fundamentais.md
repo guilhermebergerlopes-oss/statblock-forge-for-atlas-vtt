@@ -44,6 +44,8 @@ O `type` determina quais valores e opções fazem sentido. Por exemplo, `number`
 
 Veja [[05 - Fields]] para o catálogo completo de tipos.
 
+Os arquivos Forge usam `inline`, `selection`, `counter` e `groups`; IDs anteriores (`text`, `choice`, `counters` e `spells`) continuam sendo aceitos na leitura. Na importação de `.atlastemplate`, os IDs nativos do Atlas são convertidos para os identificadores atuais do Forge.
+
 ## Value
 
 Um **Value** é o conteúdo de um Field em uma ficha específica. Se o Template declara `might` como Number, cada statblock que utiliza o Template pode ter seu próprio Value de `might`.
@@ -93,44 +95,43 @@ Ao adicionar/arrastar um Field para o Canvas, o Forge utiliza um tipo de bloco p
 
 | Tipo de Field | Bloco padrão | Uso típico |
 |---|---|---|
-| `text`, `number`, `rating`, `dice`, `choice` | `Stat` | Um valor individual, como tipo, atributo, nível, HP ou fórmula de dados. |
+| `inline`, `number`, `rating`, `dice`, `selection` | `Stat` | Um valor individual, como tipo, atributo, nível, HP ou fórmula de dados. |
 | `markdown` | `Text` | Descrição com conteúdo Markdown. |
 | `list` | `Tags` | Lista compacta de tags ou palavras-chave. |
-| `scores` | `Scores` | Tabela de valores organizados por colunas. |
+| `scores` | Armazenamento interno de `Table` | Dados de linhas/colunas mantidos no formato nativo do Atlas; não é criado como Field comum. |
 | `entries` | `Entries` | Coleção de habilidades/entradas nomeadas. |
 | `pairs` | `Pairs` | Pares de chave e valor. |
 | `image` | `Image` | Imagem vinculada ao Vault. |
-| `spells` | `Spells` | Coleção de grupos/entradas de magia. |
-| `counters` | `Counters` | Linhas com usos, máximo e recuperação. |
+| `groups` | `Groups` | Coleção de grupos/entradas de magia (antigo rótulo Spells). |
+| `counter` | `Counter` | Linhas com usos, máximo e recuperação. |
 | `checkboxes` | `Checkboxes` | Opções marcáveis. |
 
 Esse é o mapeamento de criação inicial, não uma promessa de que todo Field só possa aparecer em um lugar ou de que todo bloco seja compatível com qualquer tipo. O inspetor filtra as opções quando um bloco exige um tipo específico. Consulte [[05 - Fields]] e as notas de blocos para as regras detalhadas.
 
-### Outros blocos de apresentação
+### Outros blocos e Containers de dados
 
-O Canvas também oferece blocos que não correspondem a um único Field:
+O Canvas também oferece blocos e Containers que não correspondem a um único Field:
 
 | Bloco | Quando usar | Exemplo |
 |---|---|---|
 | `Title` | Dar hierarquia de título a um Field elegível | Nome da criatura como título. |
-| `Metric` | Exibir vários Fields numéricos como métricas alinhadas | HP, AC e Speed lado a lado. |
 | `Line` | Apresentar vários Fields como uma linha de informações | `Size · Type · Alignment`. |
 | `Track` | Mostrar um Number com estado atual/máximo | HP, mana ou energia acompanhados por caixas/barra. |
 | `Heading` | Inserir um título estático de seção | `Defenses`. |
 | `Text` sem Field | Escrever texto estático | Uma nota de regra ou legenda. |
 | `Divider` / `Vertical divider` | Separar visualmente conteúdo | Separador entre grupos. |
 
-`Metric` e `Line` podem referenciar mais de um Field. `Track` usa um Field Number e configurações de tracking. As regras específicas estão nas notas de layout, Fields e Counters.
+`Line` pode referenciar mais de um Field. `Track` usa um Field Number e configurações de tracking. `Metric` é um Container de dados que reúne Fields escalares (`inline`, `number`, `rating`, `dice` e `selection`); `Table` é um Container de dados que reúne Fields compatíveis; Pairs continua sendo uma Collection independente. O armazenamento `scores` é interno. Consulte [[10 - Containers: visão geral]].
 
 ## Container
 
-Um **container** é um bloco estrutural que organiza outros blocos. No Forge, os containers principais são:
+Um **Container** organiza Fields ou elementos do layout. O Forge possui Containers estruturais e de dados.
 
-- **Section:** grupo com conteúdo organizado em uma Grid interna; pode ter título e comportamento de recolhimento conforme a configuração disponível.
-- **Row:** organiza blocos horizontalmente em uma linha flexível; os filhos são distribuídos e podem quebrar para linhas seguintes quando não cabem.
-- **Tabs:** apresenta conteúdo em abas; cada aba é estruturada por Sections/blocos internos.
+- **Section, Row e Tabs:** Containers estruturais que organizam elementos do layout.
+- **Metric:** Container de dados para Fields escalares compatíveis.
+- **Table:** Container de dados para Fields compatíveis, exceto Pairs, com armazenamento `scores` gerenciado internamente. Pairs continua sendo uma Collection independente.
 
-Containers não armazenam Values por si só. Eles controlam a organização dos blocos descendentes. Consulte [[10 - Containers: visão geral]], [[11 - Section]], [[12 - Row]] e [[13 - Tabs]].
+Metric e Table não são tipos de Field nem blocos comuns. Eles organizam Fields-filhos e sua apresentação; os dados dos Fields continuam sendo a fonte dos Values. Consulte [[10 - Containers: visão geral]] e as notas de layout.
 
 ## Statblock
 

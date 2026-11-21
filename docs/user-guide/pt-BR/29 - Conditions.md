@@ -56,7 +56,7 @@ O Forge não:
 - executa regras de Rest para aumentar, reduzir ou limpar Conditions;
 - sincroniza IDs de Conditions do Forge com IDs de Conditions do Atlas.
 
-O Forge continua compatível com o fluxo de statblocks e Tokens do Atlas. Depois que uma nota é publicada e vinculada a um Token, as Conditions desse Token são gerenciadas pelo Atlas, independentemente dos Fields e Values do statblock.
+O Forge continua compatível com o fluxo de statblocks e Tokens do Atlas. Depois que uma nota compatível é vinculada a um Token, as Conditions desse Token são gerenciadas pelo Atlas, independentemente dos Fields e Values do statblock.
 
 ## Dados antigos de Conditions do Forge
 

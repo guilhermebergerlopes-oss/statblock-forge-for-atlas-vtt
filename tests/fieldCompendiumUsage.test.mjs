@@ -60,7 +60,7 @@ test('older source markers without snapshots are released when their content cha
 
 
 test('Compendium source snapshots survive Atlas Counter projection and restoration', async () => {
-  const { projectForgeStatblockDataForAtlas, restoreForgeStatblockDataFromAtlas } = await import('../src/atlas/atlasTemplateAdapter.ts');
+  const { projectForgeStatblockDataForLegacyNote, restoreForgeStatblockDataFromLegacyNote } = await import('../src/atlas/atlasTemplateAdapter.ts');
   const counterField = {
     key: 'abilities',
     label: 'Abilities',
@@ -74,8 +74,8 @@ test('Compendium source snapshots survive Atlas Counter projection and restorati
   const template = { id: 'counter-template', fields: [counterField] };
   const item = { id: 'uses-item', value: { name: 'Bite', desc: 'Damage', uses: [true, false, false] } };
   const inserted = appendFieldCompendiumItemValue('entries', [], item.value, item.id);
-  const atlasProjection = projectForgeStatblockDataForAtlas(template, { abilities: inserted });
-  const restored = restoreForgeStatblockDataFromAtlas(template, atlasProjection.data);
+  const atlasProjection = projectForgeStatblockDataForLegacyNote(template, { abilities: inserted });
+  const restored = restoreForgeStatblockDataFromLegacyNote(template, atlasProjection.data);
 
   assert.equal(restored.abilities[0][FORGE_COMPENDIUM_ITEM_SOURCE_KEY], item.id);
   assert.equal(restored.abilities[0][FORGE_COMPENDIUM_ITEM_SNAPSHOT_KEY], inserted[0][FORGE_COMPENDIUM_ITEM_SNAPSHOT_KEY]);

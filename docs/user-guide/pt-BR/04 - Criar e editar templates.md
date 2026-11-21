@@ -11,7 +11,7 @@ parte: 1
 
 # Criar e editar templates
 
-Esta nota acompanha o fluxo de criação, edição, salvamento e manutenção de um Template. O princípio mais importante é: **defina primeiro os Fields; depois associe-os aos blocos do Canvas**. Criar um Field não adiciona automaticamente um bloco ao layout.
+Esta nota acompanha o fluxo de criação, edição, salvamento e manutenção de um Template. O princípio mais importante é: **defina os Fields e depois organize-os em blocos ou Containers no Canvas**. Metric e Table são Containers de dados: os Fields são colocados dentro deles, não convertidos em novos tipos de Field.
 
 ## Criar um Template novo
 
@@ -19,18 +19,18 @@ Esta nota acompanha o fluxo de criação, edição, salvamento e manutenção de
 2. O Forge abre um editor com um Template inicial ainda não salvo.
 3. Revise os Fields de cabeçalho reservados.
 4. Adicione os Fields específicos do seu sistema.
-5. Associe Fields a blocos e organize-os no Canvas.
-6. Ajuste containers, tamanho e aparência.
+5. Associe Fields a blocos comuns ou coloque-os dentro de Containers de dados.
+6. Use **Add Container** para criar Section, Row, Tabs, Metric ou Table; ajuste tamanho e aparência.
 7. Use Save para dar um nome ao Template e gravar o arquivo.
 
 O Template inicial contém os Fields de cabeçalho convencionais:
 
 | Key padrão | Label inicial | Type | Função comum |
 |---|---|---|---|
-| `name` | Name | `text` | Nome exibido no cabeçalho. |
+| `name` | Name | `inline` | Nome exibido no cabeçalho. |
 | `image` | Token art | `image` | Arte do Token no cabeçalho. |
 | `level` | Level | `rating` | Nível/classificação do statblock. |
-| `type` | Type | `text` | Tipo da criatura/personagem. |
+| `type` | Type | `inline` | Tipo da criatura/personagem. |
 | `hp` | HP | `number` | Hit Points. |
 | `description` | Description | `markdown` | Descrição. |
 
@@ -56,16 +56,16 @@ O editor reúne três áreas de trabalho principais:
 
 O **Canvas** é a representação visual do layout. Nele você pode adicionar, arrastar, selecionar e redimensionar blocos, além de organizar containers. O Canvas não é o lugar onde os Values de cada criatura são armazenados; ele configura como os dados serão apresentados.
 
-### Structure
+### Data
 
-A aba **Structure** apresenta a árvore dos blocos e containers. Use-a para selecionar elementos que estejam aninhados, localizar blocos pelo nome e entender a hierarquia. Selecionar um container permite acessar seus filhos e reorganizar a estrutura.
+A aba **Data** apresenta a árvore dos blocos e containers. Use-a para selecionar elementos que estejam aninhados, localizar blocos pelo nome e entender a hierarquia. Selecionar um container permite acessar seus filhos e reorganizar a estrutura.
 
 ### Properties
 
 A aba **Properties** mostra as configurações do elemento selecionado. Os controles dependem do tipo:
 
 - bloco ligado a Field: Field, apresentação e propriedades específicas;
-- `Metric` e `Line`: conjunto/ordem de Fields e opções de apresentação;
+- `Metric Container`: ordem dos Fields-filhos e opções de apresentação; `Line`: conjunto/ordem de Fields e opções de apresentação;
 - `Section`, `Row` e `Tabs`: propriedades estruturais;
 - aparência: modo de herança, cor, borda, alinhamento, padding e outros estilos;
 - permissões: controles de acesso quando aplicáveis.
@@ -79,7 +79,7 @@ Na área **Fields**, adicione um Field e configure:
 1. **Label:** texto legível apresentado na interface.
 2. **Key:** identificador usado no JSON e pelas referências internas.
 3. **Type:** tipo de dado; determina os controles e opções disponíveis.
-4. **Opções específicas:** por exemplo, unidade e fórmula para Number/Rating, opções de Choice/Checkboxes, colunas de Scores, estrutura de Entries ou configuração de Dice Formula.
+4. **Opções específicas:** por exemplo, unidade e fórmula para Number/Rating, opções de Choice/Checkboxes, configurações de armazenamento/colunas da Table, estrutura de Entries ou configuração de Dice Formula.
 
 O Forge valida keys duplicadas e identificadores inválidos. Uma key deve começar com letra e pode conter letras, números, `_` e `-`, com até 40 caracteres. Keys são comparadas sem diferenciar maiúsculas/minúsculas. `formerKeys` preserva aliases antigos reconhecidos em migrações; não use keys antigas como novas keys de outro Field.
 
@@ -90,18 +90,18 @@ O Forge valida keys duplicadas e identificadores inválidos. Uma key deve começ
 
 O Forge escolhe um bloco padrão compatível quando um Field é arrastado ao Canvas. Exemplos:
 
-- `number`, `rating`, `text`, `choice` e `dice` normalmente começam em `Stat`;
+- `number`, `rating`, `inline`, `selection` e `dice` normalmente começam em `Stat`;
 - `markdown` começa em `Text`;
 - `list` começa em `Tags`;
-- `scores` começa em `Scores`;
+- `scores` é gerenciado internamente pelo Container `Table`; não crie esse tipo como Field comum;
 - `entries` começa em `Entries`;
 - `pairs` começa em `Pairs`;
 - `image` começa em `Image`;
-- `spells` começa em `Spells`;
-- `counters` começa em `Counters`;
+- `groups` aparece como `Groups`;
+- `counter` começa em `Counter`;
 - `checkboxes` começa em `Checkboxes`.
 
-Outros blocos — como `Title`, `Metric`, `Line` e `Track` — atendem a apresentações específicas e não equivalem a um Field novo. Um mesmo Field pode ser apresentado em diferentes lugares quando a estrutura e as opções do bloco permitem. Para combinações suportadas e exemplos, consulte [[05 - Fields]] e as notas de cada bloco na Parte 2.
+Outros elementos — como `Title`, `Line` e `Track` — atendem a apresentações específicas. `Metric` e `Table` são Blocks com comportamento de Container: Metric reúne Fields escalares, enquanto Table aceita Fields compatíveis. Pairs continua sendo uma Collection independente. Cada Field adicionado vira uma coluna por padrão; **Show Labels in columns** controla os cabeçalhos, enquanto **Show Labels in rows** permite nomear cada linha de dados. As duas opções podem ser ativadas juntas. **Allow adding rows in statblocks** disponibiliza a ação **Add row** em fichas editáveis. A ordem pode ser alterada no inspetor da Table. O armazenamento `scores` é gerenciado internamente. Para detalhes, consulte [[05 - Fields]] e [[10 - Containers_ visão geral]].
 
 ## Configurar Values de exemplo (Samples)
 
@@ -144,15 +144,18 @@ Para uma cópia de um Template existente, o novo ID evita colisões e identifica
 
 - Um Template criado no Forge é salvo como `.forgetemplate`.
 - Um `.forgetemplate` atualizado mantém o formato Forge e seus metadados `statblockForge`.
-- Um `.atlastemplate` aberto e atualizado permanece no formato nativo Atlas.
-- A exportação para `.atlastemplate` produz um arquivo Atlas limpo, sem o namespace de layout exclusivo do Forge. Recursos exclusivamente Forge podem ser transformados, omitidos ou reportados como incompatíveis conforme a regra de projeção.
+- Um `.atlastemplate` é uma origem somente leitura. Ao abri-lo, o Forge importa seus dados e cria uma cópia `.forgetemplate` para edição; o arquivo Atlas original nunca é atualizado pelo Forge.
+- Durante a importação, o Forge pode ler um sidecar de layout antigo já existente para recuperar configurações compatíveis. O Forge não cria, exporta nem atualiza arquivos `.atlastemplate` ou sidecars Atlas.
 
-Use `.forgetemplate` como fonte de trabalho quando precisar preservar layout e opções próprias do Forge. Use `.atlastemplate` quando o objetivo for compartilhar uma versão compatível com o Atlas. Consulte a documentação de compatibilidade na Parte 5.
+Use `.forgetemplate` como formato de trabalho do Forge. Arquivos `.atlastemplate` podem ser abertos como fontes de importação, mas a edição continua na cópia `.forgetemplate`. Consulte a documentação de compatibilidade na Parte 5.
 
 ## Conflitos, cópias e backups
 
 - Se já existir um Template com o nome pretendido, escolha outro nome ou siga o fluxo explícito de confirmação disponibilizado pelo Forge.
-- A substituição confirmada de um `.forgetemplate` existente cria um backup antes da gravação, em `.statblock-forge/backups/` dentro da pasta de Templates configurada.
+- A substituição confirmada de um `.forgetemplate` existente cria um backup versionado em `.statblock-forge/backups/` dentro da pasta de Templates configurada.
+- Use **Recuperar backup de template Forge…** na Paleta de Comando para inspecionar e restaurar backups validados. O Forge verifica o conteúdo e o ID original do Template antes de oferecer a restauração.
+- Restaurar sobre um arquivo existente exige uma segunda confirmação e cria primeiro um backup de segurança separado. O compare-and-swap preserva edições feitas depois da confirmação.
+- Backups antigos `.forgetemplate.bak` em formato bruto continuam reconhecidos. Quando a pasta original é desconhecida, o Forge resolve o destino pelo ID estável ou restaura uma cópia separada em vez de substituir um arquivo sem relação.
 - Atualizar o mesmo arquivo é diferente de criar uma cópia e substituir outro arquivo.
 - Antes de mudanças amplas, faça também um backup externo do Vault.
 

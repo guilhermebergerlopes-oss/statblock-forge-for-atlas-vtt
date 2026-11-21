@@ -5,6 +5,7 @@ import { normalizeForgeCustomBorder, normalizeForgeCustomTheme, type ForgeCustom
 import { DEFAULT_FORGE_SHEET_WIDTH, normalizeForgeSheetWidth } from './sheetWidth.ts';
 import { normalizeFieldCompendium, normalizeFieldCompendiumSources, normalizeFieldIds } from './fieldCompendiumModel.ts';
 import { DEFAULT_COUNTERS_PER_ROW, normalizeCountersPerRow } from './counterLayoutModel.ts';
+import { normalizeForgeJsonFieldTypes, serializeForgeJsonFieldTypes } from './fieldTypeJsonModel.ts';
 /**
  * Forge-owned editing model for the public Atlas .atlastemplate JSON shape.
  * Unknown Atlas properties are preserved so editing a supported field does
@@ -77,6 +78,8 @@ export interface BlockAppearance {
 }
 
 export interface ForgeBlockLayout {
+  /** Preserve per-block layout metadata introduced by later Forge versions. */
+  [key: string]: unknown;
   span: number;
   rows: number;
   appearance: BlockAppearance;
@@ -92,8 +95,16 @@ export interface ForgeBlockLayout {
   metricSlotsPerRow?: number;
   /** Forge-only Counters preview layout: maximum number of Counters placed on each line. */
   countersPerRow?: number;
-  /** Hides this block from the final Forge statblock; Atlas exports it as Hidden from players. */
+  /** Hides this block from the final Forge statblock; child Field permissions remain independent. */
   visibility?: 'total-hidden';
+}
+
+export interface ForgeContainerDefinition {
+  blockId: string;
+  kind: 'metric' | 'table';
+  /** Native Scores Field used internally to store a Table's grid values. */
+  dataFieldKey?: string;
+  [key: string]: unknown;
 }
 
 export interface ForgeLayoutDocument {
@@ -105,7 +116,7 @@ export interface ForgeLayoutDocument {
   dense: boolean;
   /** Shared fixed-width sheet size in CSS pixels; statblocks may override per note. */
   sheetWidth?: number;
-  /** Forge-only global visual theme; never exported into the native Atlas template. */
+  /** Forge-only global visual theme stored in Forge metadata; native Atlas does not consume it. */
   themeId?: StatblockThemeId;
   /** Forge-only custom palettes, stored independently for each theme preset. */
   themeOverrides?: StatblockThemeOverrides;
@@ -116,10 +127,12 @@ export interface ForgeLayoutDocument {
   /** Optional frame surrounding the reserved Token art field; independent from image blocks. */
   tokenAppearance?: TokenFrameAppearance;
   blocks: Record<string, ForgeBlockLayout>;
+  /** Forge-only registry for Metric and Table containers; child refs stay in native blocks. */
+  containers?: ForgeContainerDefinition[];
   /** Forge-only appearance by native field key and Ability Part key. */
   abilityParts: Record<string, Record<string, BlockAppearance>>;
   /** Forge-only field category used when a registered field is later dragged to the canvas. */
-  fieldKinds?: Record<string, 'value' | 'metric' | 'collections' | 'table' | 'resources' | 'text' | 'image' | 'abilities' | 'counters' | 'checkboxes' | 'tags' | 'pairs' | 'spells'>;
+  fieldKinds?: Record<string, 'values' | 'choice' | 'text' | 'image' | 'collections' | 'value' | 'metric' | 'table' | 'resources' | 'abilities' | 'counters' | 'checkboxes' | 'tags' | 'pairs' | 'spells'>;
   /** Image Fields whose template sample is copied into every new statblock and locked from note-level removal/replacement. */
   pinnedImageFields?: string[];
   // Legacy `forgeConditionDefinitions` is intentionally not modeled. Unknown layout keys are
@@ -152,7 +165,7 @@ const HEADER_FIELD_DEFINITIONS = [
 ] as const;
 
 const FIELD_TYPES = [
-  'text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores',
+  'text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list',
   'entries', 'pairs', 'image', 'spells', 'counters', 'checkboxes',
 ] as const;
 
@@ -161,13 +174,13 @@ export const DEFAULT_SCORE_COLUMNS = ['Column 1', 'Column 2', 'Column 3'] as con
 
 export const FIELD_TO_BLOCK: Readonly<Record<string, string>> = {
   text: 'stat', number: 'stat', rating: 'stat', dice: 'stat', choice: 'stat',
-  markdown: 'text', list: 'tags', scores: 'scores', entries: 'entries',
+  markdown: 'text', list: 'tags', entries: 'entries',
   pairs: 'pairs', image: 'image', spells: 'spells', counters: 'counters', checkboxes: 'checkboxes',
 };
 
 const DEFAULT_SAMPLES: Readonly<Record<string, unknown>> = {
   text: 'Example text', markdown: 'Example description.', number: 10, rating: '1', dice: '2d6+2',
-  choice: 'Option', list: ['First', 'Second'], scores: [[10, 12, 14]], entries: [],
+  choice: 'Option', list: ['First', 'Second'], entries: [],
   pairs: {}, image: '', spells: [], counters: [], checkboxes: {},
 };
 
@@ -371,6 +384,7 @@ export function parseTemplateForEditing(text: string): { template: ForgeTemplate
     throw new Error('O template contém um bloco inválido ou um ID de bloco duplicado. O arquivo original foi mantido sem alterações.');
   }
   const template = cloneJson(parsed) as ForgeTemplate;
+  normalizeForgeJsonFieldTypes(template);
   // Keep the original arrays intact: silently filtering malformed entries
   // would make a later save destructive for templates from newer Atlas builds.
   return { template, warnings };
@@ -404,9 +418,21 @@ export function createForgeLayout(template: ForgeTemplate): ForgeLayoutDocument 
     }
   };
   addBlockMetadata(template.layout.blocks);
+  const containers: ForgeContainerDefinition[] = [];
+  const addContainerMetadata = (items: readonly ForgeBlock[]): void => {
+    for (const block of items) {
+      if (block.type === 'metric') containers.push({ blockId: block.id, kind: 'metric' });
+      else if (block.type === 'scores') containers.push({
+        blockId: block.id, kind: 'table',
+        ...(typeof block.field === 'string' && block.field ? { dataFieldKey: block.field } : {}),
+      });
+      if (Array.isArray(block.blocks)) addContainerMetadata(block.blocks.filter(isRecord) as ForgeBlock[]);
+    }
+  };
+  addContainerMetadata(template.layout.blocks);
   return {
     format: 'statblock-forge-layout', version: 1, templateId: template.id,
-    columns: DEFAULT_GRID_COLUMN_COUNT, dense: true, sheetWidth: DEFAULT_FORGE_SHEET_WIDTH, themeId: 'default', tokenAppearance: { enabled: false }, blocks, abilityParts: {}, fieldKinds: {}, pinnedImageFields: [],
+    columns: DEFAULT_GRID_COLUMN_COUNT, dense: true, sheetWidth: DEFAULT_FORGE_SHEET_WIDTH, themeId: 'default', tokenAppearance: { enabled: false }, blocks, containers, abilityParts: {}, fieldKinds: {}, pinnedImageFields: [],
     fieldIds: normalizeFieldIds({}, template.fields), compendiumByFieldId: {}, compendiumSourceByFieldId: {},
   };
 }
@@ -462,8 +488,9 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
     const parsed: unknown = JSON.parse(text);
     if (!isRecord(parsed) || parsed.format !== 'statblock-forge-layout' || parsed.version !== 1
       || parsed.templateId !== template.id || !isRecord(parsed.blocks)) return createForgeLayout(template);
+    normalizeForgeJsonFieldTypes(parsed);
     const defaults = createForgeLayout(template);
-    const knownRootKeys = new Set(['format', 'version', 'templateId', 'columns', 'dense', 'sheetWidth', 'themeId', 'themeOverrides', 'customTheme', 'frame', 'tokenAppearance', 'blocks', 'abilityParts', 'fieldKinds', 'pinnedImageFields', 'fieldIds', 'compendiumByFieldId', 'compendiumSourceByFieldId']);
+    const knownRootKeys = new Set(['format', 'version', 'templateId', 'columns', 'dense', 'sheetWidth', 'themeId', 'themeOverrides', 'customTheme', 'frame', 'tokenAppearance', 'blocks', 'containers', 'abilityParts', 'fieldKinds', 'pinnedImageFields', 'fieldIds', 'compendiumByFieldId', 'compendiumSourceByFieldId']);
     const futureRootProperties = Object.fromEntries(Object.entries(parsed).filter(([key]) => !knownRootKeys.has(key)));
     const customTheme = normalizeForgeCustomTheme(parsed.customTheme);
     const frame = normalizeForgeCustomBorder(parsed.frame);
@@ -478,6 +505,23 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
       ...(customTheme ? { customTheme } : {}),
       ...(frame ? { frame } : {}),
     };
+    const rawContainers = Array.isArray(parsed.containers) ? parsed.containers.filter(isRecord) : [];
+    const rawContainersById = new Map(rawContainers.flatMap((item) =>
+      typeof item.blockId === 'string' && (item.kind === 'metric' || item.kind === 'table')
+        ? [[item.blockId, item] as const] : [],
+    ));
+    base.containers = (defaults.containers ?? []).map((fallback) => {
+      const saved = rawContainersById.get(fallback.blockId);
+      const block = blockById(template.layout.blocks, fallback.blockId);
+      const dataFieldKey = block?.type === 'scores' && typeof block.field === 'string' && block.field
+        ? block.field : undefined;
+      return {
+        ...fallback,
+        ...(saved && saved.kind === fallback.kind ? Object.fromEntries(Object.entries(saved).filter(([key]) =>
+          key !== 'blockId' && key !== 'kind' && key !== 'dataFieldKey')) : {}),
+        ...(dataFieldKey ? { dataFieldKey } : {}),
+      };
+    });
     base.fieldIds = normalizeFieldIds(parsed.fieldIds, template.fields);
     base.compendiumByFieldId = normalizeFieldCompendium(
       parsed.compendiumByFieldId,
@@ -488,8 +532,15 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
       template.fields,
       base.fieldIds,
     );
+    const knownBlockMetadataKeys = new Set([
+      'span', 'rows', 'appearance', 'appearanceMode', 'anchorColumn', 'anchorRow', 'anchorColumns',
+      'metricSlotsPerRow', 'countersPerRow', 'visibility',
+    ]);
     for (const [id, raw] of Object.entries(parsed.blocks)) {
       if (!isRecord(raw)) continue;
+      const futureBlockProperties = Object.fromEntries(
+        Object.entries(raw).filter(([key]) => !knownBlockMetadataKeys.has(key)),
+      );
       const rawAppearance = isRecord(raw.appearance) ? raw.appearance : {};
       const defaultMetadata = defaults.blocks[id];
       const appearance = normalizeAppearanceSidecar({
@@ -511,6 +562,7 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
       const explicitMode = raw.appearanceMode === 'custom' || raw.appearanceMode === 'theme'
         ? raw.appearanceMode : undefined;
       base.blocks[id] = {
+        ...futureBlockProperties,
         span: clampInteger(raw.span, 1, 12, 12),
         rows: clampInteger(raw.rows, 1, MAX_BLOCK_ROWS, 1),
         appearance,
@@ -545,7 +597,7 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
     }));
     base.dense = parsed.dense !== false;
     const rawFieldKinds = isRecord(parsed.fieldKinds) ? parsed.fieldKinds : {};
-    const allowedKinds = new Set(['value', 'metric', 'collections', 'table', 'resources', 'text', 'image', 'abilities', 'counters', 'checkboxes', 'tags', 'pairs', 'spells']);
+    const allowedKinds = new Set(['values', 'choice', 'text', 'image', 'collections', 'value', 'metric', 'table', 'resources', 'abilities', 'counters', 'checkboxes', 'tags', 'pairs', 'spells']);
     base.fieldKinds = Object.fromEntries(Object.entries(rawFieldKinds).filter(([key, kind]) =>
       template.fields.some((field) => field.key === key) && typeof kind === 'string' && allowedKinds.has(kind),
     )) as NonNullable<ForgeLayoutDocument['fieldKinds']>;
@@ -566,8 +618,17 @@ export function serializeTemplate(template: ForgeTemplate): string {
   return `${JSON.stringify(template, null, 2)}\n`;
 }
 
+/** Serialize the editor's Forge JSON view using the reorganized Field type IDs. */
+export function serializeForgeEditorTemplate(template: ForgeTemplate): string {
+  const stored = cloneJson(template);
+  serializeForgeJsonFieldTypes(stored);
+  return `${JSON.stringify(stored, null, 2)}\n`;
+}
+
 export function serializeForgeLayout(layout: ForgeLayoutDocument): string {
-  return `${JSON.stringify(layout, null, 2)}\n`;
+  const stored = cloneJson(layout);
+  serializeForgeJsonFieldTypes({ statblockForge: { layout: stored } });
+  return `${JSON.stringify(stored, null, 2)}\n`;
 }
 
 export function headerFieldForPart(fields: readonly ForgeField[], part: string): ForgeField | undefined {
@@ -608,13 +669,12 @@ export function registerTemplateField(template: ForgeTemplate, label: string, ty
   const field: ForgeField = { key, label: cleanLabel, type };
   if (type === 'choice') field.options = ['Option 1', 'Option 2'];
   if (type === 'entries') field.entry = { nameKey: 'name', textKey: 'desc', extras: [] };
-  if (type === 'scores') {
-    field.slots = [...DEFAULT_SCORE_COLUMNS];
-    field.slotKeys = ['slot_1', 'slot_2', 'slot_3'];
-    field.rows = [[10, 10, 10]];
-  }
   if (type === 'counters') field.counterRows = [];
-  if (type === 'checkboxes') field.options = [{ key: 'option_1', label: 'Option 1' }, { key: 'option_2', label: 'Option 2' }];
+  if (type === 'checkboxes') {
+    field.options = [{ key: 'option_1', label: 'Option 1' }, { key: 'option_2', label: 'Option 2' }];
+    // New Checkbox Fields are exclusive by default; multi-choice is opt-in.
+    field.allowMultiple = false;
+  }
   if (type === 'number') field.unit = '';
   template.fields.push(field);
   const sample = isRecord(template.sample) ? template.sample : {};
@@ -622,6 +682,25 @@ export function registerTemplateField(template: ForgeTemplate, label: string, ty
     ? Object.fromEntries(field.options.filter(isRecord).map((option) => [String(option.key), false]))
     : cloneJson(DEFAULT_SAMPLES[type]);
   template.sample = { ...sample, [key]: defaultValue };
+  return field;
+}
+
+/**
+ * Creates Atlas' native Scores data adapter for a Forge Table block. This is
+ * deliberately not a user Field type: it is private storage owned by the
+ * Table block and is hidden from the Field palette and Field inspector.
+ */
+export function registerTableStorageField(template: ForgeTemplate, label: string): ForgeField {
+  const field = registerTemplateField(template, label, 'number');
+  field.type = 'scores';
+  field.forgeInternal = 'table-storage';
+  delete field.unit;
+  field.slots = [...DEFAULT_SCORE_COLUMNS];
+  field.slotKeys = ['slot_1', 'slot_2', 'slot_3'];
+  field.rows = [[10, 10, 10]];
+  const sample = isRecord(template.sample) ? { ...template.sample } : {};
+  sample[field.key] = [[10, 10, 10]];
+  template.sample = sample;
   return field;
 }
 
@@ -643,7 +722,7 @@ export function createBlock(type: string, template: ForgeTemplate, fieldKey?: st
     case 'metric': return { id, type, fields: fieldKey ? [fieldKey] : [] };
     case 'line': return { id, type, fields: fieldKey ? [fieldKey] : [] };
     case 'tags': return { id, type, field: fieldKey ?? '', look: 'chips' };
-    case 'scores': return { id, type, field: fieldKey ?? '', orientation: 'row' };
+    case 'scores': return { id, type, field: fieldKey ?? '' };
     case 'entries': return { id, type, field: fieldKey ?? '', nameStyle: 'run-in' };
     case 'pairs': return { id, type, field: fieldKey ?? '' };
     case 'image': return { id, type, field: fieldKey ?? '', shape: 'portrait' };
@@ -693,6 +772,8 @@ export function blockLabel(block: ForgeBlock, fields: readonly ForgeField[]): st
     const title = typeof block.heading === 'string' && block.heading.trim() ? block.heading : block.type;
     return `${title} · container`;
   }
+  if (block.type === 'metric') return typeof block.heading === 'string' && block.heading.trim() ? block.heading : 'Metric';
+  if (block.type === 'scores') return 'Table';
   const field = fields.find((item) => item.key === block.field);
   return field ? `${field.label.trim() || field.key} · ${block.type}` : `${block.type} · ${String(block.field ?? 'sem campo')}`;
 }

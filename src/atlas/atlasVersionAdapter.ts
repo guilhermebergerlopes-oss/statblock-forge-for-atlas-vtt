@@ -1,9 +1,9 @@
 /**
- * Version-aware Atlas compatibility profiles.
+ * Version-aware Atlas integration profiles.
  *
- * These profiles describe file-format compatibility only. They intentionally
- * expose no runtime hooks: Atlas recognizes `.atlastemplate` files, while
- * `.forgetemplate` instances are rendered and edited by the Forge-owned view.
+ * Atlas 0.17.0 and 0.18.0 are exact source snapshots inspected for direct
+ * internal-runtime access. Later semantic versions use the nearest baseline
+ * and are enabled through forward-compatible, feature-level capability checks.
  */
 
 export interface ParsedSemanticVersion {
@@ -20,8 +20,11 @@ export interface AtlasVersionRange {
 
 export type AtlasAdapterResolutionKind =
   | 'verified-version'
+  | 'forward-compatible-version'
   | 'generic-file-only'
   | 'standalone';
+
+export type AtlasRuntimeMode = 'internal-runtime' | 'standalone';
 
 export interface AtlasAdapterResolution {
   kind: AtlasAdapterResolutionKind;
@@ -30,25 +33,77 @@ export interface AtlasAdapterResolution {
   detectedVersion: string | null;
   verifiedRange: AtlasVersionRange | null;
   templateFiles: 'verified' | 'best-effort' | 'standalone';
-  runtimeMode: 'standalone';
+  runtimeMode: AtlasRuntimeMode;
   runtimeHooks: readonly string[];
   explanation: string;
 }
 
-/** The original Atlas source snapshot used for the generic file-format profile. */
-export const ATLAS_VERIFIED_SNAPSHOT = '0.13.2-beta.0';
+/** Latest exact Atlas source snapshot supplied and inspected for this transition. */
+export const ATLAS_VERIFIED_SNAPSHOT = '0.18.0';
+
+/** Minimum runtime generation accepted by Forge's capability-checked adapter. */
+export const ATLAS_RUNTIME_MINIMUM_VERSION = '0.17.0';
+export const ATLAS_DICE_PRESETS_MINIMUM_VERSION = '0.18.0';
+
+/** Internal contracts confirmed in the original Atlas 0.17.0 source snapshot. */
+export const ATLAS_0170_RUNTIME_HOOKS: readonly string[] = Object.freeze([
+  "Workspace.getLeavesOfType('atlas-vtt')",
+  'AtlasView.serviceManager',
+  'AtlasView.atlasStore',
+  'ServiceManager.getRendererService()',
+  'ServiceManager.getToolController()',
+  'ServiceManager.getNotePreviewUIManager()',
+  'ServiceManager.getAssetService()',
+  'ServiceManager.getStore()',
+  'ServiceManager.getEventBus()',
+  'ToolController.getDiceTool()',
+  'DiceTool.rollDice(formula, source, origin, options)',
+  'NotePreviewUIManager.showOrCreatePreview()',
+  'NotePreviewUIManager.hideAllUnpinnedPreviews()',
+  'AssetService.loadedTokenAssets()/getTokenAssets()/addTokenAsset()',
+  'TokenRenderer.statblockSync.tokenStatblockLinkService',
+]);
+
+/** Internal contracts rechecked against the supplied original Atlas 0.18.0 source snapshot. */
+export const ATLAS_0180_RUNTIME_HOOKS: readonly string[] = Object.freeze([
+  "Workspace.getLeavesOfType('atlas-vtt')",
+  'AtlasView.serviceManager',
+  'AtlasView.atlasStore',
+  'ServiceManager.getRendererService()',
+  'ServiceManager.getToolController()',
+  'ServiceManager.getNotePreviewUIManager()',
+  'ServiceManager.getAssetService()',
+  'ServiceManager.getStore()',
+  'ServiceManager.getEventBus()',
+  'ToolController.getDiceTool()',
+  'DiceTool.rollDice(formula, source, origin, options)',
+  'NotePreviewUIManager.showOrCreatePreview()',
+  'NotePreviewUIManager.hideAllUnpinnedPreviews()',
+  'AssetService.loadedTokenAssets()/getTokenAssets()/addTokenAsset()',
+  'AssetService.getCollections()/loadedCollections()/getDefaultCollectionId()',
+  'AssetService.getCollectionSettings()/updateCollectionSettings()',
+  'TokenRenderer.statblockSync.tokenStatblockLinkService',
+  'TypedEventEmitter.on()/off()',
+  'DiceTool written adv/dis formula handling',
+]);
+
 const VERIFIED_PROFILES: readonly {
   id: string;
   label: string;
   range: AtlasVersionRange;
+  runtimeHooks: readonly string[];
 }[] = [
   {
-    id: 'atlas-0.13.2-beta.0-file-profile',
-    label: 'Atlas 0.13.2-beta.0 — formato de arquivo verificado',
-    range: {
-      minInclusive: ATLAS_VERIFIED_SNAPSHOT,
-      maxInclusive: ATLAS_VERIFIED_SNAPSHOT,
-    },
+    id: 'atlas-0.17.0-internal-runtime',
+    label: 'Atlas 0.17.0 — runtime interno verificado',
+    range: { minInclusive: '0.17.0', maxInclusive: '0.17.0' },
+    runtimeHooks: ATLAS_0170_RUNTIME_HOOKS,
+  },
+  {
+    id: 'atlas-0.18.0-internal-runtime',
+    label: 'Atlas 0.18.0 — runtime interno verificado',
+    range: { minInclusive: ATLAS_VERIFIED_SNAPSHOT, maxInclusive: ATLAS_VERIFIED_SNAPSHOT },
+    runtimeHooks: ATLAS_0180_RUNTIME_HOOKS,
   },
 ];
 
@@ -87,7 +142,6 @@ function comparePrerelease(left: readonly string[], right: readonly string[]): n
     const aNumeric = /^\d+$/.test(a);
     const bNumeric = /^\d+$/.test(b);
     if (aNumeric && bNumeric) {
-      // Compare arbitrary-length numeric identifiers without Number precision loss.
       if (a.length !== b.length) return a.length < b.length ? -1 : 1;
       return a < b ? -1 : 1;
     }
@@ -116,10 +170,7 @@ export function isVersionInRange(version: string, range: AtlasVersionRange): boo
     && aboveMinimum >= 0 && belowMaximum <= 0;
 }
 
-/**
- * Selects the narrowest profile supported by inspected source evidence.
- * Unknown versions retain file-only compatibility and never activate hooks.
- */
+/** Selects an exact inspected profile or the nearest forward-compatible baseline. */
 export function resolveAtlasVersionAdapter(version: string | null | undefined): AtlasAdapterResolution {
   const normalized = typeof version === 'string' ? version.trim().replace(/^v(?=\d)/i, '') : '';
   if (!normalized) {
@@ -160,9 +211,28 @@ export function resolveAtlasVersionAdapter(version: string | null | undefined): 
       detectedVersion: normalized,
       verifiedRange: profile.range,
       templateFiles: 'verified',
-      runtimeMode: 'standalone',
-      runtimeHooks: [],
-      explanation: 'A versão corresponde exatamente ao snapshot do Atlas fornecido e inspecionado. A compatibilidade verificada limita-se ao formato de arquivos de template; nenhum hook de runtime é ativado.',
+      runtimeMode: 'internal-runtime',
+      runtimeHooks: profile.runtimeHooks,
+      explanation: `A versão corresponde exatamente ao snapshot original do Atlas ${profile.range.minInclusive} fornecido e inspecionado. Os contratos internos listados foram confirmados diretamente nesse código-fonte.`,
+    };
+  }
+
+  const meetsRuntimeMinimum = compareSemanticVersions(normalized, ATLAS_RUNTIME_MINIMUM_VERSION);
+  if (meetsRuntimeMinimum !== null && meetsRuntimeMinimum >= 0) {
+    const comparisonTo018 = compareSemanticVersions(normalized, ATLAS_DICE_PRESETS_MINIMUM_VERSION);
+    const uses018Baseline = comparisonTo018 !== null && comparisonTo018 >= 0;
+    const baselineVersion = uses018Baseline ? ATLAS_DICE_PRESETS_MINIMUM_VERSION : ATLAS_RUNTIME_MINIMUM_VERSION;
+    const baselineHooks = uses018Baseline ? ATLAS_0180_RUNTIME_HOOKS : ATLAS_0170_RUNTIME_HOOKS;
+    return {
+      kind: 'forward-compatible-version',
+      adapterId: `atlas-forward-compatible-${baselineVersion}-runtime`,
+      label: `Atlas ${normalized} — compatibilidade por recursos (base ${baselineVersion})`,
+      detectedVersion: normalized,
+      verifiedRange: null,
+      templateFiles: 'best-effort',
+      runtimeMode: 'internal-runtime',
+      runtimeHooks: baselineHooks,
+      explanation: `Esta versão é posterior ao mínimo ${ATLAS_RUNTIME_MINIMUM_VERSION} e será usada com o contrato-base Atlas ${baselineVersion}. A versão exata não foi inspecionada; cada recurso dependente do runtime deve confirmar os métodos e serviços necessários antes de operar. Recursos cuja API tenha mudado podem permanecer indisponíveis.`,
     };
   }
 
@@ -175,6 +245,6 @@ export function resolveAtlasVersionAdapter(version: string | null | undefined): 
     templateFiles: 'best-effort',
     runtimeMode: 'standalone',
     runtimeHooks: [],
-    explanation: 'Esta versão não corresponde a um snapshot de código verificado. O Forge mantém somente a compatibilidade genérica com arquivos .atlastemplate; nenhuma integração de runtime é ativada.',
+    explanation: `Esta versão é anterior ao mínimo de runtime ${ATLAS_RUNTIME_MINIMUM_VERSION}. O Forge mantém somente a compatibilidade genérica com arquivos .atlastemplate; nenhuma integração interna de runtime é ativada.`,
   };
 }

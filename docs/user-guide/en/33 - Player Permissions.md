@@ -23,14 +23,14 @@ This is **not** an Obsidian account system, Vault-folder permission, or encrypti
 | **Players can edit** | `edit` | Players can view and edit the Field Value. |
 | **Players can only read** | `read` | Players can view the Value but cannot edit it. |
 | **Hidden from players** | `hidden` | The Field is not presented to players but remains in the final Forge statblock for the GM. |
-| **Total Hidden** | Forge layout metadata + `hidden` | Removes the block from the final Forge statblock and marks its Fields as `hidden` for Atlas export. |
+| **Total Hidden** | Forge layout metadata + `hidden` | Removes the block from the final Forge statblock and marks its Fields as `hidden` in the Forge template. |
 
 `Total Hidden` is not a fourth value in the `players` property. It is a Forge-local layout visibility setting that also applies `hidden` to the represented Fields.
 
 ## Default access
 
 - Ordinary Fields default to `edit`.
-- `spells` Fields default to `read`; the inspector does not offer `edit` for a block representing only `spells` Fields.
+- `groups` Fields default to `read`; the inspector does not offer `edit` for a block representing only `groups` Fields.
 - Fixed header Fields such as `name`, the `image` key, Fields with `display-name` meaning, and Image-type Fields are treated as read-only by Atlas.
 
 Forge stores only deviations from defaults. When a Field returns to its default, its `players` entry is removed. If no exceptions remain, the whole property may be removed. Old entries under `formerKeys` are also cleared when access is changed using the current key.
@@ -41,7 +41,7 @@ The inspector only shows **Players** when the selected block represents Fields w
 
 | Block type | Fields considered by the inspector |
 |---|---|
-| **Metric** | Every Field listed in `fields`, plus `headingField` when present. |
+| **Metric Container** | Every child Field listed in `fields`, plus `headingField` when present. |
 | **Entries** | The associated `field`, plus `headingField` when present. |
 | **Ability Tabs** | Entries Fields when every tab contains exactly one Section and that Section contains exactly one Entries block. |
 | **Field-linked block** | The associated `field`, plus a heading Field when applicable. |
@@ -56,7 +56,7 @@ When one block represents multiple Fields, the inspector calculates the most res
 
 `hidden` is stricter than `read`, which is stricter than `edit`.
 
-For example, if a Metric contains `hp` (`edit`) and `armor` (`read`), the control shows `read`. Choosing `edit` then applies it to every Field represented by the Metric. Review the Fields grouped in a block before changing access in bulk.
+For example, if a Metric Container contains `hp` (`edit`) and `armor` (`read`), the control shows `read`. Choosing `edit` then applies it to every Field represented by the Metric. Review the Fields grouped in the Container before changing access in bulk.
 
 ## Hidden from players versus Total Hidden
 
@@ -69,7 +69,7 @@ The block remains in the layout and final Forge statblock. Players do not receiv
 Forge stores `visibility: total-hidden` in the block's layout metadata and marks the represented Fields as `hidden` in `players`.
 
 - In the final Forge-rendered statblock, the block is omitted.
-- In the Template copy published to Atlas, the block remains in the layout, but its Fields are exported with `hidden` access so players cannot see them while the GM can.
+- In a Forge template, the block remains in the layout and its Fields use `hidden` access so players cannot see them while the GM can. Atlas-imported templates are converted to this Forge representation when copied.
 - The original `.forgetemplate` keeps the block in the editor Canvas so it remains available for editing.
 
 Choosing `edit`, `read`, or `hidden` again removes the `Total Hidden` marker from the block metadata and restores normal block visibility.
@@ -82,13 +82,13 @@ These permissions only affect views and workflows that honor Atlas access metada
 
 ## Example
 
-Consider a Metric block containing `hp`, `armor`, and `secret_dc`:
+Consider a Metric Container with child Fields `hp`, `armor`, and `secret_dc`:
 
 - `hp`: `edit`, so players can update it;
 - `armor`: `read`, so players can inspect it but not change it;
 - `secret_dc`: `hidden`, so it remains in the GM's statblock but is withheld from players.
 
-If all three Fields are in the same Metric, one Players setting applies the same access to all of them. For different permissions, place the Fields in separate blocks or use separate layout structures.
+If all three Fields are inside the same Metric Container, one Players setting applies the same access to all of them. For different permissions, place the Fields in separate blocks or use separate layout structures.
 
 ## See also
 

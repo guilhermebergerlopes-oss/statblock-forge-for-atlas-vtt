@@ -50,3 +50,24 @@ test('Forge rejects a link without a vault-relative .forgetemplate path or stabl
     templateId: '   ',
   }));
 });
+
+test('moved-template path repair can require the expected old path and stable ID', async () => {
+  const { refreshForgeStatblockTemplateLinkPath, FORGE_STATBLOCK_LINK_KEY } = await import('../src/statblocks/forgeTemplateLink.ts');
+  const frontmatter = {
+    [FORGE_STATBLOCK_LINK_KEY]: createForgeStatblockTemplateLink({
+      templatePath: 'Templates/Old.forgetemplate',
+      templateId: TEMPLATE_ID,
+    }),
+    hp: 12,
+  };
+  assert.equal(refreshForgeStatblockTemplateLinkPath(frontmatter, 'Templates/New.forgetemplate', {
+    expectedOldPath: 'Templates/Old.forgetemplate',
+    expectedTemplateId: TEMPLATE_ID,
+  }), true);
+  assert.equal(frontmatter[FORGE_STATBLOCK_LINK_KEY].templatePath, 'Templates/New.forgetemplate');
+  assert.equal(frontmatter.hp, 12);
+  assert.equal(refreshForgeStatblockTemplateLinkPath(frontmatter, 'Templates/Another.forgetemplate', {
+    expectedOldPath: 'Templates/Old.forgetemplate',
+    expectedTemplateId: TEMPLATE_ID,
+  }), false);
+});

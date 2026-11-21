@@ -134,7 +134,7 @@ test('formula-backed Dice Fields also render as live roll links in Metric blocks
   const { readFile } = await import('node:fs/promises');
   const renderer = await readFile(new URL('../src/render/statblockPreviewRenderer.ts', import.meta.url), 'utf8');
   const start = renderer.indexOf('function renderMetric(');
-  const end = renderer.indexOf('\nfunction signedScoreValue(', start);
+  const end = renderer.indexOf('\nfunction renderTableSlotValue(', start);
   assert.ok(start >= 0 && end > start, 'Metric renderer should exist');
   const implementation = renderer.slice(start, end);
   assert.match(implementation, /const formulaBackedDice = Boolean\(diceField && hasDiceFieldFormula\(diceField\)\)/);
@@ -163,4 +163,13 @@ test('the Add Field form preserves numeric and Dice formulas independently when 
   assert.match(editor, /let formulaInputKind: 'numeric' \| 'dice' \| null = null/);
   assert.match(editor, /if \(formulaInputKind === 'dice'\) diceFormulaValue = formula\.value/);
   assert.match(editor, /else if \(formulaInputKind === 'numeric'\) formulaValue = formula\.value/);
+});
+
+test('Dice Field formulas accept written advantage and preserve it after resolving references', () => {
+  const { fields, resolve } = fixture();
+  fields[3].diceFormula = '{proficiency}d{might}+{level} adv';
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[3].diceFormula), true);
+  assert.equal(resolve(fields[3]), '2d8+3 adv');
+  fields[3].diceFormula = '{proficiency}d{might}+{level} dis';
+  assert.equal(resolve(fields[3]), '2d8+3 dis');
 });

@@ -16,6 +16,7 @@ import {
   type LayoutBlockType,
 } from '../templates/layoutEditorModel.ts';
 import { addTabToContainer } from '../templates/tabsEditorModel.ts';
+import { createForgeContainer, type ForgeContainerKind } from '../templates/containerEditorModel.ts';
 import { templateFields } from '../templates/fieldEditorModel.ts';
 import { titleFieldsForTemplate } from '../templates/titleEditorModel.ts';
 import { captureGridPlacementAnchors, clearGridPlacementAnchors, toggleDenseLayout } from '../templates/gridLayout.ts';
@@ -316,7 +317,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
   type AddBlockChoice = LayoutBlockType | 'collections' | 'resources';
   const blockGroups: Array<{ label: string; values: readonly AddBlockChoice[] }> = [
     { label: 'Content & layout', values: ['heading', 'text', 'line', 'divider', 'vertical-divider'] },
-    { label: 'Values & tables', values: ['stat', 'metric', 'scores'] },
+    { label: 'Values', values: ['stat'] },
     { label: 'Collections & resources', values: ['collections', 'resources'] },
     { label: 'Specialized', values: ['image', 'track'] },
   ];
@@ -349,8 +350,6 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
 
   const compatibleTypesByChoice: Partial<Record<AddBlockChoice, readonly string[]>> = {
     stat: ['text', 'number', 'rating', 'dice', 'choice'],
-    metric: ['text', 'number', 'rating', 'dice', 'choice'],
-    scores: ['scores'],
     collections: ['list', 'entries', 'pairs', 'spells'],
     resources: ['counters', 'checkboxes'],
     image: ['image'],
@@ -371,8 +370,6 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
     { value: 'divider', label: 'Divider', requiresField: false },
     { value: 'vertical-divider', label: 'Vertical divider', requiresField: false },
     { value: 'stat', label: 'Stat', requiresField: true },
-    { value: 'metric', label: 'Metric', requiresField: true },
-    { value: 'scores', label: 'Table', requiresField: true },
     { value: 'collections', label: 'Collections', requiresField: true },
     { value: 'resources', label: 'Resources', requiresField: true },
     { value: 'image', label: 'Image', requiresField: true },
@@ -442,7 +439,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
   }, true);
 
   const fieldTypeDisplayNames: Record<string, string> = {
-    list: 'List', entries: 'Entries / Abilities', pairs: 'Pairs', spells: 'Spells',
+    list: 'List', entries: 'Entries / Abilities', pairs: 'Pairs', spells: 'Groups',
     counters: 'Counters', checkboxes: 'Checkboxes',
   };
   const updateCreateFieldEnabled = (): void => {
@@ -490,7 +487,7 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
     field.value = preferred;
     fieldControl.hidden = !isHeading && !needsField;
     if (fieldControlLabel) {
-      fieldControlLabel.textContent = translateForgeText(isHeading ? 'Text field (optional)' : 'Field', language);
+      fieldControlLabel.textContent = translateForgeText(isHeading ? 'In-line field (optional)' : 'Field', language);
     }
     field.disabled = !choices.length;
     create.disabled = needsField && !field.value;
@@ -519,6 +516,8 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
     { value: 'section', label: 'Section', disabled: false },
     { value: 'row', label: 'Row', disabled: false },
     { value: 'tabs', label: 'Tabs container', disabled: false },
+    { value: 'metric', label: 'Metric', disabled: false },
+    { value: 'table', label: 'Table', disabled: false },
   ];
   let selectedContainerType = 'section';
   const containerPicker = renderComponentHelpPicker('containers', containerOptions, selectedContainerType, (value) => {
@@ -544,18 +543,28 @@ export function renderTemplateCanvasToolbar(options: TemplateCanvasToolbarOption
 
   const addContainer = button('Add container', () => {
     try {
-      const containerType = selectedContainerType as LayoutBlockType;
-      const insertion = resolveLayoutInsertionTarget(template, getInsertionSelectionId(), containerType);
-      const insertionParent = insertion.targetContainerId
-        ? findLayoutBlock(template, insertion.targetContainerId)
-        : null;
+      const selectedKind = selectedContainerType;
       let container: ForgeBlock;
-      if (containerType === 'section' && insertionParent?.type === 'tabs' && !insertion.insertAfterBlockId) {
-        container = addTabToContainer(template, layout, insertion.targetContainerId as string);
+      if (selectedKind === 'metric' || selectedKind === 'table') {
+        const insertionType: LayoutBlockType = selectedKind === 'metric' ? 'metric' : 'scores';
+        const insertion = resolveLayoutInsertionTarget(template, getInsertionSelectionId(), insertionType);
+        container = createForgeContainer(
+          template, layout, selectedKind as ForgeContainerKind,
+          insertion.targetContainerId, insertion.insertAfterBlockId,
+        ).block;
       } else {
-        container = addLayoutBlock(
-          template, layout, containerType, null, insertion.targetContainerId, insertion.insertAfterBlockId,
-        );
+        const containerType = selectedKind as LayoutBlockType;
+        const insertion = resolveLayoutInsertionTarget(template, getInsertionSelectionId(), containerType);
+        const insertionParent = insertion.targetContainerId
+          ? findLayoutBlock(template, insertion.targetContainerId)
+          : null;
+        if (containerType === 'section' && insertionParent?.type === 'tabs' && !insertion.insertAfterBlockId) {
+          container = addTabToContainer(template, layout, insertion.targetContainerId as string);
+        } else {
+          container = addLayoutBlock(
+            template, layout, containerType, null, insertion.targetContainerId, insertion.insertAfterBlockId,
+          );
+        }
       }
       closeContainerMenu();
       setSelection(container.id, [container.id]);

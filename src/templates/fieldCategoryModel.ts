@@ -2,48 +2,59 @@ import type { ForgeField } from './forgeTemplate.ts';
 import type { ForgeLayoutDocument } from './forgeTemplate.ts';
 
 /**
- * Categories group related Field data structures. Value and Metric stay
- * separate because they create different default Canvas blocks; specialized
- * collection and resource types share broader categories instead of requiring
- * one category per renderer.
+ * Current presentation groups for user-created Fields. The runtime model keeps
+ * Atlas-compatible IDs, while Forge-owned JSON writes reorganized type IDs.
  */
 export const FIELD_CATEGORY_TYPES = {
-  value: ['text', 'number', 'rating', 'dice', 'choice'],
-  metric: ['text', 'number', 'rating', 'dice', 'choice'],
-  collections: ['entries', 'list', 'pairs', 'spells'],
-  table: ['scores'],
-  resources: ['counters', 'checkboxes'],
-  text: ['markdown'],
+  values: ['number', 'rating', 'dice', 'counters'],
+  text: ['text', 'markdown'],
+  choice: ['checkboxes', 'choice'],
   image: ['image'],
+  collections: ['list', 'entries', 'pairs', 'spells'],
 } as const;
 
 export type ForgeFieldCategory = keyof typeof FIELD_CATEGORY_TYPES;
 
-/** Categories used by earlier Forge versions, normalized when a Field is read. */
+/** Default native Field type selected when a presentation group is opened. */
+export const FIELD_CATEGORY_DEFAULT_TYPES: Readonly<Record<ForgeFieldCategory, string>> = {
+  values: 'number',
+  text: 'text',
+  choice: 'checkboxes',
+  image: 'image',
+  collections: 'list',
+};
+
+/** Older saved Field categories are normalized by the actual Field type. */
 const LEGACY_CATEGORY_ALIASES: Readonly<Record<string, ForgeFieldCategory>> = {
+  value: 'values',
+  metric: 'values',
+  resources: 'values',
+  counters: 'values',
+  checkboxes: 'choice',
   abilities: 'collections',
   tags: 'collections',
   pairs: 'collections',
   spells: 'collections',
-  counters: 'resources',
-  checkboxes: 'resources',
+  table: 'collections',
 };
 
 const CATEGORY_BY_FIELD_TYPE: Readonly<Record<string, ForgeFieldCategory>> = {
-  text: 'value',
-  number: 'value',
-  rating: 'value',
-  dice: 'value',
-  choice: 'value',
+  number: 'values',
+  rating: 'values',
+  dice: 'values',
+  counters: 'values',
+  text: 'text',
   markdown: 'text',
+  checkboxes: 'choice',
+  choice: 'choice',
+  image: 'image',
   list: 'collections',
-  scores: 'table',
   entries: 'collections',
   pairs: 'collections',
-  image: 'image',
   spells: 'collections',
-  counters: 'resources',
-  checkboxes: 'resources',
+  // Legacy Scores storage is kept readable for old Table blocks but is not a
+  // user-created Field type and is excluded from the Field palette.
+  scores: 'collections',
 };
 
 export function fieldTypesForCategory(category: ForgeFieldCategory): readonly string[] {
@@ -51,10 +62,9 @@ export function fieldTypesForCategory(category: ForgeFieldCategory): readonly st
 }
 
 /**
- * Keeps a saved Category when it supports the current type. Earlier templates
- * may store one of the narrower categories (Tags, Pairs, Spells, Abilities,
- * Counters or Checkboxes); those values are migrated to their new group while
- * preserving the actual Field type.
+ * Keeps compatible saved categories and migrates old category names. If an
+ * old broad category no longer matches the new grouping (for example a Text
+ * Field formerly saved as Value), the current type determines its new group.
  */
 export function resolveFieldCategory(
   layout: ForgeLayoutDocument | null,
@@ -75,7 +85,7 @@ export function resolveFieldCategory(
     }
   }
 
-  const inferred = CATEGORY_BY_FIELD_TYPE[field.type] ?? 'value';
+  const inferred = CATEGORY_BY_FIELD_TYPE[field.type] ?? 'values';
   if (layout) {
     layout.fieldKinds ??= {};
     layout.fieldKinds[field.key] = inferred;

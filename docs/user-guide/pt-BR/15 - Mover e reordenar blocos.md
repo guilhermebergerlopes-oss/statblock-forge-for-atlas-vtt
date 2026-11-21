@@ -96,7 +96,7 @@ O nome do Field na paleta pode ser arrastado para uma Grid, um bloco ou um conta
 - Se o Field ainda não estiver representado no layout, o Forge cria o bloco correspondente ao tipo/categoria do Field.
 - Se o Field já estiver representado, o Forge move o bloco existente. Não cria uma segunda representação independente do mesmo Field.
 - O Field e sua chave continuam os mesmos. O gesto altera onde ele é apresentado, não cria uma propriedade nova.
-- A categoria de apresentação registrada no layout pode escolher uma representação especializada, como **Metric**, **Table**, **Entries**, **Counters**, **Text** ou **Image**, em vez do bloco padrão do tipo.
+- **Metric** e **Table** são Containers de dados, criados por **Add Container**. Arraste Fields compatíveis para dentro deles para adicioná-los como filhos: Metric aceita Fields escalares; Table aceita Fields compatíveis; Pairs permanece uma Collection independente. O Field `scores` da Table é gerenciado internamente e não deve ser adicionado à paleta como Field comum.
 
 ### Soltar um Field diretamente em Tabs
 

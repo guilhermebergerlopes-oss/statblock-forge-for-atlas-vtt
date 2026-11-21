@@ -46,6 +46,17 @@ export function createTemplateVaultStorage(app: App): TemplateStorage {
       return { path: renamed.path, basename: renamed.basename };
     },
     ensureFolder,
+    listBackupFiles: async (folder) => {
+      const prefix = `${folder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')}/`;
+      return vault.getFiles()
+        .filter((file) => file.path.startsWith(prefix) && file.path.toLowerCase().endsWith('.forgetemplate.bak'))
+        .map((file) => ({
+          path: file.path,
+          basename: file.name,
+          size: file.stat.size,
+          mtime: file.stat.mtime,
+        }));
+    },
     listTemplateIds: async () => {
       const files = vault.getFiles().filter((file) => ['forgetemplate', 'atlastemplate'].includes(file.extension.toLowerCase()));
       const entries = await Promise.all(files.map(async (file) => {

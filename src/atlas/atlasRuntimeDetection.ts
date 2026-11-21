@@ -1,6 +1,13 @@
+import { ATLAS_PLUGIN_ID } from './atlasRuntime.ts';
 import { resolveAtlasVersionAdapter, type AtlasAdapterResolution } from './atlasVersionAdapter.ts';
 
-export const ATLAS_PLUGIN_ID = 'forked-atlas-vtt-compatibility-for-statblock-forge';
+export { ATLAS_PLUGIN_ID } from './atlasRuntime.ts';
+
+/**
+ * Kept temporarily while the Ctrl-hover and off-map dice migrations are staged.
+ * New direct-runtime integrations must use ATLAS_PLUGIN_ID (`atlas-vtt`) instead.
+ */
+export const LEGACY_ATLAS_FORK_PLUGIN_ID = 'forked-atlas-vtt-compatibility-for-statblock-forge';
 
 export interface AtlasManifestStorage {
   configDir: string;
@@ -34,9 +41,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Detects the Atlas installation by reading only its public Obsidian plugin
- * manifest through Vault.configDir and Vault.adapter. This does not prove the
- * plugin is enabled or currently running.
+ * Detects the original Atlas VTT installation through the Vault adapter.
+ * This verifies the installed manifest; inspectAtlasRuntime() separately
+ * determines whether the plugin instance and per-map services are currently loaded.
  */
 export async function detectAtlasInstallation(vault: AtlasManifestStorage): Promise<AtlasRuntimeDetection> {
   const configDir = normalizeConfigDir(vault.configDir);
@@ -51,7 +58,7 @@ export async function detectAtlasInstallation(vault: AtlasManifestStorage): Prom
         pluginId: null,
         version: null,
         adapter: resolveAtlasVersionAdapter(null),
-        message: `Manifesto do Atlas não encontrado em ${manifestPath}. Isso não impede importar e exportar templates por arquivo.`,
+        message: `Manifesto do Atlas VTT original não encontrado em ${manifestPath}. O Forge continuará funcionando em modo independente.`,
       };
     }
 
@@ -66,7 +73,7 @@ export async function detectAtlasInstallation(vault: AtlasManifestStorage): Prom
         pluginId: null,
         version: null,
         adapter: resolveAtlasVersionAdapter(null),
-        message: 'O manifesto encontrado não contém JSON válido. O Forge permanecerá em modo independente.',
+        message: 'O manifesto encontrado não contém JSON válido. Nenhum adaptador de runtime foi selecionado.',
       };
     }
 
@@ -77,7 +84,7 @@ export async function detectAtlasInstallation(vault: AtlasManifestStorage): Prom
         pluginId: isRecord(parsed) && typeof parsed.id === 'string' ? parsed.id : null,
         version: isRecord(parsed) && typeof parsed.version === 'string' ? parsed.version : null,
         adapter: resolveAtlasVersionAdapter(null),
-        message: 'O manifesto encontrado não corresponde ao plugin Atlas VTT ou não informa uma versão válida. Nenhum adaptador foi ativado.',
+        message: 'O manifesto encontrado não corresponde ao Atlas VTT original ou não informa uma versão válida. Nenhum adaptador foi ativado.',
       };
     }
 
@@ -89,20 +96,20 @@ export async function detectAtlasInstallation(vault: AtlasManifestStorage): Prom
         pluginId: ATLAS_PLUGIN_ID,
         version: parsed.version,
         adapter,
-        message: 'O Atlas foi localizado, mas sua versão não pôde ser interpretada. O Forge permanecerá em modo independente.',
+        message: 'O Atlas foi localizado, mas sua versão não pôde ser interpretada. Nenhum adaptador de runtime foi selecionado.',
       };
     }
 
-    const isVerified = adapter.kind === 'verified-version';
+    const isRuntimeVerified = adapter.runtimeMode === 'internal-runtime';
     return {
       status: 'detected',
       manifestPath,
       pluginId: ATLAS_PLUGIN_ID,
       version: parsed.version,
       adapter,
-      message: isVerified
-        ? `Manifesto do Atlas ${parsed.version} encontrado. O formato de arquivos corresponde ao snapshot de código inspecionado; APIs de runtime permanecem desativadas.`
-        : `Manifesto do Atlas ${parsed.version} encontrado. Será usada somente compatibilidade genérica por arquivo, sem hooks de runtime.`,
+      message: isRuntimeVerified
+        ? `Atlas VTT ${parsed.version} encontrado. O perfil interno de runtime foi verificado contra o código-fonte original; os serviços são descobertos dinamicamente por mapa.`
+        : `Atlas VTT ${parsed.version} encontrado. A versão não possui um perfil interno verificado; somente a compatibilidade por arquivo será considerada.`,
     };
   } catch (error) {
     return {
@@ -111,7 +118,7 @@ export async function detectAtlasInstallation(vault: AtlasManifestStorage): Prom
       pluginId: null,
       version: null,
       adapter: resolveAtlasVersionAdapter(null),
-      message: `Não foi possível ler o manifesto do Atlas: ${error instanceof Error ? error.message : String(error)}. O Forge permanecerá em modo independente.`,
+      message: `Não foi possível ler o manifesto do Atlas: ${error instanceof Error ? error.message : String(error)}. O Forge continuará funcionando em modo independente.`,
     };
   }
 }

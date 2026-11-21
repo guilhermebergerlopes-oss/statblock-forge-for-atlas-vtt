@@ -1,4 +1,4 @@
-import type { ForgeBlock, ForgeLayoutDocument, ForgeTemplate } from '../templates/forgeTemplate.ts';
+import type { ForgeBlock, ForgeField, ForgeLayoutDocument, ForgeTemplate } from '../templates/forgeTemplate.ts';
 import type { ForgeLanguage } from '../i18n/localization.ts';
 
 /** Narrow view bridge used by block-specific Inspector modules. */
@@ -18,4 +18,6 @@ export interface TemplateBlockInspectorContext {
   getDisclosureOpen?(key: string): boolean;
   setDisclosureOpen?(key: string, open: boolean): void;
   setTemplate(template: ForgeTemplate): void;
+  /** Renders a managed internal Field without exposing it in the public Field palette. */
+  renderFieldCard?(field: ForgeField, showRemoveButton?: boolean): HTMLElement;
 }

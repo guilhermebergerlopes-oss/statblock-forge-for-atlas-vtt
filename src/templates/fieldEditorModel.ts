@@ -101,9 +101,14 @@ export function fieldKeyProblem(template: ForgeTemplate, key: string, currentKey
   return null;
 }
 
+/** Native adapters are serialized with the Template but are not user-editable Fields. */
+export function isInternalTemplateField(field: ForgeField): boolean {
+  return field.type === 'scores' || field.forgeInternal === 'table-storage';
+}
+
 /** Header fields are fixed parts of the card, not regular layout fields. */
 export function templateFields(template: ForgeTemplate): ForgeField[] {
-  return template.fields.filter((field) => !isHeaderField(field));
+  return template.fields.filter((field) => !isHeaderField(field) && !isInternalTemplateField(field));
 }
 
 /** Adds a missing fixed header field without creating a layout block. */
@@ -291,10 +296,11 @@ function renameBlockReferences(blocks: ForgeBlock[], from: string, to: string): 
     for (const property of ['headingField', 'rollFrom', 'introField'] as const) {
       if (block[property] === from) update(property, to);
     }
-    const boundFields = block.fields;
-    if (Array.isArray(boundFields)) {
+    for (const property of ['fields'] as const) {
+      const boundFields = block[property];
+      if (!Array.isArray(boundFields)) continue;
       const fields = boundFields.map((value: unknown) => value === from ? to : value);
-      if (fields.some((value: unknown, index: number) => value !== boundFields[index])) update('fields', fields);
+      if (fields.some((value: unknown, index: number) => value !== boundFields[index])) update(property, fields);
     }
     for (const property of ['pattern', 'fallback'] as const) {
       if (typeof block[property] === 'string') update(property, replacePatternReference(block[property] as string, from, to));
@@ -589,7 +595,8 @@ export function removeTemplateField(template: ForgeTemplate, key: string): void 
 export function changeTemplateFieldType(template: ForgeTemplate, key: string, nextType: string): void {
   const field = template.fields.find((item) => item.key === key);
   if (!field) throw new Error(`O campo "${key}" não existe.`);
-  const allowed = ['text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'entries', 'pairs', 'image', 'spells', 'counters', 'checkboxes'];
+  if (isInternalTemplateField(field)) throw new Error('O armazenamento interno da Table não pode ser alterado como um Field.');
+  const allowed = ['text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'entries', 'pairs', 'image', 'spells', 'counters', 'checkboxes'];
   if (!allowed.includes(nextType)) throw new Error(`Tipo de campo não suportado: ${nextType}`);
   const previousType = field.type;
   if (previousType === nextType) return;
@@ -608,9 +615,6 @@ export function changeTemplateFieldType(template: ForgeTemplate, key: string, ne
   if (previousType === 'dice' && nextType !== 'dice') delete field.diceFormula;
   if (nextType === 'entries' && !isRecord(field.entry)) field.entry = { nameKey: 'name', textKey: 'desc', extras: [] };
   if (nextType === 'choice' && !Array.isArray(field.options)) field.options = ['Option 1', 'Option 2'];
-  if (nextType === 'scores' && !Array.isArray(field.slots)) {
-    field.slots = [...DEFAULT_SCORE_COLUMNS]; field.slotKeys = ['slot_1', 'slot_2', 'slot_3']; field.rows = [[10, 10, 10]];
-  }
   if (nextType === 'counters' && !Array.isArray(field.counterRows)) field.counterRows = [];
   if (nextType === 'checkboxes' && !Array.isArray(field.options)) field.options = [{ key: 'option_1', label: 'Option 1' }];
   const previousBlockType = FIELD_TO_BLOCK[previousType];
@@ -623,7 +627,6 @@ export function changeTemplateFieldType(template: ForgeTemplate, key: string, ne
           if (nextType === 'image') block.shape = 'portrait';
           if (['text', 'number', 'rating', 'dice', 'choice'].includes(nextType)) block.look = 'run-in';
           if (nextType === 'list') block.look = 'chips';
-          if (nextType === 'scores') block.orientation = 'row';
           if (nextType === 'entries') block.nameStyle = 'run-in';
         }
         if (Array.isArray(block.blocks)) update(block.blocks.filter(isRecord) as ForgeBlock[]);

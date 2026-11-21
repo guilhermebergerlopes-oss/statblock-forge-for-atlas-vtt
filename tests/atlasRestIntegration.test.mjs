@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calculateRestCounters } from '../src/statblocks/restRecoveryModel.ts';
+import { runRestNotePersistenceWithAtlasRollback } from '../src/statblocks/restPersistenceTransaction.ts';
 import {
+  atlasResourceFieldKeysForTemplate,
+  atlasResourceMatchesForTemplate,
   atlasRestResourceContextForNote,
   persistAtlasRestResourceChangesWithReceipt,
   rollbackAtlasRestResourceChanges,
@@ -113,7 +116,7 @@ test('context discovery selects the canonical linked character and gathers every
   assert.equal(context.collectionId, COLLECTION);
   assert.equal(context.resources.find((resource) => resource.key === 'hp')?.holder, 'token');
   assert.deepEqual(context.resources.find((resource) => resource.key === 'hp'), {
-    key: 'hp', name: 'Health', field: 'hp', direction: 'drains', color: '#22c55e',
+    key: 'hp', name: 'Health', field: 'hp', direction: 'drains', color: '#22c55e', visibleToPlayers: false,
     current: 4, max: 20, holder: 'token',
     tokenEntries: [
       { store: visible, tokenId: 'main', value: { current: 4, max: 20 }, rawValue: { current: 4, max: 20 }, overriddenMax: undefined },
@@ -234,4 +237,75 @@ test('a campaign-held Resource is used only when no linked token currently holds
   rollbackAtlasRestResourceChanges(commit.receipt);
   assert.deepEqual(first.getState().partyValues[partyKey], partyValues[partyKey]);
   assert.deepEqual(second.getState().partyValues[partyKey], partyValues[partyKey]);
+});
+
+
+test('Template Resource catalog identifies every matching collection Resource without writing Atlas state', () => {
+  const template = {
+    ...TEMPLATE,
+    fields: [
+      { key: 'hp', label: 'Hit Points', type: 'number', meaning: 'hit-points' },
+      { key: 'stress', label: 'Stress', type: 'number' },
+      { key: 'guard', label: 'Guard', type: 'number' },
+    ],
+  };
+  let updateCalls = 0;
+  const store = makeStore({}, {}, { updateTokens: () => { updateCalls += 1; } });
+  const collections = [
+    { id: COLLECTION, name: 'Heroes', settings: { statblockRoles: [{ id: 'hero', name: 'Hero', templateId: template.id }], resources: [
+      { key: 'hp', name: 'Health', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true },
+      { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7' },
+      { key: 'guard', name: 'Guard', field: 'guard', direction: 'static', color: '#64748b' },
+    ] } },
+    { id: 'other', name: 'Other', settings: { statblockRoles: [{ id: 'npc', name: 'NPC', templateId: 'another-template' }], resources: [
+      { key: 'hp', name: 'Health', field: 'hp', direction: 'drains', color: '#22c55e' },
+    ] } },
+  ];
+  const service = {
+    loadedTokenAssets: () => [],
+    loadedCollections: () => collections,
+    getCollectionSettings: (id) => collections.find((entry) => entry.id === id)?.settings,
+  };
+  const view = {
+    containerEl: { isShown: () => true },
+    serviceManager: { getAssetService: () => service, getStore: () => store },
+  };
+  const app = makeApp([view]);
+
+  const matches = atlasResourceMatchesForTemplate(app, template);
+  assert.deepEqual(matches.map((match) => [match.collectionId, match.resource.key, match.fieldKey, match.recoverable]), [
+    [COLLECTION, 'hp', 'hp', true],
+    [COLLECTION, 'stress', 'stress', true],
+    [COLLECTION, 'guard', 'guard', false],
+  ]);
+  assert.deepEqual(atlasResourceFieldKeysForTemplate(app, template), ['hp', 'stress']);
+  assert.equal(updateCalls, 0);
+});
+
+
+test('a calculated Atlas Resource recovery is compensated when frontmatter persistence fails', async () => {
+  const store = makeStore({
+    main: { assetId: 'pc-main', resources: { hp: { current: 4, max: 20 } } },
+  });
+  const context = atlasRestResourceContextForNote(makeApp([makeView(store, linkedAssets())]), NOTE);
+  assert.ok(context);
+  const before = structuredClone(store.getState().objects.tokens);
+  const calculated = calculate(context, {
+    target: { kind: 'resource', field: 'hp' },
+    does: 'amount',
+    formula: '1d4',
+  }, { data: { hp: 4 }, roll: () => 3 });
+  assert.equal(calculated.resourceChanges[0]?.to, 7);
+
+  await assert.rejects(runRestNotePersistenceWithAtlasRollback(async (registerReceipt) => {
+    const changes = calculated.resourceChanges.map(({ resourceKey, from, to, max, direction }) => ({
+      resourceKey, from, to, max, direction,
+    }));
+    const commit = persistAtlasRestResourceChangesWithReceipt(context, changes);
+    registerReceipt(commit.receipt);
+    // Models a failure from Obsidian after processFrontMatter's mutation callback returns.
+    throw new Error('simulated frontmatter write failure after recovery calculation');
+  }, rollbackAtlasRestResourceChanges), /frontmatter write failure/);
+
+  assert.deepEqual(store.getState().objects.tokens, before);
 });

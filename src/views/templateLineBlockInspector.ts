@@ -15,7 +15,7 @@ export interface TemplateLineBlockInspectorContext {
 
 export function renderLineBlockOptions(context: TemplateLineBlockInspectorContext): HTMLElement {
   const { template, block } = context;
-  const panel = section('Line values', 'Displays one to four scalar fields in order. Supported types: Text, Number, Rating, Dice and Choice.');
+  const panel = section('Line values', 'Displays one to four scalar fields in order. Supported types: In-line, Number, Rating, Dice and Selection.');
   const fields = Array.isArray(block.fields)
     ? block.fields.filter((key): key is string => typeof key === 'string' && key.length > 0)
     : [];
@@ -76,11 +76,11 @@ export function renderLineBlockOptions(context: TemplateLineBlockInspectorContex
 
   if (fields.length < MAX_LINE_FIELDS) {
     const createRow = el('div', 'statblock-forge__part-row');
-    const name = inputText('', 'New text field name');
-    name.setAttribute('aria-label', 'New text field name');
-    const create = button('Create Text field', () => {
+    const name = inputText('', 'New In-line field name');
+    name.setAttribute('aria-label', 'New In-line field name');
+    const create = button('Create In-line field', () => {
       if (!name.value.trim()) {
-        context.showNotice('Enter a name for the new Text field.');
+        context.showNotice('Enter a name for the new In-line field.');
         return;
       }
       try {
@@ -92,7 +92,7 @@ export function renderLineBlockOptions(context: TemplateLineBlockInspectorContex
     }, true);
     create.disabled = fields.length >= MAX_LINE_FIELDS;
     create.classList.add('statblock-forge__properties-add-compact');
-    createRow.append(labeledControl('Create a new Text field', name), create);
+    createRow.append(labeledControl('Create a new In-line field', name), create);
     list.append(createRow);
   }
 

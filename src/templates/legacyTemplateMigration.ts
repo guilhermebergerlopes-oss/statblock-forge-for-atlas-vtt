@@ -50,8 +50,9 @@ function normalizeFieldType(value: unknown): string {
   const type = value.trim().toLowerCase();
   if (FIELD_TYPES.has(type)) return type;
   const aliases: Record<string, string> = {
-    string: 'text', integer: 'number', float: 'number', longtext: 'markdown', textarea: 'markdown',
-    select: 'choice', multiselect: 'choice', array: 'list', table: 'scores', object: 'pairs', counter: 'counters',
+    string: 'text', inline: 'text', integer: 'number', float: 'number', longtext: 'markdown', textarea: 'markdown',
+    select: 'choice', selection: 'choice', multiselect: 'choice', array: 'list', table: 'scores', object: 'pairs',
+    counter: 'counters', groups: 'spells',
   };
   return aliases[type] ?? 'text';
 }
@@ -166,9 +167,10 @@ function applyLegacySettings(block: ForgeBlock, settings?: JsonRecord): ForgeBlo
     if (block.type === 'spells' && ['lines', 'tabs'].includes(settings.look)) next.look = settings.look;
   }
   if (block.type === 'image' && ['token', 'portrait'].includes(String(settings.shape))) next.shape = settings.shape;
-  if (block.type === 'scores' && ['row', 'table'].includes(String(settings.orientation))) next.orientation = settings.orientation;
   const extras = isRecord(block.fsExtras) ? { ...block.fsExtras } : {};
-  extras.atlasLegacyFieldSettings = { ...settings };
+  const legacySettings = { ...settings };
+  if (block.type === 'scores') delete legacySettings.orientation;
+  extras.atlasLegacyFieldSettings = legacySettings;
   next.fsExtras = extras;
   return next as ForgeBlock;
 }
@@ -181,7 +183,7 @@ function createFieldBlock(field: ForgeField, id: string, settings?: JsonRecord):
     case 'choice': case 'list':
       block = { id, type: 'tags', field: field.key, label: field.label, look: 'comma' }; break;
     case 'scores':
-      block = { id, type: 'scores', field: field.key, orientation: 'row' }; break;
+      block = { id, type: 'scores', field: field.key }; break;
     case 'entries': block = { id, type: 'entries', field: field.key }; break;
     case 'pairs': block = { id, type: 'pairs', field: field.key, label: field.label }; break;
     case 'counters': block = { id, type: 'counters', field: field.key, label: field.label }; break;
@@ -232,6 +234,10 @@ function migrateLegacyGridBlock(
           originalLayout: { x: legacy.x, y: legacy.y, w: legacy.width, h: legacy.height },
           originalFieldIds: [...legacy.fieldIds],
           fieldSettings: legacy.raw.fieldSettings ?? keptSettings,
+          // Preserve the complete legacy block payload, including fields that
+          // this migration does not understand yet. The opaque copy is data
+          // only: no legacy callbacks or executable values are evaluated.
+          originalPayload: { ...legacy.raw },
         },
       },
     },
@@ -239,33 +245,11 @@ function migrateLegacyGridBlock(
   };
 }
 
-const DEFAULT_LEGACY_TABLE_MODIFIER = 'floor((value - 10) / 2)';
-const SAFE_MODIFIER_FUNCTIONS = new Set(['floor', 'ceil', 'round', 'abs', 'min', 'max', 'value']);
-
 /**
- * Converts the old Atlas Table modifier callback only when it is a plain,
- * side-effect-free arithmetic expression understood by Forge's formula parser.
- * Arbitrary JavaScript is never executed during template migration.
- */
-function safeLegacyTableModifier(value: unknown): string | null {
-  if (typeof value !== 'string' || !value.trim()) return DEFAULT_LEGACY_TABLE_MODIFIER;
-  let formula = value.trim()
-    .replace(/^return\s+/i, '')
-    .replace(/;\s*$/, '')
-    .replace(/\bMath\.(floor|ceil|round|abs|min|max)\b/g, '$1')
-    .replace(/\bstat\b/g, 'value');
-  if (!formula || /[{};=\x5B\x5D`]|=>|\b(?:monster|this|globalThis|window|document|function|const|let|var|new|import|require)\b/i.test(formula)) return null;
-  if (!/^[A-Za-z0-9_\s()+\-*/%.,?:<>!&|]+$/.test(formula)) return null;
-  const identifiers = formula.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [];
-  if (identifiers.some((identifier) => !SAFE_MODIFIER_FUNCTIONS.has(identifier))) return null;
-  return formula;
-}
-
-/**
- * Older Atlas statblock layouts used a `table` item with `properties`,
- * `headers` and an optional `calculate` modifier. Forge stores the same data
- * in a Scores Field. Preserve the legacy payload, but render its calculated
- * modifier through Forge's safe derived-column formula path.
+ * Older Atlas layouts allowed a calculated modifier column directly on a
+ * Table block. That block-level Columns feature is retired: keep the original
+ * callback data as inert migration metadata and ask users to model the value
+ * with a Number/Rating Field instead.
  */
 function promoteLegacyTableBlock(
   value: JsonRecord,
@@ -289,9 +273,8 @@ function promoteLegacyTableBlock(
   }
 
   const calculate = value.calculate === true;
-  const modifierFormula = calculate ? safeLegacyTableModifier(value.modifier) : null;
   const hasCustomModifier = typeof value.modifier === 'string' && value.modifier.trim().length > 0;
-  if (calculate && !modifierFormula) unsupportedModifiers.add(id);
+  if (calculate) unsupportedModifiers.add(id);
 
   const extras = isRecord(value.fsExtras) ? { ...value.fsExtras } : {};
   extras.atlasLegacyTable = {
@@ -306,24 +289,17 @@ function promoteLegacyTableBlock(
     id,
     type: 'scores',
     field: fieldKey,
-    orientation: 'row',
     fsExtras: extras,
   };
   delete next.properties;
   delete next.headers;
   delete next.calculate;
   delete next.modifier;
+  delete next.orientation;
+  delete next.perLine;
+  delete next.columns;
 
   if (value.rollable === true) next.rollable = true;
-  if (calculate && modifierFormula) {
-    const existingColumns = Array.isArray(value.columns) ? value.columns.filter(isRecord) : [];
-    next.columns = existingColumns.length > 0
-      ? existingColumns
-      : [{ label: 'Modifier', formula: modifierFormula, display: 'signed' }];
-    // Legacy Table calculated modifiers are rolls even when its base cells
-    // were not configured as bonuses.
-    next.legacyModifierRollable = true;
-  }
   return next as ForgeBlock;
 }
 
@@ -584,10 +560,10 @@ export function migrateLegacyTemplate(input: unknown): LegacyTemplateMigrationRe
   }
   const warnings: string[] = [];
   if (migratedGridBlocks > 0) warnings.push(`${migratedGridBlocks} legacy grid block(s) were converted to native Section/Row blocks. Review the canvas and save the template to keep the migration.`);
-  if (addedFallbacks) warnings.push('Some referenced fields were missing. Text fields were created so their values and references remain accessible.');
+  if (addedFallbacks) warnings.push('Some referenced fields were missing. In-line Fields were created so their values and references remain accessible.');
   if (rawId && rawId !== templateId) warnings.push('The legacy template ID did not match Atlas requirements and was replaced with a stable compatible ID.');
   if (unsupportedLegacyTableModifiers.size > 0) {
-    warnings.push(`${unsupportedLegacyTableModifiers.size} legacy Table modifier callback(s) were preserved as metadata but not executed. Replace them with a supported arithmetic formula in the Table block to display and roll the calculated modifier.`);
+    warnings.push(`${unsupportedLegacyTableModifiers.size} legacy calculated Table column(s) were preserved as metadata but are no longer displayed. Recreate each calculated value as a Number/Rating Field with a formula, then add that Field to the Table.`);
   }
   return { template: updated, changed: true, migratedGridBlocks, warnings };
 }

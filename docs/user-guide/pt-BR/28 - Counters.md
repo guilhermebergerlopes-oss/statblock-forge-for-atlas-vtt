@@ -12,13 +12,13 @@ parte: 4
 
 # Counters
 
-Um Field do tipo **Counters** define várias linhas de contadores nomeados. Cada linha tem um máximo, acompanha quantos usos foram gastos e pode definir uma fórmula opcional de recuperação (`regain`). É indicado para cargas, usos por descanso, munição especial, ativações limitadas e habilidades com quantidade finita.
+Um Field do tipo **Counter** define várias linhas de contadores nomeados. Cada linha tem um máximo, acompanha quantos usos foram gastos e pode definir uma fórmula opcional de recuperação (`regain`). É indicado para cargas, usos por descanso, munição especial, ativações limitadas e habilidades com quantidade finita.
 
 O Template define os presets das linhas. Cada statblock mantém seu próprio estado de uso e as próprias associações com os botões Rest.
 
-## Criar um Counters Field
+## Criar um Counter Field
 
-1. No Template, adicione um Field da categoria **Counters**.
+1. No Template, adicione um Field na categoria **Values** e selecione o tipo **Counter**.
 2. Selecione o Field na lista de Fields.
 3. No inspetor, abra **Counter rows**.
 4. Clique em **Adicionar Counter**.
@@ -66,8 +66,7 @@ Essa linha tem `2 / 3` usos restantes. O `reset` pode ser acrescentado na ficha 
 O bloco **Counters** organiza cada contador em uma célula. A quantidade de contadores por linha é uma propriedade do bloco, **Counters per row**:
 
 - padrão: `2`;
-- mínimo: `1`;
-- máximo: `6`.
+- digite qualquer número inteiro positivo; não há máximo configurado.
 
 O modo do indicador depende do `max` de cada linha:
 
@@ -143,7 +142,7 @@ As linhas são selecionadas pelo escopo da regra e pelas associações `reset`. 
 
 Esses conceitos podem parecer semelhantes, mas têm modelos diferentes:
 
-| Counters Field | Resource |
+| Counter Field | Resource |
 |---|---|
 | Pode agrupar várias linhas nomeadas em um único Field. | Representa um valor rastreado, frequentemente um Number ou Resource da coleção Atlas. |
 | Cada linha tem `max`, `used` e opcional `regain`. | Usa direção de tracking (counts up/down), valor atual e máximo. |
@@ -156,7 +155,7 @@ Um Rest pode gastar um Counter e recuperar um Resource, ou gastar um Resource e 
 
 Um **Counter dentro de uma Ability Part** é um controle local de usos associado a uma parte de Entry/Ability. Ele pode aparecer como pips ou checkboxes e possui máximo próprio (o modelo de parte suporta valores de 1 a 12).
 
-Esse contador pertence àquela parte da habilidade. Ele não é um Counters Field, não possui a mesma lista de linhas e não usa a mesma atribuição `reset`/`regain` das regras Rest do Counters Field.
+Esse contador pertence àquela parte da habilidade. Ele não é um Counter Field, não possui a mesma lista de linhas e não usa a mesma atribuição `reset`/`regain` das regras Rest do Counter Field.
 
 ## Mudanças no Template e fichas existentes
 

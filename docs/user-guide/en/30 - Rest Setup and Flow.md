@@ -79,8 +79,10 @@ Without repeated picks, an action can be selected only once and the maximum cann
 2. If choices or spends are required, the chooser requests actions and quantities.
 3. Forge rereads the current note values and validates the request. This prevents applying choices made against values that became stale while the chooser was open.
 4. Direct button rules are calculated first; rules from selected actions are then calculated in selection order.
-5. Local Resources and Counters are written to the sheet. An Atlas collection Resource is written to the corresponding Atlas character/Token state.
+5. Local Resources and Counters are written to the sheet. An Atlas collection Resource is written to the corresponding Atlas character/Token state. Before the first Atlas write, Forge validates all affected stores and checks that the Resource values still match the snapshot used for calculation.
 6. The result modal reports rolls, spends, Counter and Resource changes, and rules that were skipped.
+
+Atlas Resource writes use a compensating transaction rather than a cross-system database transaction: Forge records the previous value of every affected token/form and PartySync store. If a later Atlas store write or the statblock note write fails, Forge attempts to restore only the entries changed by that Rest. Entries that were never changed are left alone, and entries edited by another operation are not overwritten. A rollback conflict is reported with the original write error so the state can be reconciled rather than silently discarding a newer edit.
 
 An invalid rule does not necessarily prevent other valid rules from being calculated. The result summary identifies targets or formulas that could not be applied.
 
@@ -94,7 +96,7 @@ The editor preserves recovery entries and properties it cannot interpret. Legacy
 
 ## Example design: Short Rest and Long Rest
 
-Consider a character with tracked `hp`, a Number Field `mana` configured as a Resource, and a Counters Field named `abilities`:
+Consider a character with tracked `hp`, a Number Field `mana` configured as a Resource, and a Counter Field named `abilities`:
 
 - **Short Rest:** a direct rule restores `1d8` `hp`; another rule restores half of `mana` maximum, rounded down. A Counter rule may restore only rows assigned to Short Rest.
 - **Long Rest:** restores `hp` to maximum and recovers Counter rows assigned to Long Rest. Since rows can be associated with multiple buttons, configure each row's association to match the rests allowed to recover it.

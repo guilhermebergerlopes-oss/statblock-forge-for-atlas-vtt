@@ -42,9 +42,10 @@ test('block pattern references participate in emptiness; fallback references do 
   assert.equal(shouldShowWhenEmptyFallback(configured, { initiative: null, dex: null }), true);
 });
 
-test('Stat rollFrom is not treated as displayed content; Scores columns and Entries intro are', () => {
+test('Stat rollFrom and retired Scores Columns are not treated as displayed content; Table Fields and Entries intro are', () => {
   assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ rollFrom: 'initiative_dice' })), ['initiative']);
-  assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ type: 'scores', columns: [{ field: 'str' }, { field: 'dex' }] })), ['initiative', 'str', 'dex']);
+  assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ type: 'scores', columns: [{ field: 'str' }, { field: 'dex' }] })), ['initiative']);
+  assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ type: 'scores', fields: ['str', 'dex'] })), ['initiative', 'str', 'dex']);
   assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ type: 'entries', introField: 'intro' })), ['initiative', 'intro']);
   assert.deepEqual(whenEmptyFallbackSourceFieldKeys(block({ type: 'metric', fields: [''], formulas: ['floor((dex - 10) / 2)'] }), [{ key: 'dex' }]), ['dex']);
 });

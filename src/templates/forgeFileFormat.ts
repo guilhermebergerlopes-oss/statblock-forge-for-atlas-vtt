@@ -1,24 +1,22 @@
 /**
  * Forge-owned `.forgetemplate` container format.
  *
- * The Atlas template remains in its native shape at the root of the JSON file.
- * Forge-only layout data is stored under `statblockForge`, a namespaced key
- * that is removed when exporting to `.atlastemplate`.
+ * The Atlas template structure remains at the root, while Forge-owned files
+ * write the reorganized Field type IDs. Legacy IDs are normalized on read.
+ * Forge-only layout data is stored under `statblockForge`. Atlas-native
+ * `.atlastemplate` files are import-only and are normalized when read.
  */
-import { projectForgeTemplateForAtlas } from '../atlas/atlasTemplateAdapter.ts';
-import { migrateLegacyBlockAppearanceTokens, stripLegacyBlockAppearanceTokens } from './blockAppearance.ts';
+import { migrateLegacyBlockAppearanceTokens } from './blockAppearance.ts';
 import { isLegacyTemplateCandidate, migrateLegacyTemplate } from './legacyTemplateMigration.ts';
 import {
   cloneJson,
   isRecord,
   parseForgeLayout,
   parseTemplateForEditing,
-  serializeTemplate,
-  type ForgeBlock,
   type ForgeLayoutDocument,
   type ForgeTemplate,
 } from './forgeTemplate.ts';
-import { playerKeysForBlock, withPlayerAccess } from './playerSettingsModel.ts';
+import { serializeForgeJsonFieldTypes } from './fieldTypeJsonModel.ts';
 
 export const FORGE_TEMPLATE_EXTENSION = 'forgetemplate';
 export const FORGE_FILE_METADATA_KEY = 'statblockForge';
@@ -47,14 +45,16 @@ export function parseTemplateFileText(text: string, sourceExtension?: string): P
   const result = parseTemplateForEditing(migratedText);
   const baseWarnings = [...result.warnings, ...migration.warnings];
   const metadata = migration.template[FORGE_FILE_METADATA_KEY];
+  const normalizedExtension = sourceExtension?.toLowerCase().replace(/^\./, '');
+  const isForgeExtension = normalizedExtension === FORGE_TEMPLATE_EXTENSION;
+  const isAtlasExtension = normalizedExtension === 'atlastemplate';
   if (metadata === undefined) {
-    const isForgeExtension = sourceExtension?.toLowerCase().replace(/^\./, '') === FORGE_TEMPLATE_EXTENSION;
     return {
       ...result,
       warnings: baseWarnings,
       layout: null,
       fileFormat: isForgeExtension ? 'forge' : 'atlas',
-      canOverwrite: !isForgeExtension,
+      canOverwrite: false,
       ...(isForgeExtension ? { warnings: [...baseWarnings, 'Este arquivo .forgetemplate não contém metadados Forge. O original ficará protegido; use “Salvar cópia Forge” para reconstruí-los.'] } : {}),
     };
   }
@@ -64,7 +64,7 @@ export function parseTemplateFileText(text: string, sourceExtension?: string): P
     return {
       ...result,
       layout: null,
-      fileFormat: 'forge',
+      fileFormat: isAtlasExtension ? 'atlas' : 'forge',
       canOverwrite: false,
       warnings: [...baseWarnings, 'Forge metadata is missing, damaged, or uses an unsupported version. A default layout will be rebuilt; the original file is protected. Use Save Forge Copy to recover without overwriting the source.'],
     };
@@ -79,7 +79,7 @@ export function parseTemplateFileText(text: string, sourceExtension?: string): P
     return {
       ...result,
       layout: null,
-      fileFormat: 'forge',
+      fileFormat: isAtlasExtension ? 'atlas' : 'forge',
       canOverwrite: false,
       warnings: [...baseWarnings, 'Forge layout metadata is incomplete or belongs to another template. The source file is protected; use Save Forge Copy to rebuild it.'],
     };
@@ -90,8 +90,8 @@ export function parseTemplateFileText(text: string, sourceExtension?: string): P
     ...result,
     warnings: baseWarnings,
     layout: parseForgeLayout(layoutText, result.template),
-    fileFormat: 'forge',
-    canOverwrite: true,
+    fileFormat: isAtlasExtension ? 'atlas' : 'forge',
+    canOverwrite: !isAtlasExtension,
   };
 }
 
@@ -136,48 +136,8 @@ export function serializeForgeTemplateFile(
       layout: forgeLayout,
     },
   };
+  serializeForgeJsonFieldTypes(document);
   return `${JSON.stringify(document, null, 2)}\n`;
-}
-
-/** Remove all Forge-only information and produce a clean Atlas `.atlastemplate`. */
-export function serializeAtlasTemplateFile(template: ForgeTemplate, layout?: ForgeLayoutDocument): string {
-  const projection = projectForgeTemplateForAtlas(template);
-  let atlasTemplate = cloneJson(projection.template) as ForgeTemplate;
-  delete atlasTemplate[FORGE_FILE_METADATA_KEY];
-
-  // Total Hidden remains present in the native Atlas layout. Its Forge-only
-  // meaning is projected to Atlas's native `hidden` player access for every
-  // Field represented by the block and its descendants. Atlas can then keep
-  // the content available to the GM while withholding it from players.
-  if (layout && Array.isArray(atlasTemplate.layout.blocks)) {
-    const hiddenFieldKeys = new Set<string>();
-    const collectTotalHiddenFields = (blocks: readonly ForgeBlock[], inheritedHidden = false): void => {
-      for (const block of blocks) {
-        const totalHidden = inheritedHidden || layout.blocks[block.id]?.visibility === 'total-hidden';
-        if (totalHidden) {
-          for (const key of playerKeysForBlock(block)) hiddenFieldKeys.add(key);
-        }
-        if (Array.isArray(block.blocks)) {
-          collectTotalHiddenFields(block.blocks as ForgeBlock[], totalHidden);
-        }
-      }
-    };
-    collectTotalHiddenFields(atlasTemplate.layout.blocks);
-    if (hiddenFieldKeys.size > 0) {
-      atlasTemplate = withPlayerAccess(atlasTemplate, [...hiddenFieldKeys], 'hidden');
-    }
-  }
-  const stripBlocks = (blocks: unknown[]): void => {
-    for (const rawBlock of blocks) {
-      if (!isRecord(rawBlock)) continue;
-      const className = stripLegacyBlockAppearanceTokens(typeof rawBlock.className === 'string' ? rawBlock.className : undefined);
-      if (className) rawBlock.className = className;
-      else delete rawBlock.className;
-      if (Array.isArray(rawBlock.blocks)) stripBlocks(rawBlock.blocks);
-    }
-  };
-  if (isRecord(atlasTemplate.layout) && Array.isArray(atlasTemplate.layout.blocks)) stripBlocks(atlasTemplate.layout.blocks);
-  return serializeTemplate(atlasTemplate);
 }
 
 export function isForgeTemplatePath(path: string): boolean {

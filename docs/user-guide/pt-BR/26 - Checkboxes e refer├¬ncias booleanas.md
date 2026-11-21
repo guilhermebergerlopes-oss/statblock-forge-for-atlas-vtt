@@ -12,9 +12,15 @@ parte: 4
 
 # Checkboxes e referências booleanas
 
-Um Field do tipo **Checkboxes** armazena várias opções independentes, cada uma com um estado booleano: marcada (`true`) ou desmarcada (`false`). Essas opções podem ser lidas por fórmulas Number/Rating e por outros contextos que usam o avaliador numérico compartilhado.
+Um Field do tipo **Checkboxes** armazena opções com estado booleano: marcada (`true`) ou desmarcada (`false`). Cada conjunto possui a opção **Escolhas múltiplas**. Em Fields novos, ela começa desativada e somente uma opção pode ficar marcada por vez. Ative-a para permitir várias opções marcadas no mesmo conjunto. A configuração é independente por Field: outros conjuntos Checkboxes podem ter sua própria seleção, sem interferência.
 
-Use Checkboxes para características que ligam/desligam: voar, nadar, estar protegido por escudo, possuir visão no escuro, ativar uma postura ou receber uma condição de equipamento. Não use um Checkbox quando o dado precisa contar mais de dois estados; nesse caso, Choice, Number ou outro Field pode ser mais adequado.
+Use Checkboxes para características que ligam/desligam: voar, nadar, estar protegido por escudo, possuir visão no escuro, ativar uma postura ou receber uma condição de equipamento. Não use um Checkbox quando o dado precisa contar mais de dois estados; nesse caso, Selection, Number ou outro Field pode ser mais adequado.
+
+## Escolhas únicas e múltiplas
+
+No inspetor do Field, ative **Escolhas múltiplas** para permitir mais de uma opção marcada naquele conjunto. Quando desativada, marcar uma opção desmarca as demais opções do mesmo Field. Desmarcar a opção selecionada deixa o conjunto sem seleção. Outros Fields Checkboxes nunca são afetados.
+
+Templates antigos que não possuem essa configuração são abertos em modo múltiplo para preservar o comportamento anterior. Fields Checkboxes criados agora começam em modo de escolha única. Ao desativar escolhas múltiplas em um conjunto que já tinha várias opções marcadas no exemplo, somente a primeira opção configurada permanece marcada.
 
 ## Criar e configurar as opções
 

@@ -2,12 +2,14 @@ import type { ForgeLayoutDocument } from './forgeTemplate.ts';
 
 /** Default number of named Counter tracks shown on each visual line. */
 export const DEFAULT_COUNTERS_PER_ROW = 2;
-export const MAX_COUNTERS_PER_ROW = 6;
 
-/** Clamp persisted Block layout settings while keeping older templates compact. */
+/** Normalize a Counter column count to a positive, whole, safely representable number. */
 export function normalizeCountersPerRow(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_COUNTERS_PER_ROW;
-  return Math.max(1, Math.min(MAX_COUNTERS_PER_ROW, Math.floor(value)));
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  if (!Number.isFinite(parsed)) return DEFAULT_COUNTERS_PER_ROW;
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(1, Math.floor(parsed)));
 }
 
 /** Update the visual layout for one Counters block without changing its Field. */
