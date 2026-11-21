@@ -25,24 +25,26 @@ test('reserved Token-art aliases keep the Token linking menu available', async (
   assert.match(surface, /if \(isNativeImageField\) \{/);
 });
 
-test('Forge statblocks replace the matching Atlas DM Screen card instead of rendering a duplicate Forge section', async () => {
-  const bridge = await read('../src/atlas/forgeDMScreenBridge.ts');
-  assert.match(bridge, /findNativeFeedMount\(/);
-  assert.match(bridge, /attachCard\(card, nativeMount\.target, nativeMount\.nativeSheet\)/);
-  assert.match(bridge, /nativeSheet\.hidden = true/);
-  assert.match(bridge, /restoreNativeSheet\(/);
-  assert.doesNotMatch(bridge, /No Forge sheets are linked to Tokens or Characters in this scene/);
+test('Atlas DM Screen keeps its native compact statblock card; Forge does not replace or duplicate it', async () => {
+  const [previewBridge, renderer, readme] = await Promise.all([
+    read('../src/atlas/forgeAtlasPreviewBridge.ts'),
+    read('../src/atlas/atlasForgePreviewRenderer.ts'),
+    read('../README.md'),
+  ]);
+  assert.doesNotMatch(previewBridge, /startForgeAtlasDMScreenBridge|forgeDMScreenBridge/);
+  assert.doesNotMatch(renderer, /variant: 'feed'|atlas-feed-mount/);
+  assert.match(readme, /Atlas' own compact statblock presentation/);
+  assert.match(readme, /full Forge layout/);
 });
 
-test('DM Screen bridge startup and reconciliation failures are isolated from existing token-link and preview features', async () => {
-  const [bridge, runtime] = await Promise.all([
+test('Removing Forge DM Screen rendering does not affect Token linking or Ctrl-hover preview', async () => {
+  const [bridge, surface] = await Promise.all([
     read('../src/atlas/forgeAtlasPreviewBridge.ts'),
-    read('../src/atlas/forgeDMScreenBridge.ts'),
+    read('../src/views/StatblockRenderSurface.ts'),
   ]);
-  assert.match(bridge, /try \{\s*stopDMScreenBridge = startForgeAtlasDMScreenBridge/);
-  assert.match(bridge, /DM Screen integration could not start/);
-  assert.match(runtime, /Could not synchronize the Atlas DM Screen feed/);
-  assert.match(runtime, /catch \(error\)/);
+  assert.match(bridge, /startForgeAtlasStatblockLinkDialogBridge\(app, plugin\)/);
+  assert.match(bridge, /new ForgeStatblockPreviewWindow/);
+  assert.match(surface, /id: 'link-selected-atlas-tokens'/);
 });
 
 test('card actions remain visible instead of being hidden behind hover-only interaction', async () => {

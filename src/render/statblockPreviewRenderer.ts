@@ -597,6 +597,10 @@ function createNumericFieldRuntime(
         throw error;
       } finally {
         savingValue = false;
+        // Subscribers disable inline controls while a value is being saved.
+        // Notify them again after clearing the flag so controls (including
+        // Gauge +/- buttons) become available for subsequent interactions.
+        notifyAll();
       }
     },
     subscribe(fieldKey, update) {
@@ -1336,10 +1340,13 @@ function createInlineNumericFieldValue(
   runtime: NumericFieldRuntime | undefined,
   displayText: () => string,
   extraClass = '',
+  options: { displayElement?: HTMLElement; preserveDisplayFormatting?: boolean; slotClass?: string } = {},
 ): HTMLElement {
-  const value = element('span', `statblock-forge__preview-numeric-field-value${extraClass ? ` ${extraClass}` : ''}`);
-  const slot = createInlineEditSlot('span', '', value);
+  const value = options.displayElement
+    ?? element('span', `statblock-forge__preview-numeric-field-value${extraClass ? ` ${extraClass}` : ''}`);
+  const slot = createInlineEditSlot('span', options.slotClass ?? '', value);
   const redraw = (): void => {
+    if (options.displayElement) return;
     const display = displayText();
     const rollFormula = field.type === 'number' && !hasNumericFieldFormulaSettings(field)
       ? numberFieldAdvantageRollFormula(sample[field.key])
@@ -1356,7 +1363,7 @@ function createInlineNumericFieldValue(
       if (!value.isConnected || runtime.isSaving) return null;
       const input = element('input', 'atlas-sb-pane-input statblock-forge__inline-numeric-editor');
       input.type = 'text';
-      // Number Values may contain a valid dice expression ending in `adv` or `dis`.
+      // Number Values may contain a valid dice expression ending in adv/dis.
       // A decimal mobile keyboard hides those letters, so request a text keyboard.
       input.inputMode = 'text';
       input.spellcheck = false;
@@ -1401,11 +1408,13 @@ function createInlineNumericFieldValue(
           redraw();
         },
       };
-    }, value);
+    }, options.preserveDisplayFormatting === false ? undefined : value);
   }
 
-  runtime?.subscribe(field.key, redraw);
-  runtime?.subscribeAll(redraw);
+  if (!options.displayElement) {
+    runtime?.subscribe(field.key, redraw);
+    runtime?.subscribeAll(redraw);
+  }
   return slot.slot;
 }
 
@@ -5488,7 +5497,7 @@ function renderPairs(
 }
 
 function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: JsonRecord, layout: ForgeLayoutDocument, fields: readonly ForgeField[], numericRuntime?: NumericFieldRuntime): HTMLElement {
-  const wrapper = element('div', 'statblock-forge__preview-track');
+  const wrapper = element('div', `statblock-forge__preview-track${block.look === 'gauge' ? ' is-gauge' : ' is-boxes'}`);
   const fieldKey = typeof block.field === 'string' ? block.field : '';
   const fieldTracks = object(field?.tracks);
   const hasFieldTracking = fieldTracks.counts === 'down' || fieldTracks.counts === 'up';
@@ -5515,75 +5524,6 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
   if (!label) wrapper.classList.add('is-value-only');
   if (label) wrapper.append(element('strong', 'statblock-forge__preview-block-heading', label));
 
-  // In the final statblock, Boxes mode is represented by the boxes alone.
-  // The boxes themselves remain clickable/editable, so repeating the numeric
-  // current/maximum values above them only duplicates the same information.
-  // Keep the numeric readout only for explicit Gauge mode. Boxes mode is
-  // controlled exclusively through its clickable boxes, including tracked
-  // Number fields; it must not introduce a separate −/+ stepper.
-  const showTrackNumericValues = block.look === 'gauge';
-  if (numericRuntime?.canEdit && isFormulaCapableNumericField(field) && showTrackNumericValues) {
-    const valueLine = element('div', 'statblock-forge__preview-track-values');
-    const showTrackValueLabels = block.look === 'gauge';
-    if (selfTracked) {
-      const currentLine = element('span', 'statblock-forge__preview-track-value');
-      if (showTrackValueLabels) currentLine.append(element('span', 'statblock-forge__preview-track-value-label', numericRuntime.language === 'pt-BR' ? 'Atual: ' : 'Current: '));
-      const stepper = element('span', 'atlas-sb-counter__stepper statblock-forge__tracked-resource-stepper');
-      const minus = element('button', 'atlas-sb-counter__step', '−');
-      minus.type = 'button';
-      minus.setAttribute('aria-label', numericRuntime.language === 'pt-BR' ? `Diminuir ${label}` : `Decrease ${label}`);
-      const count = element('span', 'atlas-sb-counter__count statblock-forge__preview-track-current');
-      count.setAttribute('aria-live', 'polite');
-      const plus = element('button', 'atlas-sb-counter__step', '+');
-      plus.type = 'button';
-      plus.setAttribute('aria-label', numericRuntime.language === 'pt-BR' ? `Aumentar ${label}` : `Increase ${label}`);
-      const refreshCurrent = (): void => {
-        const current = currentValue();
-        const currentMax = Math.max(0, Math.floor(readMaximum() ?? 0));
-        count.textContent = current === null ? '—' : String(current);
-        minus.disabled = current === null || current <= 0 || numericRuntime.isSaving;
-        plus.disabled = current === null || current >= currentMax || numericRuntime.isSaving;
-      };
-      const changeCurrent = (delta: number): void => {
-        if (numericRuntime.isSaving || !forgeResourceValuesAreValid(sample)) return;
-        const current = currentValue();
-        if (current === null) return;
-        const currentMax = Math.max(0, Math.floor(readMaximum() ?? 0));
-        const next = Math.max(0, Math.min(currentMax, current + delta));
-        if (next === current) return;
-        const nextData: JsonRecord = { [FORGE_RESOURCE_VALUES_KEY]: sample[FORGE_RESOURCE_VALUES_KEY] };
-        if (!setForgeTrackedResourceCurrent(nextData, fieldKey, next)) return;
-        void numericRuntime.setBaseValue(FORGE_RESOURCE_VALUES_KEY, nextData[FORGE_RESOURCE_VALUES_KEY])
-          .then(refreshCurrent)
-          .catch(refreshCurrent);
-      };
-      minus.addEventListener('click', (event) => { event.stopPropagation(); changeCurrent(-1); });
-      plus.addEventListener('click', (event) => { event.stopPropagation(); changeCurrent(1); });
-      refreshCurrent();
-      stepper.append(minus, count, plus);
-      currentLine.append(stepper);
-      valueLine.append(currentLine);
-      const maximumLine = element('span', 'statblock-forge__preview-track-value');
-      if (showTrackValueLabels) maximumLine.append(element('span', 'statblock-forge__preview-track-value-label', numericRuntime.language === 'pt-BR' ? 'Máximo: ' : 'Maximum: '));
-      maximumLine.append(createInlineNumericFieldValue(field, sample, numericRuntime, () => numericFieldDisplayText(field, sample, numericRuntime)));
-      valueLine.append(maximumLine);
-      numericRuntime.subscribe(FORGE_RESOURCE_VALUES_KEY, refreshCurrent);
-      numericRuntime.subscribeAll(refreshCurrent);
-    } else {
-      const currentLine = element('span', 'statblock-forge__preview-track-value');
-      if (showTrackValueLabels) currentLine.append(element('span', 'statblock-forge__preview-track-value-label', numericRuntime.language === 'pt-BR' ? 'Atual: ' : 'Current: '));
-      currentLine.append(createInlineNumericFieldValue(field, sample, numericRuntime, () => numericFieldDisplayText(field, sample, numericRuntime)));
-      valueLine.append(currentLine);
-      if (isFormulaCapableNumericField(maximumField) && maximumField.key !== field?.key) {
-        const maximumLine = element('span', 'statblock-forge__preview-track-value');
-        if (showTrackValueLabels) maximumLine.append(element('span', 'statblock-forge__preview-track-value-label', numericRuntime.language === 'pt-BR' ? 'Máximo: ' : 'Maximum: '));
-        maximumLine.append(createInlineNumericFieldValue(maximumField, sample, numericRuntime, () => numericFieldDisplayText(maximumField, sample, numericRuntime)));
-        valueLine.append(maximumLine);
-      }
-    }
-    wrapper.append(valueLine);
-  }
-
   const blockMeta = layout.blocks[block.id];
   const appearance = blockMeta?.appearanceMode === 'custom' ? blockMeta.appearance ?? {} : {};
   const track = element('div', 'statblock-forge__track-preview');
@@ -5593,10 +5533,8 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
   trackContent.setCssStyles({ maxWidth: '100%' });
   const accessibleLabel = label || field?.label?.trim() || fieldKey || 'Track';
   // In Boxes mode, show the trailing /maximum only when this Value owns its
-  // maximum. When another Number Field supplies the cap, the extra number is
-  // redundant; the boxes already communicate the available capacity.
-  // Keep the editor node stable across track redraws so numeric subscriptions
-  // and its inline-edit registration are created only once.
+  // maximum. The value remains editable in place; Gauge exposes this edit by
+  // clicking the bar itself when the Number is its own maximum.
   const trailingMaximum = block.look === 'gauge' || !selfTracked
     ? null
     : element('span', 'statblock-forge__preview-track-maximum');
@@ -5622,36 +5560,107 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
   }
   track.append(trackContent);
   if (trailingMaximum) track.append(trailingMaximum);
+
+  const useGauge = block.look === 'gauge';
+  let gaugeTrack: HTMLElement | null = null;
+  let gaugeFill: HTMLElement | null = null;
+  let gaugeMinus: HTMLButtonElement | null = null;
+  let gaugePlus: HTMLButtonElement | null = null;
+  if (useGauge) {
+    // Gauge keeps its controls and meter mounted. This is important when the
+    // bar itself opens the Number editor: a saved maximum must not replace the
+    // active editor node while its commit is completing.
+    const gauge = element('span', 'atlas-sb-gauge statblock-forge__track-gauge');
+    const canAdjust = Boolean(numericRuntime?.canEdit && field && isFormulaCapableNumericField(field));
+    const changeCurrent = (delta: number): void => {
+      if (!numericRuntime || !field || numericRuntime.isSaving) return;
+      const current = currentValue();
+      if (current === null) return;
+      const currentMax = Math.max(0, Math.floor(readMaximum() ?? 0));
+      const next = Math.max(0, Math.min(currentMax, current + delta));
+      if (next === current) return;
+      if (selfTracked) {
+        if (!forgeResourceValuesAreValid(sample)) return;
+        const nextData: JsonRecord = { [FORGE_RESOURCE_VALUES_KEY]: sample[FORGE_RESOURCE_VALUES_KEY] };
+        if (!setForgeTrackedResourceCurrent(nextData, fieldKey, next)) return;
+        void numericRuntime.setBaseValue(FORGE_RESOURCE_VALUES_KEY, nextData[FORGE_RESOURCE_VALUES_KEY]).catch(() => undefined);
+      } else {
+        void numericRuntime.setBaseValue(fieldKey, next).catch(() => undefined);
+      }
+    };
+    if (canAdjust) {
+      gaugeMinus = element('button', 'atlas-sb-counter__step statblock-forge__track-gauge-step', '−') as HTMLButtonElement;
+      gaugeMinus.type = 'button';
+      gaugeMinus.setAttribute('aria-label', numericRuntime?.language === 'pt-BR' ? `Diminuir ${accessibleLabel}` : `Decrease ${accessibleLabel}`);
+      gaugeMinus.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        changeCurrent(-1);
+      });
+      gauge.append(gaugeMinus);
+    }
+
+    gaugeTrack = element('span', 'atlas-sb-gauge-track statblock-forge__track-gauge-track');
+    gaugeFill = element('span', 'atlas-sb-gauge-fill statblock-forge__track-gauge-fill');
+    gaugeTrack.setCssStyles({ backgroundColor: appearance.trackEmptyColor ?? 'var(--background-modifier-border)' });
+    gaugeTrack.setAttribute('role', 'meter');
+    gaugeTrack.setAttribute('aria-label', `${accessibleLabel}: ${filled} de ${max}`);
+    gaugeTrack.setAttribute('aria-valuemin', '0');
+    gaugeTrack.setAttribute('aria-valuemax', String(max));
+    gaugeTrack.setAttribute('aria-valuenow', String(filled));
+    if (appearance.trackBorderColor) gaugeTrack.setCssStyles({ border: `1px solid ${appearance.trackBorderColor}` });
+    gaugeTrack.append(gaugeFill);
+
+    if (selfTracked && numericRuntime?.canEdit && field && isFormulaCapableNumericField(field)) {
+      const maximumEditor = createInlineNumericFieldValue(field, sample, numericRuntime, () => '', '', {
+        displayElement: gaugeTrack,
+        preserveDisplayFormatting: false,
+        slotClass: 'statblock-forge__track-gauge-edit-slot',
+      });
+      maximumEditor.setAttribute('aria-label', numericRuntime.language === 'pt-BR'
+        ? `Clique para editar o máximo de ${accessibleLabel}`
+        : `Click to edit ${accessibleLabel} maximum`);
+      maximumEditor.title = numericRuntime.language === 'pt-BR'
+        ? 'Clique no gauge para editar o máximo'
+        : 'Click the gauge to edit its maximum';
+      gauge.append(maximumEditor);
+    } else {
+      gauge.append(gaugeTrack);
+    }
+
+    if (canAdjust) {
+      gaugePlus = element('button', 'atlas-sb-counter__step statblock-forge__track-gauge-step', '+') as HTMLButtonElement;
+      gaugePlus.type = 'button';
+      gaugePlus.setAttribute('aria-label', numericRuntime?.language === 'pt-BR' ? `Aumentar ${accessibleLabel}` : `Increase ${accessibleLabel}`);
+      gaugePlus.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        changeCurrent(1);
+      });
+      gauge.append(gaugePlus);
+    }
+    trackContent.append(gauge);
+  }
+
   const drawTrack = (safeFilled: number, safeMax: number): void => {
     track.dataset.currentValue = String(safeFilled);
     track.dataset.maximumValue = String(safeMax);
     // The selected display mode is authoritative: Boxes stays boxes and
-    // Gauge stays a gauge. Tracked Boxes remain adjustable by clicking them.
-    const useGauge = block.look === 'gauge';
-    trackContent.replaceChildren();
-
+    // Gauge stays a gauge. Gauge controls flank the bar; its maximum editor
+    // lives on the bar itself only when the Number is self-tracked.
     if (useGauge) {
-      // Match Atlas' native TrackMeter: a 96×6 px gauge followed by the
-      // tabular current/maximum value. The fill is scaled on the compositor.
-      const gauge = element('span', 'atlas-sb-gauge statblock-forge__track-gauge');
-      const gaugeTrack = element('span', 'atlas-sb-gauge-track statblock-forge__track-gauge-track');
-      const gaugeFill = element('span', 'atlas-sb-gauge-fill statblock-forge__track-gauge-fill');
+      if (!gaugeTrack || !gaugeFill) return;
       gaugeFill.setCssProps({ ['--atlas-sb-gauge-share']: String(safeMax > 0 ? safeFilled / safeMax : 0) });
       gaugeFill.setCssStyles({ backgroundColor: appearance.trackFillColor ?? 'var(--text-accent)' });
-      gaugeTrack.setCssStyles({ backgroundColor: appearance.trackEmptyColor ?? 'var(--background-modifier-border)' });
-      gaugeTrack.setAttribute('role', 'meter');
       gaugeTrack.setAttribute('aria-label', `${accessibleLabel}: ${safeFilled} de ${safeMax}`);
-      gaugeTrack.setAttribute('aria-valuemin', '0');
       gaugeTrack.setAttribute('aria-valuemax', String(safeMax));
       gaugeTrack.setAttribute('aria-valuenow', String(safeFilled));
-      if (appearance.trackBorderColor) gaugeTrack.setCssStyles({ border: `1px solid ${appearance.trackBorderColor}` });
-      gaugeTrack.append(gaugeFill);
-      const gaugeValue = element('span', 'atlas-sb-gauge-value statblock-forge__track-gauge-value', `${safeFilled} / ${safeMax}`);
-      gauge.append(gaugeTrack, gaugeValue);
-      trackContent.append(gauge);
+      if (gaugeMinus) gaugeMinus.disabled = safeFilled <= 0 || Boolean(numericRuntime?.isSaving);
+      if (gaugePlus) gaugePlus.disabled = safeFilled >= safeMax || Boolean(numericRuntime?.isSaving);
       return;
     }
 
+    trackContent.replaceChildren();
     // Atlas draws at most twelve 12px boxes per line, with 4px gaps, and
     // switches to a gauge above 36 boxes. The class names intentionally match
     // Atlas so its semantics remain familiar while Forge keeps its own scope.

@@ -2,7 +2,6 @@ import type { App, EventRef, WorkspaceLeaf } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
 import { getAtlasMapViewContexts, inspectAtlasRuntime } from './atlasRuntime.ts';
 import { isForgeNativeV2Statblock } from './atlasForgePreviewRenderer.ts';
-import { startForgeAtlasDMScreenBridge } from './forgeDMScreenBridge.ts';
 import { startForgeAtlasStatblockLinkDialogBridge } from './forgeStatblockLinkDialogBridge.ts';
 import type { AtlasDiceTokenRollContextLike } from './atlasDiceRuntime.ts';
 import {
@@ -167,15 +166,7 @@ export function installForgePreviewHooksForManager(
 /** Installs and owns direct Atlas preview hooks for all currently open and future map views. */
 export function startForgeAtlasPreviewBridge(app: App, plugin: StatblockForgePlugin): () => void {
   let disposed = false;
-  let stopDMScreenBridge: () => void = () => {};
   let stopStatblockLinkDialogBridge: () => void = () => {};
-  try {
-    stopDMScreenBridge = startForgeAtlasDMScreenBridge(app, plugin);
-  } catch (error) {
-    // The optional DM Screen feed must not prevent token linking or native
-    // Ctrl-hover preview hooks from being installed on a supported Atlas map.
-    console.error('[Statblock Forge] Atlas DM Screen integration could not start:', error);
-  }
   try {
     stopStatblockLinkDialogBridge = startForgeAtlasStatblockLinkDialogBridge(app, plugin);
   } catch (error) {
@@ -222,7 +213,6 @@ export function startForgeAtlasPreviewBridge(app: App, plugin: StatblockForgePlu
     disposed = true;
     for (const patch of patches.values()) patch();
     patches.clear();
-    stopDMScreenBridge();
     stopStatblockLinkDialogBridge();
     for (const ref of eventRefs) app.workspace.offref(ref);
     eventRefs.length = 0;

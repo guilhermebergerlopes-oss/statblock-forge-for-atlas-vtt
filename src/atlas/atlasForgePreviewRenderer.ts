@@ -22,7 +22,7 @@ interface ForgePreviewRenderContext {
   readonly container: HTMLElement;
   readonly instanceId: string;
   readonly sceneId: string;
-  readonly variant: 'full' | 'preview' | 'feed';
+  readonly variant: 'full' | 'preview';
   readonly token?: { readonly tokenId: string; readonly name: string; readonly imagePath: string };
   /** The Link Statblock dialog previews the statblock as it will appear for the selected Token. */
   readonly preferTokenImage?: boolean;
@@ -147,10 +147,6 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
           'statblock-forge__atlas-preview-mount',
           renderContext.variant === 'preview',
         );
-        renderContext.container.classList.toggle(
-          'statblock-forge__atlas-feed-mount',
-          renderContext.variant === 'feed',
-        );
         const resolved = await resolveDefinition(sourceId);
         if (disposed || renderContext.signal.aborted || sequence !== drawSequence) return;
         if (!resolved) {
@@ -162,7 +158,7 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
         }
 
         const data = { ...resolved.data };
-        // Atlas hover/feed previews keep explicit Forge art; the link dialog can preview the selected Token's art.
+        // Atlas hover previews keep explicit Forge art; the link dialog can preview the selected Token's art.
         const imageField = headerFieldForPart(resolved.template.fields, 'image');
         if (imageField && renderContext.token?.imagePath
           && (renderContext.preferTokenImage === true || !data[imageField.key])) {
@@ -243,8 +239,8 @@ export interface ForgeAtlasPreviewRenderOptions {
   /** The Link Statblock dialog previews the statblock as it will appear for the selected Token. */
   readonly preferTokenImage?: boolean;
   readonly signal: AbortSignal;
-  /** Render surface: Atlas hover preview or DM Screen feed. */
-  readonly variant?: 'preview' | 'feed';
+  /** Render surface: the full statblock hover/selection preview. */
+  readonly variant?: 'preview';
 }
 
 export interface ForgeAtlasPreviewRenderSession {
