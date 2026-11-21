@@ -1674,6 +1674,90 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .atlas-sb-pane-chip__remove { padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
 .atlas-sb-pane-entry__counter-marks { display: inline-flex; flex-wrap: wrap; gap: 0.15rem; }
 .atlas-sb-pane-entry__counter-marks input { margin: 0; }
+/* Selection settings that allow multiple picks or an optional number per pick. */
+.statblock-forge__selection-editor {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  color: var(--forge-theme-text, var(--text-normal));
+}
+.statblock-forge__selection-editor-option {
+  box-sizing: border-box;
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--forge-theme-border, var(--background-modifier-border));
+  border-radius: var(--radius-s);
+  background: var(--forge-theme-raised, var(--background-primary));
+}
+.statblock-forge__selection-editor-choice {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--interactive-accent);
+}
+.statblock-forge__selection-editor-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--forge-theme-text, var(--text-normal));
+  font: inherit;
+}
+.statblock-forge__selection-editor-number {
+  box-sizing: border-box;
+  width: 5.25rem;
+  min-width: 3.5rem;
+  max-width: 100%;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--forge-theme-border, var(--background-modifier-border));
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--forge-theme-text, var(--text-normal));
+  font: inherit;
+  line-height: 1.3;
+}
+.statblock-forge__selection-editor-unit {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+.statblock-forge__selection-editor-number:focus-visible,
+.statblock-forge__selection-editor-choice:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.statblock-forge__selection-editor-custom {
+  display: inline-flex;
+  flex: 1 1 12rem;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: min(12rem, 100%);
+  max-width: 100%;
+}
+.statblock-forge__selection-editor-custom .statblock-forge__selection-editor-number {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 6rem;
+}
+.statblock-forge__selection-editor-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.statblock-forge__selection-editor-error {
+  display: block;
+  flex: 1 1 100%;
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
 .statblock-forge__inline-field-editor-error { flex: 1 1 100%; color: var(--text-error); font-size: var(--font-ui-smaller); }
 .statblock-forge__preview-entry-name { font-weight: 700; }
 .statblock-forge__preview-entry-description { min-width: 0; }
@@ -8384,3 +8468,279 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   font-size: 0 !important;
   line-height: 0 !important;
 }
+
+/* BEGIN GENERATED FORGE SELECTION STYLES */
+/* Generated from src/styles/selection.scss. Do not edit this block directly. */
+/*
+ * Selection value styling, kept in step with Atlas' ChoiceValueInput,
+ * ChoicePicksInput, _pane-inputs.scss and _pane-lists.scss.
+ *
+ * This file intentionally contains plain CSS syntax (valid SCSS without
+ * Sass-only directives). The build embeds the compiled result in styles.css,
+ * because Obsidian loads CSS files and does not load SCSS source files.
+ */
+/* Atlas' inline value field: no separate form-control box around the value. */
+.statblock-forge__statblock .statblock-forge__selection-atlas {
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+  vertical-align: baseline;
+  cursor: text;
+}
+
+/* Inline values keep their natural text width; Metrics and Table cells fill their slot. */
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-inline {
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-metric,
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-table {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Forge groups the selected chips in a wrapper; display:contents gives them
+   the same flex layout as Atlas' direct children. */
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-selection-chips {
+  display: contents;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas.atlas-sb-pane-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-pick__add {
+  position: relative;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-metric:not(.atlas-sb-pane-chips) > .atlas-sb-pane-input,
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-table:not(.atlas-sb-pane-chips) > .atlas-sb-pane-input {
+  flex: 1 1 auto;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-metric .atlas-sb-pane-pick__add,
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-table .atlas-sb-pane-pick__add {
+  flex: 1 1 4em;
+  min-width: 2ch;
+}
+
+/* Atlas inputs inherit the surrounding statblock typography and have no
+   browser/theme-specific border, fill or focus chrome. */
+.statblock-forge__statblock .statblock-forge__selection-atlas :is(input, textarea).atlas-sb-pane-input {
+  appearance: none;
+  box-sizing: border-box;
+  height: auto;
+  min-width: 2ch;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-transform: inherit;
+  vertical-align: baseline;
+  field-sizing: content;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas :is(input, textarea).atlas-sb-pane-input:focus,
+.statblock-forge__statblock .statblock-forge__selection-atlas :is(input, textarea).atlas-sb-pane-input:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-input::placeholder {
+  color: var(--text-faint);
+  font-style: normal;
+  font-weight: var(--font-normal, 400);
+  opacity: 1;
+}
+
+/* A single option is typed where the value normally sits. */
+.statblock-forge__statblock .statblock-forge__selection-atlas.is-live-inline:not(.atlas-sb-pane-chips) > .atlas-sb-pane-input {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 2ch;
+  max-width: 100%;
+}
+
+/* A multiple/numbered choice adds options through the trailing combobox. */
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-pick__add > .atlas-sb-pane-chips__input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 2ch;
+  max-width: 100%;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-choice__chevron {
+  display: block;
+  flex: none;
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Atlas chips: compact pills, with the number appearing as chip text until focused. */
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 0 0 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-pick {
+  color: var(--text-normal);
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas input.atlas-sb-pane-input.atlas-sb-pane-pick__number {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 2ch;
+  max-width: 8ch;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas input.atlas-sb-pane-input.atlas-sb-pane-pick__number:hover,
+.statblock-forge__statblock .statblock-forge__selection-atlas input.atlas-sb-pane-input.atlas-sb-pane-pick__number:focus {
+  background: var(--background-modifier-form-field);
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-pick__unit {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-pick--unread {
+  background: color-mix(in oklch, var(--text-warning) 14%, transparent);
+  color: var(--text-normal);
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-chip__remove {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas .atlas-sb-pane-chip__remove:hover {
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  color: var(--text-normal);
+}
+
+.statblock-forge__statblock .statblock-forge__selection-atlas :is(.atlas-sb-pane-chip__remove, .atlas-sb-pane-pick__number):focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus, var(--interactive-accent));
+  outline-offset: 1px;
+}
+
+/* Atlas' ChoiceOptionList menu. The Forge positions it with fixed coordinates
+   in the Atlas portal host, so this rule deliberately leaves position and the
+   inline placement properties to the renderer. */
+.atlas-vtt-plugin.atlas-sb-pane-options {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 500;
+  min-width: 160px;
+  max-height: 300px;
+  padding: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: var(--menu-border-width, 1px) solid var(--menu-border-color, var(--background-modifier-border));
+  border-radius: var(--radius-l, 16px);
+  background: var(--menu-background, var(--background-secondary));
+  box-shadow: var(--menu-shadow, var(--shadow-s, 0 4px 16px rgba(0, 0, 0, 0.18)));
+  color: var(--text-normal);
+  font-style: normal;
+  font-weight: var(--font-normal, 400);
+}
+
+.atlas-vtt-plugin.atlas-sb-pane-options[hidden] {
+  display: none;
+}
+
+.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--input-height, 30px);
+  padding: 0 8px;
+  border-radius: var(--radius-m, 10px);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  user-select: none;
+}
+
+.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option:hover,
+.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option.is-active {
+  background-color: var(--background-modifier-hover);
+}
+
+.atlas-vtt-plugin.atlas-sb-pane-options .atlas-sb-pane-option[aria-selected=true] {
+  color: var(--text-normal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-vtt-plugin.atlas-sb-pane-options {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+/* END GENERATED FORGE SELECTION STYLES */

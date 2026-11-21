@@ -198,7 +198,7 @@ test('the row-label column heading is blank whenever Table column Labels are dis
 
 test('all editable Table rows use the same rollable value and cell editor', async () => {
   const renderer = await readFile(rendererUrl, 'utf8');
-  assert.match(renderer, /if \(onValueEdit && runtime\?\.canEdit && !isFormulaBackedDice && isPrimitiveValue\)/);
+  assert.match(renderer, /if \(onValueEdit && runtime\?\.canEdit && !isFormulaBackedDice && \(isPrimitiveValue \|\| field\.type === 'choice'\)\)/);
   assert.match(renderer, /statblock-forge__table-row-cell-value/);
   assert.match(renderer, /tableCellRollFormulas\(rollText, rollable\)/);
   assert.match(renderer, /appendForgeStatblockDiceText\(valueNode, displayText, rollable\)/);

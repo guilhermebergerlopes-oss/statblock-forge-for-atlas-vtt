@@ -3,7 +3,7 @@
  * preview. These mirror the public value shapes, without importing Atlas code.
  */
 import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
-import { selectionHasValue, selectionOptionIsSelected, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
+import { readSelectionField, selectionHasValue, selectionOptionIsSelected, selectionOptionNumber, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -419,10 +419,15 @@ export function evaluatePreviewFormula(
     const selectionField = selectionFields.get(rootKey);
     if (selectionField) {
       const raw = sample[rootKey];
-      if (parts.length === 0) return selectionHasValue(raw) ? 1 : 0;
-      if (parts.length === 1) {
+      if (parts.length === 0) {
+        return selectionHasValue(raw) || readSelectionField(selectionField, raw).picks.length > 0 ? 1 : 0;
+      }
+      if (parts.length === 1 || (parts.length === 2 && parts[1] === 'number')) {
         const option = selectionOptionReferences(selectionField).find((candidate) => candidate.key === parts[0]);
-        if (option) return selectionOptionIsSelected(selectionField, raw, option.value, option.key) ? 1 : 0;
+        if (option) {
+          if (parts.length === 2) return selectionOptionNumber(selectionField, raw, option.value, option.key) ?? 0;
+          return selectionOptionIsSelected(selectionField, raw, option.value, option.key) ? 1 : 0;
+        }
       }
       return undefined;
     }

@@ -108,8 +108,25 @@ test('Selection boolean references support multi-pick and numbered values', asyn
 
   const numbered = { ...selection, several: false, numbered: true };
   assert.equal(evaluatePreviewFormula('@languages.common', { languages: 'Common 60' }, undefined, [numbered]), 1);
-  assert.equal(evaluatePreviewFormula('@languages.common', { languages: 'Common 0' }, undefined, [numbered]), 0);
+  assert.equal(evaluatePreviewFormula('@languages.common', { languages: 'Common 0' }, undefined, [numbered]), 1,
+    'a zero-number pick is still selected; its numeric reference is zero');
+  assert.equal(evaluatePreviewFormula('@languages.common.number', { languages: 'Common 60' }, undefined, [numbered]), 60);
+  assert.equal(evaluatePreviewFormula('@languages.common.number', { languages: 'Common' }, undefined, [numbered]), 0,
+    'a pick can be selected without having a number yet');
   assert.equal(selectionOptionReferences(numbered).length, 3);
+
+  const numberedSeveral = { ...selection, numbered: true, unit: 'ft.' };
+  const numberedValues = { languages: 'Common 60 ft., Elvish 30 ft.' };
+  assert.equal(evaluatePreviewFormula('@languages.common', numberedValues, undefined, [numberedSeveral]), 1);
+  assert.equal(evaluatePreviewFormula('@languages.elvish', numberedValues, undefined, [numberedSeveral]), 1);
+  assert.equal(evaluatePreviewFormula('@languages.draconic', numberedValues, undefined, [numberedSeveral]), 0);
+  assert.equal(evaluatePreviewFormula('@languages.common.number + @languages.elvish.number', numberedValues, undefined, [numberedSeveral]), 90);
+  const mixedNumberedValues = { languages: 'Common, Elvish 30 ft.' };
+  assert.equal(evaluatePreviewFormula('@languages.common', mixedNumberedValues, undefined, [numberedSeveral]), 1,
+    'a pick without a number remains selected in multi-pick mode');
+  assert.equal(evaluatePreviewFormula('@languages.common.number', mixedNumberedValues, undefined, [numberedSeveral]), 0,
+    'a pick without a number contributes zero to its numeric reference');
+  assert.equal(evaluatePreviewFormula('@languages.elvish.number', mixedNumberedValues, undefined, [numberedSeveral]), 30);
 });
 
 test('Number/Rating formula evaluation receives Selection metadata for boolean option references', async () => {

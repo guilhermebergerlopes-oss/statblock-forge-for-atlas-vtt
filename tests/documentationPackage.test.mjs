@@ -96,6 +96,10 @@ test('downloadable Portuguese and English guides document Checkbox multiple choi
   assert.match(english.content, /Other Checkboxes Fields are never affected/);
   assert.match(portuguese.content, /Selection como Booleano/);
   assert.match(portuguese.content, /stance\.aggressive/);
+  assert.match(portuguese.content, /@languages\.common\.number/);
+  assert.match(portuguese.content, /número estiver vazio/);
   assert.match(english.content, /Selection as a boolean/);
   assert.match(english.content, /stance\.aggressive/);
+  assert.match(english.content, /@languages\.common\.number/);
+  assert.match(english.content, /number is blank/);
 });
