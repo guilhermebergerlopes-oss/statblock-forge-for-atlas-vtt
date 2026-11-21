@@ -47,7 +47,7 @@ function existingPreview(manager: AtlasPreviewManager, pinId: string): unknown {
 
 function raisePreview(manager: AtlasPreviewManager, preview: ForgeStatblockPreviewWindow): void {
   if (manager.raiseZIndex) manager.raiseZIndex(preview);
-  else if (preview.element) preview.element.style.zIndex = '40';
+  else if (preview.element) preview.element.setCssStyles({ zIndex: '40' });
 }
 
 

@@ -2538,17 +2538,14 @@ function renderTableFields(
 
     table.style.width = `${tableWidthPx}px`;
     table.style.minWidth = `${tableWidthPx}px`;
-    table.style.maxWidth = 'none';
-    table.style.tableLayout = 'fixed';
+    table.setCssStyles({ maxWidth: 'none', tableLayout: 'fixed' });
 
     table.querySelectorAll<HTMLTableColElement>('col[data-table-data-column]').forEach((column) => {
       column.style.width = `${dataColumnWidthPx}px`;
     });
     table.querySelectorAll<HTMLElement>('[data-table-data-column]').forEach((cell) => {
       cell.style.width = `${dataColumnWidthPx}px`;
-      cell.style.minWidth = '0';
-      cell.style.maxWidth = 'none';
-      cell.style.boxSizing = 'border-box';
+      cell.setCssStyles({ minWidth: '0', maxWidth: 'none', boxSizing: 'border-box' });
     });
     table.querySelectorAll<HTMLElement>(
       '.statblock-forge__preview-table-row-actions-column, .statblock-forge__preview-table-row-actions-heading, .statblock-forge__preview-table-row-actions-cell',
@@ -2556,7 +2553,7 @@ function renderTableFields(
       actionTrack.style.width = `${actionsWidthPx}px`;
       actionTrack.style.minWidth = `${actionsWidthPx}px`;
       actionTrack.style.maxWidth = `${actionsWidthPx}px`;
-      actionTrack.style.boxSizing = 'border-box';
+      actionTrack.setCssStyles({ boxSizing: 'border-box' });
     });
   };
 

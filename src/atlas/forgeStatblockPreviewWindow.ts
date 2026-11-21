@@ -152,12 +152,14 @@ export class ForgeStatblockPreviewWindow {
     const element = doc.createElement('div');
     element.className = 'atlas-statblock-preview-window atlas-statblock-preview-window--movable';
     element.tabIndex = -1;
-    element.style.position = 'fixed';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.width = 'max-content';
-    element.style.boxSizing = 'border-box';
-    element.style.zIndex = '100';
+    element.setCssStyles({
+      position: 'fixed',
+      display: 'flex',
+      flexDirection: 'column',
+      width: 'max-content',
+      boxSizing: 'border-box',
+      zIndex: '100',
+    });
     doc.body.append(element);
     this.element = element;
 
@@ -204,12 +206,14 @@ export class ForgeStatblockPreviewWindow {
     element.append(content);
     const renderHost = doc.createElement('div');
     renderHost.className = 'atlas-sheet-render-container';
-    renderHost.style.display = 'flex';
-    renderHost.style.flex = '1 1 auto';
-    renderHost.style.minWidth = '0';
-    renderHost.style.minHeight = '0';
-    renderHost.style.maxWidth = '100%';
-    renderHost.style.overflowX = 'auto';
+    renderHost.setCssStyles({
+      display: 'flex',
+      flex: '1 1 auto',
+      minWidth: '0',
+      minHeight: '0',
+      maxWidth: '100%',
+      overflowX: 'auto',
+    });
     content.append(renderHost);
     this.renderHost = renderHost;
 
@@ -391,10 +395,9 @@ export class ForgeStatblockPreviewWindow {
       const availableContentWidth = Math.max(1, outerWidth - horizontalPadding);
       element.style.width = `${outerWidth}px`;
       element.style.maxWidth = `${outerWidth}px`;
-      this.renderHost.style.boxSizing = 'border-box';
+      this.renderHost.setCssStyles({ boxSizing: 'border-box', minWidth: '0' });
       this.renderHost.style.flex = `0 0 ${availableContentWidth}px`;
       this.renderHost.style.width = `${availableContentWidth}px`;
-      this.renderHost.style.minWidth = '0';
       this.renderHost.style.maxWidth = `${availableContentWidth}px`;
     } else {
       element.style.maxWidth = `${maxWidth}px`;
