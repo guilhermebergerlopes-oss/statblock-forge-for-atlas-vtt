@@ -1,0 +1,36 @@
+.statblock-forge__table-formula-editors {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+
+.statblock-forge__table-formula-editors > summary {
+  cursor: pointer;
+  font-weight: var(--font-medium);
+}
+
+.statblock-forge__table-formula-editors .statblock-forge__control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.statblock-forge__table-formula-editors textarea {
+  width: 100%;
+  min-height: 3.5rem;
+  resize: vertical;
+  font-family: var(--font-monospace);
+}
+
+.statblock-forge__preview-table-formula-row > th,
+.statblock-forge__preview-table-formula-row > td {
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  font-weight: var(--font-semibold);
+}
+
+.statblock-forge__preview-table-formula-value {
+  font-weight: var(--font-semibold);
+}

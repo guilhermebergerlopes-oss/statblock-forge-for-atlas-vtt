@@ -365,6 +365,17 @@ const strings: Record<string, { en: string; 'pt-BR': string }> = {
   'Items per row': { en: 'Items per row', 'pt-BR': 'Itens por linha' },
   'Grid table': { en: 'Grid table', 'pt-BR': 'Tabela em grade' },
   'One value per line': { en: 'One value per line', 'pt-BR': 'Um valor por linha' },
+  'Table formulas': { en: 'Table formulas', 'pt-BR': 'Fórmulas da Table' },
+  'Row Formula': { en: 'Row Formula', 'pt-BR': 'Fórmula de linha' },
+  'Column Formula': { en: 'Column Formula', 'pt-BR': 'Fórmula de coluna' },
+  'Calculates this cell for every row. Use {fieldKey} to read a cell from this row when the Field belongs to this Table, or the current statblock Value for any other Field; value is this cell’s stored value.': {
+    en: 'Calculates this cell for every row. Use {fieldKey} to read a cell from this row when the Field belongs to this Table, or the current statblock Value for any other Field; value is this cell’s stored value.',
+    'pt-BR': 'Calcula esta célula em todas as linhas. Use {fieldKey} para ler uma célula desta linha se o Field pertencer à Table, ou o Value atual da ficha para qualquer outro Field; value representa o valor armazenado nesta célula.',
+  },
+  'Calculates a summary cell below the Table. value is this column’s sum; use {fieldKey.sum}, {fieldKey.average}, {fieldKey.min}, {fieldKey.max}, or {fieldKey.count} for a numeric Table column, or {fieldKey} to read any other statblock Field.': {
+    en: 'Calculates a summary cell below the Table. value is this column’s sum; use {fieldKey.sum}, {fieldKey.average}, {fieldKey.min}, {fieldKey.max}, or {fieldKey.count} for a numeric Table column, or {fieldKey} to read any other statblock Field.',
+    'pt-BR': 'Calcula uma célula de resumo abaixo da Table. value é a soma desta coluna; use {fieldKey.sum}, {fieldKey.average}, {fieldKey.min}, {fieldKey.max} ou {fieldKey.count} para consultar uma coluna numérica da Table, ou {fieldKey} para ler qualquer outro Field da ficha.',
+  },
   'Roll as a bonus': { en: 'Roll as a bonus', 'pt-BR': 'Rolar como bônus' },
   'Add to next roll': { en: 'Add to next roll', 'pt-BR': 'Adicionar à próxima rolagem' },
   'Presentation': { en: 'Layout', 'pt-BR': 'Apresentação' },

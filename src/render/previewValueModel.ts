@@ -4,6 +4,7 @@
  */
 import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
 import { readSelectionField, selectionHasValue, selectionOptionIsSelected, selectionOptionNumber, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
+import { checkboxFieldOptions } from '../templates/checkboxFieldModel.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -413,6 +414,7 @@ export function evaluatePreviewFormula(
   };
   const truthy = (value: FormulaAtom): boolean => typeof value === 'boolean' ? value : value !== 0;
   const selectionFields = new Map(fields.filter((field) => field.type === 'choice').map((field) => [field.key, field]));
+  const checkboxFields = new Map(fields.filter((field) => field.type === 'checkboxes').map((field) => [field.key, field]));
   const readRef = (ref: string): unknown => {
     const [rootKey, ...parts] = ref.split('.');
     if (!rootKey) return undefined;
@@ -428,6 +430,18 @@ export function evaluatePreviewFormula(
           if (parts.length === 2) return selectionOptionNumber(selectionField, raw, option.value, option.key) ?? 0;
           return selectionOptionIsSelected(selectionField, raw, option.value, option.key) ? 1 : 0;
         }
+      }
+      return undefined;
+    }
+    const checkboxField = checkboxFields.get(rootKey);
+    if (checkboxField) {
+      const raw = isRecord(sample[rootKey]) ? sample[rootKey] : {};
+      const options = checkboxFieldOptions(checkboxField);
+      if (parts.length === 0) return options.some((option) => raw[option.key] === true) ? 1 : 0;
+      if (parts.length === 1) {
+        const option = options.find((candidate) => candidate.key === parts[0]
+          || candidate.aliases?.includes(parts[0] ?? ''));
+        return option ? (raw[option.key] === true ? 1 : 0) : undefined;
       }
       return undefined;
     }

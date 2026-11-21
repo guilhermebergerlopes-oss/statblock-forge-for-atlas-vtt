@@ -23,6 +23,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 - Compose layouts with blocks and nested containers, including Sections, Rows, and Tabs.
 - Resize and reorder blocks, adjust their placement, and use Dense Layout for more compact arrangements.
 - Build Tables from compatible Fields: each Field becomes a column, or a labeled row when **Show Field labels in rows** is enabled. Pairs Fields remain standalone Collections.
+- Configure per-Table **Row Formula** calculations for each data row and **Column Formula** summaries in the footer; formulas can reference any Template Field, plus numeric Table-column aggregates.
 - Use the **More options** panel for secondary Canvas controls.
 
 ### Customize the appearance
@@ -35,6 +36,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 ### Add rules and interactive data
 
 - Calculate Number and Rating values with formulas that reference other Fields.
+- Calculate Table cells per row and show per-column summaries with Table-specific formulas.
 - Build dynamic Dice Field formulas from the current statblock's values.
 - Use clickable dice expressions in statblock text; rolling uses the Atlas dice service when the integration is available.
 - Track Resources and Counter uses, including maximums, spending, and recovery.

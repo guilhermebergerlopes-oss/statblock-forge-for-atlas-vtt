@@ -52,7 +52,7 @@ test('writes the selected language documentation and creates nested folders', as
   const result = await writeForgeDocumentation(vault, 'Campaign/Forge Docs', 'en');
 
   assert.equal(result.folder, 'Campaign/Forge Docs');
-  assert.equal(result.created, 34);
+  assert.equal(result.created, 35);
   assert.equal(result.preserved, 0);
   assert.ok(folders.has('Campaign'));
   assert.ok(folders.has('Campaign/Forge Docs'));
@@ -67,7 +67,7 @@ test('preserves existing notes and fills only missing documentation files', asyn
 
   const result = await writeForgeDocumentation(vault, DEFAULT_DOCUMENTATION_FOLDER, 'pt-BR');
 
-  assert.equal(result.created, 33);
+  assert.equal(result.created, 34);
   assert.equal(result.preserved, 1);
   assert.equal(files.get(path), '# My personal notes');
 });
@@ -102,4 +102,23 @@ test('downloadable Portuguese and English guides document Checkbox multiple choi
   assert.match(english.content, /stance\.aggressive/);
   assert.match(english.content, /@languages\.common\.number/);
   assert.match(english.content, /number is blank/);
+});
+
+test('downloadable Portuguese and English guides document Table Row and Column Formulas', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '34 - Fórmulas em Tables.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '34 - Table Formulas.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  assert.equal(FORGE_DOCUMENTATION_FILES.length, 35);
+  assert.equal(FORGE_DOCUMENTATION_FILES_EN.length, 35);
+  for (const guide of [portuguese.content, english.content]) {
+    assert.match(guide, /Row Formula/);
+    assert.match(guide, /Column Formula/);
+    assert.match(guide, /\{fieldKey\.sum\}/);
+    assert.match(guide, /\{fieldKey\.average\}/);
+    assert.match(guide, /any Field|qualquer Field/i);
+    assert.match(guide, /500 characters|500 caracteres/);
+  }
+  assert.match(portuguese.content, /Cada linha usa sua própria quantidade/);
+  assert.match(english.content, /Each row uses its own quantity/);
 });

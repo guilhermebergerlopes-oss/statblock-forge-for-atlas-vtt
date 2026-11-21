@@ -7,6 +7,7 @@
  */
 import { diceFieldFormulaUsesField, renameDiceFieldFormulaReference } from '../statblocks/diceFieldFormulaModel.ts';
 import { isFormulaCapableNumericField } from './numericFieldModel.ts';
+import { tableFormulaReferencesField } from '../statblocks/tableFormulaModel.ts';
 import {
   DEFAULT_SCORE_COLUMNS,
   FIELD_TO_BLOCK,
@@ -327,6 +328,19 @@ function renameBlockReferences(blocks: ForgeBlock[], from: string, to: string): 
       });
       if (columns.some((column: unknown, index: number) => column !== sourceColumns[index])) update('columns', columns);
     }
+    for (const property of ['rowFormulas', 'columnFormulas'] as const) {
+      const sourceFormulas = block[property];
+      if (!isRecord(sourceFormulas)) continue;
+      const nextFormulas: Record<string, unknown> = {};
+      let formulasChanged = false;
+      for (const [formulaKey, formula] of Object.entries(sourceFormulas)) {
+        const nextKey = formulaKey === from ? to : formulaKey;
+        const nextFormula = typeof formula === 'string' ? renameFormulaFieldReference(formula, from, to) : formula;
+        nextFormulas[nextKey] = nextFormula;
+        if (nextKey !== formulaKey || nextFormula !== formula) formulasChanged = true;
+      }
+      if (formulasChanged) update(property, nextFormulas);
+    }
     if (Array.isArray(block.blocks)) {
       const children = renameBlockReferences(block.blocks.filter(isRecord) as ForgeBlock[], from, to);
       if (children !== block.blocks) update('blocks', children);
@@ -460,6 +474,18 @@ export function findFieldReferences(template: ForgeTemplate, key: string): Field
       if (Array.isArray(record.formulas) && record.formulas.some((formula) => typeof formula === 'string' && formulaUsesField(formula, key))) {
         references.push({ blockId: block.id, blockType: block.type, property: 'formulas' });
       }
+      for (const property of ['rowFormulas', 'columnFormulas'] as const) {
+        if (!isRecord(record[property])) continue;
+        const formulaMap = record[property] as Record<string, unknown>;
+        // Table formulas can reference any Field in the Template, not only
+        // columns linked to that Table. This keeps rename/delete protection
+        // aligned with the runtime formula context.
+        if (typeof formulaMap[key] === 'string' || Object.values(formulaMap).some((formula) =>
+          typeof formula === 'string' && tableFormulaReferencesField(formula, key, template.fields),
+        )) {
+          references.push({ blockId: block.id, blockType: block.type, property });
+        }
+      }
       for (const property of ['pattern', 'fallback'] as const) {
         if (typeof record[property] === 'string' && (record[property] as string).includes(`{${key}}`)) {
           references.push({ blockId: block.id, blockType: block.type, property });
@@ -512,6 +538,14 @@ function unbindFieldFromLayoutBlocks(blocks: ForgeBlock[], key: string): ForgeBl
       const remaining = block.fields.filter((value) => value !== key);
       if (remaining.length > 0) next.fields = remaining;
       else delete next.fields;
+      blockChanged = true;
+    }
+    for (const property of ['rowFormulas', 'columnFormulas'] as const) {
+      if (!isRecord(block[property]) || !Object.prototype.hasOwnProperty.call(block[property], key)) continue;
+      const formulas = { ...(block[property] as Record<string, unknown>) };
+      delete formulas[key];
+      if (Object.keys(formulas).length > 0) next[property] = formulas;
+      else delete next[property];
       blockChanged = true;
     }
 

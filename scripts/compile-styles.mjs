@@ -13,6 +13,11 @@ const generatedStyles = [
     beginMarker: '/* BEGIN GENERATED FORGE SELECTION STYLES */',
     endMarker: '/* END GENERATED FORGE SELECTION STYLES */',
   },
+  {
+    sourcePath: 'src/styles/table-formulas.scss',
+    beginMarker: '/* BEGIN GENERATED FORGE TABLE FORMULA STYLES */',
+    endMarker: '/* END GENERATED FORGE TABLE FORMULA STYLES */',
+  },
 ];
 
 let stylesheet = await readFile(stylesheetPath, 'utf8');

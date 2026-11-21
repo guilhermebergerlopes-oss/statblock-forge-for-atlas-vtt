@@ -64,6 +64,7 @@ import { imageReferenceText } from './vaultImageResolver.ts';
 import { DEFAULT_STATBLOCK_IMAGE_FRAME, normalizeStatblockImageFrame, panStatblockImageFrame, statblockImagePanTranslation, type StatblockImageFrame, type StatblockImageFrames } from '../statblocks/statblockImageFraming.ts';
 import { rollableBonusFormula } from '../statblocks/statblockValueRolls.ts';
 import { tableCellRollFormulas } from '../statblocks/tableCellRollsModel.ts';
+import { resolveTableRowFormulaValues, tableColumnAggregateContext, tableColumnFormulaValue, tableFormulaMap } from '../statblocks/tableFormulaModel.ts';
 import { appendForgeStatblockDiceText, setForgeStatblockDiceLink } from './statblockDiceLinkElement.ts';
 import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
@@ -2783,6 +2784,57 @@ function normalizeTableCellValue(field: ForgeField, value: unknown): unknown {
   return value;
 }
 
+function resolveTableFormulaRowValues(
+  childFields: readonly ForgeField[],
+  rowSample: JsonRecord,
+  formulas: Record<string, string>,
+  fields: readonly ForgeField[],
+  runtime?: NumericFieldRuntime,
+): Record<string, unknown> {
+  // Start from the complete statblock sample. Table-local cells are already
+  // overlaid by the caller, while non-Table Fields keep their current Values.
+  const baseValues: Record<string, unknown> = { ...rowSample };
+  for (const field of fields) {
+    if ((field.type === 'number' || field.type === 'rating') && hasNumericFieldFormulaSettings(field)) {
+      const raw = rowSample[field.key];
+      const calculated = runtime?.value(field, rowSample)
+        ?? evaluatePreviewFormula(String(field.formula ?? ''), rowSample, raw, fields);
+      baseValues[field.key] = calculated;
+    }
+  }
+  return resolveTableRowFormulaValues(
+    childFields,
+    baseValues,
+    formulas,
+    (formula, values, slotValue, referenceFields) => evaluatePreviewFormula(formula, values, slotValue, referenceFields),
+    fields,
+  );
+}
+
+function renderTableCalculatedValue(
+  cell: HTMLTableCellElement,
+  field: ForgeField,
+  value: unknown,
+  signed: boolean,
+  rollable: boolean,
+): void {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  const shown = numeric === null
+    ? '—'
+    : withUnit(`${signed && numeric > 0 ? '+' : ''}${String(Number(numeric.toFixed(4)))}`, field);
+  const display = element('span', 'statblock-forge__preview-numeric-field-value statblock-forge__preview-table-formula-value', shown);
+  display.dataset.noBlockEdit = 'true';
+  display.setAttribute('aria-readonly', 'true');
+  display.title = 'Calculated by Table formula';
+  if (numeric !== null) {
+    const rollText = `${(rollable && numeric > 0) ? '+' : ''}${String(Number(numeric.toFixed(4)))}`;
+    const formulas = tableCellRollFormulas(rollText, rollable);
+    if (formulas.length === 1) setForgeStatblockDiceLink(display, formulas[0]);
+    else if (formulas.length > 1) appendForgeStatblockDiceText(display, rollText, rollable);
+  }
+  cell.append(display);
+}
+
 /** Builds formula text from the value actually shown in a Table cell. */
 function tableCellRollText(
   field: ForgeField,
@@ -3247,6 +3299,7 @@ function renderTableFields(
     row.append(markForgeUiText(element('td', 'statblock-forge__table-empty-cell', message), message));
     body.append(row);
     table.append(body);
+
     wrapper.append(table);
     return wrapper;
   }
@@ -3255,6 +3308,8 @@ function renderTableFields(
   const rowLabelHeader = language === 'pt-BR' ? 'Linha' : 'Row';
   const addRowLabel = language === 'pt-BR' ? '＋ Adicionar linha' : '＋ Add row';
   const removeRowLabel = language === 'pt-BR' ? 'Excluir linha' : 'Delete row';
+  const rowFormulaMap = tableFormulaMap(block, 'row');
+  const columnFormulaMap = tableFormulaMap(block, 'column');
 
   const dispatchEdit = async (edit: ScoreTableEdit): Promise<void> => {
     if (onEdit) {
@@ -3338,6 +3393,17 @@ function renderTableFields(
     const counterRowCount = counterFields.reduce((count, field) =>
       Math.max(count, counterRows(valueOf(current, field.key), field)?.length ?? 0), 0);
     const rowCount = Math.min(FORGE_TABLE_MAX_ROWS, Math.max(1 + stored.extraRows.length, counterRowCount));
+    const rowValues = Array.from({ length: rowCount }, (_unused, rowIndex) => {
+      const rowSample: JsonRecord = rowIndex === 0 ? current : { ...current };
+      if (rowIndex > 0) {
+        childFields.forEach((field) => {
+          if (field.type !== 'counters') rowSample[field.key] = forgeTableCellValue(current[storageFieldKey], rowIndex, field.key);
+        });
+      }
+      return resolveTableFormulaRowValues(childFields, rowSample, rowFormulaMap, fields, runtime);
+    });
+    const columnFormulaContext = tableColumnAggregateContext(childFields, rowValues);
+    const columnFormulaExternalValues = resolveTableFormulaRowValues([], current, {}, fields, runtime);
 
     // Keep percentage widths as a no-JS fallback. Once this wrapper is mounted,
     // updateTableColumnWidths assigns the exact same pixel width to every data
@@ -3433,9 +3499,17 @@ function renderTableFields(
         // Counter Fields are row-oriented collections: their Nth configured
         // Counter is rendered on Table row N and keeps its own shared Field value.
         const isCounterField = field.type === 'counters';
-        const rowSample = isCounterField || rowIndex === 0
+        const rowSample: JsonRecord = isCounterField || rowIndex === 0
           ? current
           : { ...current, [field.key]: forgeTableCellValue(current[storageFieldKey], rowIndex, field.key) };
+        const rowFormula = rowFormulaMap[field.key];
+        if (rowFormula) {
+          renderTableCalculatedValue(
+            cell, field, rowValues[rowIndex]?.[field.key], block.display === 'signed', block.rollable === true,
+          );
+          row.append(cell);
+          return;
+        }
         // Every editable row uses the same Table cell interaction and visual editor.
         // Row zero writes the base Field; later rows write their own cell values.
         const onValueEdit = editable
@@ -3476,6 +3550,33 @@ function renderTableFields(
       body.append(row);
     }
     table.append(body);
+
+    if (Object.values(columnFormulaMap).some((formula) => formula.trim().length > 0)) {
+      const foot = element('tfoot', 'statblock-forge__preview-table-formula-footer');
+      const summary = element('tr', 'statblock-forge__preview-table-formula-row');
+      if (showRowLabels) {
+        const label = element('th', 'statblock-forge__preview-table-row-label statblock-forge__preview-table-formula-label', language === 'pt-BR' ? 'Resumo' : 'Summary');
+        label.dataset.tableDataColumn = '0';
+        label.scope = 'row';
+        summary.append(label);
+      }
+      childFields.forEach((field, fieldIndex) => {
+        const cell = element('td', `statblock-forge__preview-table-cell statblock-forge__preview-table-cell--${field.type} statblock-forge__preview-table-formula-cell`);
+        cell.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
+        const formula = columnFormulaMap[field.key];
+        if (formula) {
+          const value = tableColumnFormulaValue(
+            formula, field.key, columnFormulaContext, fields, evaluatePreviewFormula, columnFormulaExternalValues,
+          );
+          renderTableCalculatedValue(cell, field, value, block.display === 'signed', block.rollable === true);
+        }
+        summary.append(cell);
+      });
+      if (editableRows) summary.append(element('td', 'statblock-forge__preview-table-row-actions-cell'));
+      foot.append(summary);
+      table.append(foot);
+    }
+
     wrapper.append(table);
     updateTableColumnWidths();
 
@@ -3497,6 +3598,11 @@ function renderTableFields(
   };
 
   draw();
+  if (runtime && (Object.keys(rowFormulaMap).length > 0 || Object.keys(columnFormulaMap).length > 0)) {
+    // Formula cells and the footer depend on other columns, so refresh the
+    // complete Table whenever any source Field changes outside this Table.
+    runtime.subscribeAll(draw);
+  }
   if (typeof ResizeObserver !== 'undefined' && equalColumnCount > 0) {
     forgeTableColumnResizeObservers.get(wrapper)?.disconnect();
     const resizeObserver = new ResizeObserver(() => {

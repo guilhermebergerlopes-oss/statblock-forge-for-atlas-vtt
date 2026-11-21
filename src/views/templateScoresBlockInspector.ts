@@ -1,7 +1,8 @@
 import { addFieldToContainer, containerAcceptsField, moveFieldWithinContainer, removeFieldFromContainer } from '../templates/containerEditorModel.ts';
 import { setScoresBlockOption } from '../templates/tableEditorModel.ts';
-import { button, el, labeledControl, selectInput, toggleControl } from './templateEditorDom.ts';
+import { button, el, labeledControl, selectInput, toggleControl, textareaInput } from './templateEditorDom.ts';
 import { translateForgeText } from '../i18n/localization.ts';
+import { setScoresTableFormula, tableFormulaText } from '../statblocks/tableFormulaModel.ts';
 import type { TemplateBlockInspectorContext } from './templateBlockInspectorContext.ts';
 
 /** Inspector for the Field-backed Table block. Pair Fields are deliberately not supported here. */
@@ -121,6 +122,45 @@ export function renderScoresBlockInspector(context: TemplateBlockInspectorContex
       actions.append(moveUp, moveDown, remove);
       row.append(title, actions);
       childrenPanel.append(row);
+
+      if (field.type === 'number' || field.type === 'rating') {
+        const formulas = el('details', 'statblock-forge__table-formula-editors');
+        const summary = el('summary', '', translateForgeText('Table formulas', language));
+        formulas.append(summary);
+
+        const rowFormula = textareaInput(
+          tableFormulaText(block, 'row', field.key),
+          '{quantity} * {unitPrice}',
+          2,
+        );
+        rowFormula.setAttribute('aria-label', `${field.label.trim() || field.key} — ${translateForgeText('Row Formula', language)}`);
+        rowFormula.addEventListener('change', () => {
+          if (setScoresTableFormula(block, 'row', field.key, rowFormula.value)) context.renderPreviewOnly();
+        });
+        const rowFormulaControl = labeledControl(translateForgeText('Row Formula', language), rowFormula);
+        rowFormulaControl.append(el('small', 'statblock-forge__detail', translateForgeText(
+          'Calculates this cell for every row. Use {fieldKey} to read a cell from this row when the Field belongs to this Table, or the current statblock Value for any other Field; value is this cell’s stored value.',
+          language,
+        )));
+        formulas.append(rowFormulaControl);
+
+        const columnFormula = textareaInput(
+          tableFormulaText(block, 'column', field.key),
+          'value',
+          2,
+        );
+        columnFormula.setAttribute('aria-label', `${field.label.trim() || field.key} — ${translateForgeText('Column Formula', language)}`);
+        columnFormula.addEventListener('change', () => {
+          if (setScoresTableFormula(block, 'column', field.key, columnFormula.value)) context.renderPreviewOnly();
+        });
+        const columnFormulaControl = labeledControl(translateForgeText('Column Formula', language), columnFormula);
+        columnFormulaControl.append(el('small', 'statblock-forge__detail', translateForgeText(
+          'Calculates a summary cell below the Table. value is this column’s sum; use {fieldKey.sum}, {fieldKey.average}, {fieldKey.min}, {fieldKey.max}, or {fieldKey.count} for a numeric Table column, or {fieldKey} to read any other statblock Field.',
+          language,
+        )));
+        formulas.append(columnFormulaControl);
+        childrenPanel.append(formulas);
+      }
     });
   }
   panel.append(childrenPanel);

@@ -8,6 +8,7 @@ import {
   type ForgeTemplate,
 } from './forgeTemplate.ts';
 import { addLayoutBlock, findLayoutBlock } from './layoutEditorModel.ts';
+import { tableFormulaReferencesField } from '../statblocks/tableFormulaModel.ts';
 
 /** Forge-only container kinds backed by native Atlas Metric and Scores blocks. */
 export type ForgeContainerKind = 'metric' | 'table';
@@ -280,6 +281,17 @@ export function removeFieldFromContainer(
     const nextFields = fields.filter((key) => key !== fieldKey);
     if (nextFields.length === fields.length) return false;
     if (nextFields.length) block.fields = nextFields; else delete block.fields;
+    for (const property of ['rowFormulas', 'columnFormulas'] as const) {
+      if (!isRecord(block[property])) continue;
+      const formulas = { ...(block[property] as Record<string, unknown>) };
+      for (const [targetKey, formula] of Object.entries(formulas)) {
+        if (targetKey === fieldKey || (typeof formula === 'string' && tableFormulaReferencesField(formula, fieldKey, template.fields))) {
+          delete formulas[targetKey];
+        }
+      }
+      if (Object.keys(formulas).length > 0) block[property] = formulas;
+      else delete block[property];
+    }
   }
   ensureForgeContainers(template, layout);
   return true;
