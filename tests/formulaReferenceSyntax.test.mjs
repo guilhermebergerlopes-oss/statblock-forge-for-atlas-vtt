@@ -25,6 +25,18 @@ test('Number, Rating, Metric and Scores arithmetic accepts @ and braces in mixed
   assert.equal(evaluatePreviewFormula('@proficiency-1', sample, undefined), 1, 'minus remains an operator after an @ reference');
 });
 
+test('bare value reads the current slot while {value} explicitly reads a Field named value', () => {
+  const fields = [
+    { key: 'value', label: 'Value', type: 'number' },
+    { key: 'mod', label: 'Mod', type: 'number' },
+  ];
+  const sample = { value: 10, mod: null };
+  assert.equal(evaluatePreviewFormula('floor(({value}-10)/2)', sample, null, fields), 0);
+  assert.equal(evaluatePreviewFormula('floor(({value}-10)/2)', { ...sample, value: 15 }, null, fields), 2);
+  assert.equal(evaluatePreviewFormula('value + 2', sample, 7, fields), 9,
+    'the unbraced keyword still reads the target cell’s original stored value');
+});
+
 test('Dice Field formula syntax and runtime resolution accept both reference spellings', () => {
   const localTemplate = structuredClone(template);
   const fields = localTemplate.fields;

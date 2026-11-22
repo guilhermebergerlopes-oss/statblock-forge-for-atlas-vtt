@@ -139,7 +139,7 @@ export function renderScoresBlockInspector(context: TemplateBlockInspectorContex
         });
         const rowFormulaControl = labeledControl(translateForgeText('Row Formula', language), rowFormula);
         rowFormulaControl.append(el('small', 'statblock-forge__detail', translateForgeText(
-          'Calculates this cell for every row. Use {fieldKey} to read a cell from this row when the Field belongs to this Table, or the current statblock Value for any other Field; value is this cell’s stored value.',
+          'Calculates this cell for every row. Use {fieldKey} to read a Field Value (including a column in this Table); bare value without braces reads this cell’s original stored value.',
           language,
         )));
         formulas.append(rowFormulaControl);

@@ -1,5 +1,6 @@
 import {
   isRecord,
+  isForgeField,
   registerTableStorageField,
   type ForgeBlock,
   type ForgeContainerDefinition,
@@ -57,6 +58,12 @@ function definitionFor(block: ForgeBlock): ForgeContainerDefinition | null {
  * introduced: no native Field data is copied or rewritten.
  */
 export function ensureForgeContainers(template: ForgeTemplate, layout: ForgeLayoutDocument): void {
+  // Recover empty array slots emitted by the 0.5.2 Field-reordering bug.
+  // Null/undefined slots contain no Field properties or user data; real Field
+  // records, including unknown future properties, are left untouched.
+  const presentFields = template.fields.filter((field) => field !== null && field !== undefined);
+  if (presentFields.length !== template.fields.length) template.fields = presentFields;
+
   const current = Array.isArray(layout.containers) ? layout.containers : [];
   const currentByBlockId = new Map(current.filter(isRecord).map((item) => [
     typeof item.blockId === 'string' ? item.blockId : '', item,
@@ -75,11 +82,11 @@ export function ensureForgeContainers(template: ForgeTemplate, layout: ForgeLayo
     if (block.type !== 'scores') return;
     migrateTableChildren(template, block);
     const requestedStorage = typeof block.field === 'string'
-      ? template.fields.find((field) => field.key === block.field && field.type === 'scores')
+      ? template.fields.find((field) => isForgeField(field) && field.key === block.field && field.type === 'scores')
       : undefined;
     let storage = requestedStorage && !referencedStorageKeys.has(requestedStorage.key)
       ? requestedStorage
-      : template.fields.find((field) => field.type === 'scores' && !referencedStorageKeys.has(field.key));
+      : template.fields.find((field) => isForgeField(field) && field.type === 'scores' && !referencedStorageKeys.has(field.key));
     if (!storage) storage = registerTableStorageField(template, `Table ${tableCount()}`);
     if (block.field !== storage.key) block.field = storage.key;
     storage.forgeInternal = 'table-storage';
@@ -90,7 +97,7 @@ export function ensureForgeContainers(template: ForgeTemplate, layout: ForgeLayo
   // Older templates could contain a Scores Field without a matching Canvas
   // block. Promote it to a Table block instead of leaving a Field-only Table.
   for (const storage of template.fields) {
-    if (storage.type !== 'scores' || referencedStorageKeys.has(storage.key)) continue;
+    if (!isForgeField(storage) || storage.type !== 'scores' || referencedStorageKeys.has(storage.key)) continue;
     storage.forgeInternal = 'table-storage';
     if (layout.fieldKinds) delete layout.fieldKinds[storage.key];
     addLayoutBlock(template, layout, 'scores', storage.key);
@@ -140,7 +147,7 @@ function migrateTableChildren(template: ForgeTemplate, block: ForgeBlock): void 
       .filter((key): key is string => typeof key === 'string')
     : [];
   const validFields = [...fields, ...legacyColumnFields].filter((key) => {
-    const field = template.fields.find((item) => item.key === key);
+    const field = template.fields.find((item) => isForgeField(item) && item.key === key);
     return Boolean(field && field.type !== 'pairs' && field.type !== 'scores' && TABLE_FIELD_TYPES.has(field.type));
   });
   const nextFields = [...new Set(validFields)];
@@ -162,7 +169,7 @@ function migrateTableChildren(template: ForgeTemplate, block: ForgeBlock): void 
 /** Return the public Forge Container objects represented in a template. */
 export function forgeContainers(template: ForgeTemplate, layout: ForgeLayoutDocument): ForgeContainer[] {
   ensureForgeContainers(template, layout);
-  const fieldsByKey = new Map(template.fields.map((field) => [field.key, field]));
+  const fieldsByKey = new Map(template.fields.filter(isForgeField).map((field) => [field.key, field]));
   return (layout.containers ?? []).flatMap((definition) => {
     const block = findLayoutBlock(template, definition.blockId);
     if (!block || (block.type !== 'metric' && block.type !== 'scores')) return [];
@@ -208,7 +215,7 @@ export function addFieldToContainer(
   fieldKey: string,
 ): boolean {
   const block = findLayoutBlock(template, blockId);
-  const field = template.fields.find((item) => item.key === fieldKey);
+  const field = template.fields.find((item) => isForgeField(item) && item.key === fieldKey);
   if (!block || !field || (block.type !== 'metric' && block.type !== 'scores')) return false;
   const kind: ForgeContainerKind = block.type === 'metric' ? 'metric' : 'table';
   if (!containerAcceptsField(kind, field)) return false;

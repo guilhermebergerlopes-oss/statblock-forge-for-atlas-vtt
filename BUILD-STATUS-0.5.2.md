@@ -59,3 +59,18 @@ The supplied source snapshot does not contain the root `main.ts` entry point (no
 - Full automated suite: **772/783 passed**. The 11 remaining failures are the same source-archive limitations: the omitted root `main.ts` and `docs/user-guide/en/01 - Overview.md`; failures reference those missing files.
 - Build/typecheck remain unavailable in this source snapshot because dependencies are absent and the root `main.ts` entry point is omitted.
 - No in-app Obsidian/Atlas runtime verification was possible in this environment.
+
+## Regression fix — Field reordering with Table storage
+
+- Fixed `reorderTemplateField()` so it reorders only user-editable Fields. Fixed Header Fields and private Table/Scores storage adapters keep their original positions and are no longer replaced by an out-of-range array lookup.
+- Added defensive Field-record checks to the Field palette and Container normalization paths so an empty entry cannot trigger `.key` access errors in `isHeaderField()`, `ensureForgeContainers()`, or Canvas selection.
+- Added recovery for `null` Field-array slots serialized by the previous bug. Empty slots are removed with a warning; all valid Field records, their sample values, and Table storage references are preserved.
+- Added regression tests covering reordering with a Table adapter between regular Fields, runtime repair of empty slots, and recovery when reopening a template containing serialized `null` entries.
+
+## Validation after Field reordering fix
+
+- Focused Container, Table, Field reordering, and recovery tests: **22/22 passed**.
+- Broad test run excluding 10 test files that require the omitted root `main.ts` and/or `docs/user-guide/en/01 - Overview.md`: **736/736 passed**.
+- Full test run: **775/786 passed**. All 11 remaining failures are the same incomplete-archive limitations involving missing `main.ts` or the referenced overview document; none are failures in the new Field/Container regression tests.
+- `tsc --noEmit` remains blocked because the source archive does not include the `obsidian` type dependency. The archive also still omits root `main.ts`, so it cannot be built into an installable plugin in isolation.
+- Targeted strict TypeScript check for `forgeTemplate.ts`, `fieldEditorModel.ts`, and `containerEditorModel.ts`: **passed**. The full project `tsc --noEmit` still cannot start because `@types/obsidian` is absent from this source archive.

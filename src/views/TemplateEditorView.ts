@@ -6,6 +6,7 @@ import {
   createBlankTemplate,
   createForgeLayout,
   isRecord,
+  isForgeField,
   parseForgeLayout,
   serializeForgeEditorTemplate,
   type ForgeBlock,
@@ -547,7 +548,7 @@ export class TemplateEditorView extends FileView {
     this.selectedBlockId = this.template.layout.blocks[0]?.id ?? null;
     this.selectedBlockIds = this.selectedBlockId ? [this.selectedBlockId] : [];
     this.selectedTemplateFieldKey = null;
-    const firstCompendiumField = this.template.fields.find((field) => isCollectionFieldType(field.type));
+    const firstCompendiumField = this.template.fields.find((field) => isForgeField(field) && isCollectionFieldType(field.type));
     this.compendiumFieldKey = firstCompendiumField?.key ?? null;
     this.compendiumFieldId = firstCompendiumField && this.layout ? ensureFieldId(this.layout, firstCompendiumField) : null;
     this.compendiumEditingItemId = null;
@@ -733,7 +734,7 @@ export class TemplateEditorView extends FileView {
     const pt = language === 'pt-BR';
     const panel = section(translateForgeText('Compendium', language));
     panel.classList.add('statblock-forge__compendium-panel');
-    const fields = template.fields.filter((field) => isCollectionFieldType(field.type));
+    const fields = template.fields.filter((field) => isForgeField(field) && isCollectionFieldType(field.type));
     const selectedField = fields.find((field) => ensureFieldId(layout, field) === this.compendiumFieldId);
     const activeField = selectedField ?? fields[0];
     this.compendiumFieldKey = activeField?.key ?? null;
@@ -1123,7 +1124,7 @@ export class TemplateEditorView extends FileView {
     panel.classList.add('statblock-forge__properties-panel');
     const selectedBlock = this.selectedBlockId ? findLayoutBlock(template, this.selectedBlockId) : null;
     const fieldKeys = this.fieldKeysForBlock(selectedBlock);
-    if (this.selectedTemplateFieldKey && template.fields.some((field) => field.key === this.selectedTemplateFieldKey && field.type !== 'scores' && field.forgeInternal !== 'table-storage')
+    if (this.selectedTemplateFieldKey && template.fields.some((field) => isForgeField(field) && field.key === this.selectedTemplateFieldKey && field.type !== 'scores' && field.forgeInternal !== 'table-storage')
       && (this.sidebarMode === 'field' || !selectedBlock || fieldKeys.includes(this.selectedTemplateFieldKey))
       && !fieldKeys.includes(this.selectedTemplateFieldKey)) {
       fieldKeys.unshift(this.selectedTemplateFieldKey);
@@ -1143,7 +1144,7 @@ export class TemplateEditorView extends FileView {
     if (selectedBlock?.type === 'text') appendSelectedBlockProperties();
 
     for (const fieldKey of fieldKeys) {
-      const field = template.fields.find((item) => item.key === fieldKey);
+      const field = template.fields.find((item) => isForgeField(item) && item.key === fieldKey);
       if (!field) continue;
       const content = this.renderSelectedTemplateFieldProperties(field);
       const fieldLabel = `${translateForgeText('Field', language)} · ${field.label.trim() || field.key}`;
@@ -2080,7 +2081,7 @@ export class TemplateEditorView extends FileView {
         const useField = typeof rule.to === 'object' && rule.to !== null;
         card.append(toggleControl('Use another field as the value', useField, (checked) => update({ to: checked ? { field: fieldOptions[0]?.value ?? '' } : 0 } as Partial<RecoveryRule>)));
         if (useField) {
-          const numericOptions = template.fields.filter((field) => field.type === 'number' || field.type === 'rating').map((field) => ({ value: field.key, label: `${field.label.trim() || field.key} (${field.key})` }));
+          const numericOptions = template.fields.filter((field) => isForgeField(field) && (field.type === 'number' || field.type === 'rating')).map((field) => ({ value: field.key, label: `${field.label.trim() || field.key} (${field.key})` }));
           const valueField = selectInput(typeof rule.to === 'object' && rule.to !== null ? rule.to.field : '', numericOptions);
           valueField.addEventListener('change', () => update({ to: { field: valueField.value } } as Partial<RecoveryRule>));
           card.append(labeledControl('Value field', valueField));
@@ -3093,7 +3094,7 @@ export class TemplateEditorView extends FileView {
     // the Field remains available immediately below it.
     const linkedFieldKey = block.type === 'text' ? null : templateFieldKeyToOpenForBlock(
       block,
-      template.fields.map((field) => field.key),
+      template.fields.filter(isForgeField).map((field) => field.key),
       additive,
     );
     if (linkedFieldKey) {

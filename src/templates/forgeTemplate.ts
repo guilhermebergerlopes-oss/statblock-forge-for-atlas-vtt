@@ -188,6 +188,14 @@ export function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** True only for a complete, user-visible or internal Forge Field record. */
+export function isForgeField(value: unknown): value is ForgeField {
+  return isRecord(value)
+    && typeof value.key === 'string'
+    && typeof value.label === 'string'
+    && typeof value.type === 'string';
+}
+
 export function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -367,7 +375,18 @@ export function parseTemplateForEditing(text: string): { template: ForgeTemplate
   if (!Array.isArray(parsed.fields)) throw new Error('O template não contém uma lista válida de fields.');
   if (!isRecord(parsed.layout) || !Array.isArray(parsed.layout.blocks)) throw new Error('O template não contém layout.blocks válido.');
 
-  const warnings: string[] = collectTemplateKeyWarnings(parsed.fields, parsed.layout.blocks);
+  // Forge 0.5.2 had a Field reordering bug that could leave an `undefined`
+  // array slot when a Table's private Scores adapter was present. JSON turns
+  // that empty slot into `null`; it has no Field data to preserve, so recover
+  // the remaining valid Fields and report the repair instead of rejecting the
+  // entire template. Malformed non-null records are still rejected below.
+  let parsedFields: unknown[] = parsed.fields;
+  const emptyFieldSlots = parsedFields.filter((field) => field === null).length;
+  if (emptyFieldSlots > 0) parsedFields = parsedFields.filter((field) => field !== null);
+  parsed.fields = parsedFields;
+
+  const warnings: string[] = collectTemplateKeyWarnings(parsedFields, parsed.layout.blocks);
+  if (emptyFieldSlots > 0) warnings.push(`${emptyFieldSlots} entrada(s) vazia(s) na lista de Fields foram removidas. Isso corrige uma falha de reordenação de Fields de versões anteriores; os Fields válidos foram preservados.`);
   if (Number(parsed.version) > 1) warnings.push(`Este template usa a versão ${String(parsed.version)}. Propriedades desconhecidas serão preservadas, mas a edição de recursos novos pode ser limitada.`);
   const blockIds = new Set<string>();
   const hasValidBlockTree = (blocks: unknown[]): boolean => blocks.every((block) => {
@@ -376,8 +395,7 @@ export function parseTemplateForEditing(text: string): { template: ForgeTemplate
     blockIds.add(block.id);
     return block.blocks === undefined || (Array.isArray(block.blocks) && hasValidBlockTree(block.blocks));
   });
-  if (!parsed.fields.every((field) => isRecord(field)
-    && typeof field.key === 'string' && typeof field.label === 'string' && typeof field.type === 'string')) {
+  if (!parsedFields.every(isForgeField)) {
     throw new Error('O template contém um campo com estrutura inválida. O arquivo original foi mantido sem alterações.');
   }
   if (!hasValidBlockTree(parsed.layout.blocks)) {
@@ -646,7 +664,8 @@ export function headerFieldForPart(fields: readonly ForgeField[], part: string):
   return meaningMatch ?? fields.find((field) => field.key === fallback[part]);
 }
 
-export function isHeaderField(field: ForgeField): boolean {
+export function isHeaderField(field: ForgeField | null | undefined): boolean {
+  if (!isForgeField(field)) return false;
   // Only fields that are actually rendered as fixed header parts are reserved.
   // Legacy `display-name` and `hit_dice` fields remain ordinary Template Fields
   // so existing template data stays editable after their Header controls were removed.

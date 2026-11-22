@@ -75,8 +75,10 @@ export function tableFormulaReferencedFieldKeys(
   for (const match of formula.matchAll(pattern)) {
     const token = match[1] ?? match[2] ?? match[3] ?? '';
     const root = token.split('.')[0] ?? '';
-    // These are evaluator keywords, not Field references.
-    if (['value', 'true', 'false'].includes(root.toLowerCase())) continue;
+    const explicitReference = match[1] !== undefined || match[2] !== undefined;
+    // Bare keywords belong to the formula language; braced/@ references
+    // always mean a Template Field key, even when that key is `value`.
+    if (!explicitReference && ['value', 'true', 'false'].includes(root.toLowerCase())) continue;
     if (!candidates.has(root)) continue;
     if (match[3] !== undefined) {
       const next = formula.slice((match.index ?? 0) + token.length).match(/^\s*(.)/)?.[1];

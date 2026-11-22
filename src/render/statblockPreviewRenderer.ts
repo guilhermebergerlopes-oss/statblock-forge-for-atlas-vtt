@@ -3346,7 +3346,7 @@ function renderTableFields(
   const editableRows = editable && block.allowRowAdd === true;
   const equalColumnCount = childFields.length + (showRowLabels ? 1 : 0);
   const actionsWidthRem = editableRows ? 2.1 : 0;
-  const minimumDataColumnWidthRem = 9;
+  const minimumDataColumnWidthRem = 2.25;
 
   // Resolve the equal data-column width against the Table's actual rendered
   // container width. This avoids relying on percentage widths on <col>, which

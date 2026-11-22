@@ -268,7 +268,8 @@ export function normalizeCheckboxFieldValue(field: ForgeField, raw: unknown): Js
 }
 
 export function checkboxOptionIsEnabled(data: JsonRecord, field: ForgeField, optionKey: string): boolean {
-  const fieldValue = isRecord(data[field.key]) ? data[field.key] : {};
+  const rawFieldValue = data[field.key];
+  const fieldValue = isRecord(rawFieldValue) ? rawFieldValue : {};
   if (checkboxFieldAllowsMultiple(field)) return fieldValue[optionKey] === true;
   const selected = checkboxFieldOptions(field).find((option) => fieldValue[option.key] === true);
   return selected?.key === optionKey;

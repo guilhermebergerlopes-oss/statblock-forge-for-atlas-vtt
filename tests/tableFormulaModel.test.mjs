@@ -34,6 +34,25 @@ test('Row Formula calculates a target cell using other cells in the same row', (
   assert.equal(result.unitPrice, 10);
 });
 
+test('Row Formula can read a same-row Field whose key is value', () => {
+  const valueAndModFields = [
+    { key: 'value', label: 'Value', type: 'number' },
+    { key: 'mod', label: 'Mod', type: 'number' },
+  ];
+  const result = resolveTableRowFormulaValues(
+    valueAndModFields,
+    { value: 10, mod: null },
+    { mod: 'floor(({value}-10)/2)' },
+    evaluate,
+  );
+  assert.equal(result.mod, 0);
+  assert.equal(resolveTableRowFormulaValues(
+    valueAndModFields, { value: 8, mod: null }, { mod: 'floor(({value}-10)/2)' }, evaluate,
+  ).mod, -1);
+  assert.deepEqual(tableFormulaReferencedFieldKeys('{value}', valueAndModFields), ['value']);
+  assert.deepEqual(tableFormulaReferencedFieldKeys('value', valueAndModFields), []);
+});
+
 test('Row Formula resolves dependencies between calculated columns regardless of order', () => {
   const result = resolveTableRowFormulaValues(
     fields,

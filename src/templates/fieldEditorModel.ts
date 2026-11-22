@@ -14,6 +14,7 @@ import {
   headerFieldForPart,
   isHeaderField,
   isRecord,
+  isForgeField,
   slugify,
   type ForgeBlock,
   type ForgeField,
@@ -103,13 +104,14 @@ export function fieldKeyProblem(template: ForgeTemplate, key: string, currentKey
 }
 
 /** Native adapters are serialized with the Template but are not user-editable Fields. */
-export function isInternalTemplateField(field: ForgeField): boolean {
-  return field.type === 'scores' || field.forgeInternal === 'table-storage';
+export function isInternalTemplateField(field: ForgeField | null | undefined): boolean {
+  return isForgeField(field) && (field.type === 'scores' || field.forgeInternal === 'table-storage');
 }
 
 /** Header fields are fixed parts of the card, not regular layout fields. */
 export function templateFields(template: ForgeTemplate): ForgeField[] {
-  return template.fields.filter((field) => !isHeaderField(field) && !isInternalTemplateField(field));
+  return template.fields.filter((field): field is ForgeField =>
+    isForgeField(field) && !isHeaderField(field) && !isInternalTemplateField(field));
 }
 
 /** Adds a missing fixed header field without creating a layout block. */
@@ -444,9 +446,14 @@ export function reorderTemplateField(
   custom.splice(targetIndexAfterRemoval + (afterTarget ? 1 : 0), 0, source);
 
   let customIndex = 0;
-  template.fields = template.fields.map((field) => (
-    isHeaderField(field) ? field : (custom[customIndex++] as ForgeField)
-  ));
+  template.fields = template.fields.map((field) => {
+    // Keep fixed Header Fields and private Table/Scores adapters in their
+    // original slots. Only user-editable Fields participate in the reordered
+    // sequence; treating an internal adapter as a custom Field used to shift
+    // past the end of `custom` and insert `undefined` into template.fields.
+    if (!isForgeField(field) || isHeaderField(field) || isInternalTemplateField(field)) return field;
+    return custom[customIndex++] ?? field;
+  });
   return true;
 }
 

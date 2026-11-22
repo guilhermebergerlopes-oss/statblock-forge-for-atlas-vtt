@@ -129,7 +129,7 @@ test('Table data columns receive identical measured widths and only delete actio
     readFile(stylesUrl, 'utf8'),
   ]);
   assert.match(renderer, /const equalColumnCount = childFields\.length \+ \(showRowLabels \? 1 : 0\)/);
-  assert.match(renderer, /const minimumDataColumnWidthRem = 9/);
+  assert.match(renderer, /const minimumDataColumnWidthRem = 2\.25/);
   assert.match(renderer, /const availableWidth = Math\.max\(0, wrapper\.clientWidth - horizontalPadding\)/);
   assert.match(renderer, /const dataColumnWidthPx = Math\.max\([\s\S]*minimumDataColumnWidthPx,[\s\S]*\(availableWidth - actionsWidthPx\) \/ equalColumnCount/);
   assert.match(renderer, /table\.style\.width = `\$\{tableWidthPx\}px`/);

@@ -204,12 +204,12 @@ export function evaluatePreviewFormula(
   type FormulaAtom = number | boolean;
   type Token =
     | { type: 'number'; value: number }
-    | { type: 'name'; value: string }
+    | { type: 'name'; value: string; explicitReference: boolean }
     | { type: 'op'; value: string }
     | { type: 'end' };
   type FormulaNode =
     | { kind: 'literal'; value: FormulaAtom }
-    | { kind: 'reference'; name: string }
+    | { kind: 'reference'; name: string; explicitReference: boolean }
     | { kind: 'unary'; operator: '+' | '-' | '!'; operand: FormulaNode }
     | { kind: 'binary'; operator: string; left: FormulaNode; right: FormulaNode }
     | { kind: 'conditional'; condition: FormulaNode; whenTrue: FormulaNode; whenFalse: FormulaNode }
@@ -228,9 +228,9 @@ export function evaluatePreviewFormula(
       tokens.push({ type: 'number', value });
     } else if (match[2] !== undefined) {
       const reference = match[2];
-      tokens.push({ type: 'name', value: reference.startsWith('@') ? reference.slice(1) : reference.slice(1, -1) });
+      tokens.push({ type: 'name', value: reference.startsWith('@') ? reference.slice(1) : reference.slice(1, -1), explicitReference: true });
     } else if (match[3] !== undefined) {
-      tokens.push({ type: 'name', value: match[3] });
+      tokens.push({ type: 'name', value: match[3], explicitReference: false });
     } else if (match[4] !== undefined) {
       tokens.push({ type: 'op', value: match[4] });
     }
@@ -356,9 +356,9 @@ export function evaluatePreviewFormula(
     const token = take();
     if (token.type === 'number') return { kind: 'literal', value: token.value };
     if (token.type === 'name') {
-      if (token.value.toLowerCase() === 'true') return { kind: 'literal', value: true };
-      if (token.value.toLowerCase() === 'false') return { kind: 'literal', value: false };
-      if (!consumeOperator('(')) return { kind: 'reference', name: token.value };
+      if (!token.explicitReference && token.value.toLowerCase() === 'true') return { kind: 'literal', value: true };
+      if (!token.explicitReference && token.value.toLowerCase() === 'false') return { kind: 'literal', value: false };
+      if (!consumeOperator('(')) return { kind: 'reference', name: token.value, explicitReference: token.explicitReference };
 
       const name = token.value.toLowerCase();
       if (!['floor', 'ceil', 'round', 'abs', 'min', 'max'].includes(name)) return null;
@@ -462,7 +462,9 @@ export function evaluatePreviewFormula(
   const evaluate = (node: FormulaNode): FormulaAtom | null => {
     if (node.kind === 'literal') return node.value;
     if (node.kind === 'reference') {
-      if (node.name === 'value') return toAtom(slotValue);
+      // Bare `value` is the current cell's original value. Explicit references
+      // such as `{value}` or `@value` must resolve the Template Field key.
+      if (node.name === 'value' && !node.explicitReference) return toAtom(slotValue);
       return toAtom(readRef(node.name));
     }
     if (node.kind === 'conditional') {
