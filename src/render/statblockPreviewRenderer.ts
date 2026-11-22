@@ -64,7 +64,7 @@ import { imageReferenceText } from './vaultImageResolver.ts';
 import { DEFAULT_STATBLOCK_IMAGE_FRAME, normalizeStatblockImageFrame, panStatblockImageFrame, statblockImagePanTranslation, type StatblockImageFrame, type StatblockImageFrames } from '../statblocks/statblockImageFraming.ts';
 import { rollableBonusFormula } from '../statblocks/statblockValueRolls.ts';
 import { tableCellRollFormulas } from '../statblocks/tableCellRollsModel.ts';
-import { resolveTableRowFormulaValues, tableColumnAggregateContext, tableColumnFormulaValue, tableFormulaMap } from '../statblocks/tableFormulaModel.ts';
+import { resolveTableRowFormulaValues, tableCellReferenceIndex, tableColumnAggregateContext, tableColumnFormulaValue, tableFormulaMap } from '../statblocks/tableFormulaModel.ts';
 import { appendForgeStatblockDiceText, setForgeStatblockDiceLink } from './statblockDiceLinkElement.ts';
 import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
@@ -514,6 +514,8 @@ interface NumericFieldRuntime {
   readonly isSaving: boolean;
   readonly language: ForgeLanguage;
   value(field: ForgeField | undefined, sample: JsonRecord): number | null;
+  /** Evaluate a numeric expression with access to the current statblock's Table cells. */
+  evaluateFormula(formula: string, sample: Record<string, unknown>, slotValue: unknown, selfFieldKey?: string): number | null;
   /** Resolve a formula-backed Dice Field; null means no formula, empty means unresolved. */
   diceFormula(field: ForgeField, sample: JsonRecord): string | null;
   setBaseValue(fieldKey: string, value: unknown): Promise<void>;
@@ -542,6 +544,7 @@ function createNumericFieldRuntime(
   onValueChange?: (fieldKey: string, value: unknown) => Promise<void> | void,
   language: ForgeLanguage = 'en',
   getLiveFieldData?: () => JsonRecord,
+  tableReferences: ReturnType<typeof tableCellReferenceIndex> = {},
 ): NumericFieldRuntime {
   const listeners = new Map<string, Set<() => void>>();
   const allListeners = new Set<() => void>();
@@ -562,8 +565,8 @@ function createNumericFieldRuntime(
   };
   let savingValue = false;
   let navigationHandler: ((fieldKey: string, step: 1 | -1) => Promise<void>) | null = null;
-  const evaluateFormula = (formula: string, sample: Record<string, unknown>, slotValue: unknown): number | null =>
-    evaluatePreviewFormula(formula, sample, slotValue, fields);
+  const evaluateFormula = (formula: string, sample: Record<string, unknown>, slotValue: unknown, selfFieldKey?: string): number | null =>
+    evaluatePreviewFormula(formula, sample, slotValue, fields, tableReferences, data, selfFieldKey);
   const runtime: NumericFieldRuntime = {
     canEdit: typeof onValueChange === 'function',
     get isSaving() { return savingValue; },
@@ -572,6 +575,7 @@ function createNumericFieldRuntime(
       if (!field) return null;
       return calculateNumericFieldValue(field, sample, evaluateFormula);
     },
+    evaluateFormula,
     diceFormula(field, sample) {
       return resolveDiceFieldFormula(field, fields, sample, (sourceField) =>
         calculateNumericFieldValue(sourceField, sample, evaluateFormula));
@@ -2692,7 +2696,7 @@ function renderMetric(
           ? (formulaLabel || formula)
           : fieldLabel(field, key);
         const getBaseValue = (): number | null => formula
-          ? evaluatePreviewFormula(formula, sample, undefined, fields)
+          ? (numericRuntime?.evaluateFormula(formula, sample, undefined) ?? evaluatePreviewFormula(formula, sample, undefined, fields))
           : isFormulaCapableNumericField(field) && numericRuntime
             ? numericRuntime.value(field, sample)
             : numberValue(valueOf(sample, key));
@@ -2807,7 +2811,8 @@ function resolveTableFormulaRowValues(
     if ((field.type === 'number' || field.type === 'rating') && hasNumericFieldFormulaSettings(field)) {
       const raw = rowSample[field.key];
       const calculated = runtime?.value(field, rowSample)
-        ?? evaluatePreviewFormula(String(field.formula ?? ''), rowSample, raw, fields);
+        ?? (runtime?.evaluateFormula(String(field.formula ?? ''), rowSample, raw)
+        ?? evaluatePreviewFormula(String(field.formula ?? ''), rowSample, raw, fields));
       baseValues[field.key] = calculated;
     }
   }
@@ -2815,7 +2820,8 @@ function resolveTableFormulaRowValues(
     childFields,
     baseValues,
     formulas,
-    (formula, values, slotValue, referenceFields) => evaluatePreviewFormula(formula, values, slotValue, referenceFields),
+    (formula, values, slotValue, referenceFields, selfFieldKey) => runtime?.evaluateFormula(formula, values, slotValue, selfFieldKey)
+      ?? evaluatePreviewFormula(formula, values, slotValue, referenceFields, {}, values, selfFieldKey),
     fields,
   );
 }
@@ -3403,13 +3409,22 @@ function renderTableFields(
       Math.max(count, counterRows(valueOf(current, field.key), field)?.length ?? 0), 0);
     const rowCount = Math.min(FORGE_TABLE_MAX_ROWS, Math.max(1 + stored.extraRows.length, counterRowCount));
     const rowValues = Array.from({ length: rowCount }, (_unused, rowIndex) => {
-      const rowSample: JsonRecord = rowIndex === 0 ? current : { ...current };
+      const rowSample: JsonRecord = rowIndex === 0 ? { ...current } : { ...current };
       if (rowIndex > 0) {
         childFields.forEach((field) => {
           if (field.type !== 'counters') rowSample[field.key] = forgeTableCellValue(current[storageFieldKey], rowIndex, field.key);
         });
       }
-      return resolveTableFormulaRowValues(childFields, rowSample, rowFormulaMap, fields, runtime);
+      const resolvedRow = resolveTableFormulaRowValues(childFields, rowSample, rowFormulaMap, fields, runtime);
+      // Column Formula aggregates must summarize the values users actually see.
+      // A Table Row Formula has priority for its cell; otherwise a Number/Rating
+      // Field's own Formula supplies the displayed numeric value.
+      for (const field of childFields) {
+        if (rowFormulaMap[field.key] || !isFormulaCapableNumericField(field)) continue;
+        const displayed = runtime?.value(field, rowSample);
+        if (displayed !== null && displayed !== undefined) resolvedRow[field.key] = displayed;
+      }
+      return resolvedRow;
     });
     const columnFormulaContext = tableColumnAggregateContext(childFields, rowValues);
     const columnFormulaExternalValues = resolveTableFormulaRowValues([], current, {}, fields, runtime);
@@ -3444,10 +3459,12 @@ function renderTableFields(
       if (showRowLabels) {
         // The row-label column remains structurally present, but its header
         // follows the same visibility setting as every other column label.
-        const th = element('th', 'statblock-forge__preview-table-row-label-heading', showColumnLabels ? rowLabelHeader : '');
+        const th = element('th', 'statblock-forge__preview-table-row-label-heading');
         th.dataset.tableDataColumn = '0';
         th.scope = 'col';
-        if (!showColumnLabels) th.setAttribute('aria-label', rowLabelHeader);
+        // Row labels identify the row contents; the row-label column itself
+        // intentionally has no visible heading ("Row" / "Linha").
+        th.setAttribute('aria-label', rowLabelHeader);
         header.append(th);
       }
       if (showColumnLabels) childFields.forEach((field, fieldIndex) => {
@@ -3487,7 +3504,7 @@ function renderTableFields(
           const editor = element('input', 'statblock-forge__table-row-label-editor') as HTMLInputElement;
           editor.type = 'text';
           editor.value = storedLabel;
-          editor.placeholder = label || `${rowLabelHeader} ${rowIndex + 1}`;
+          editor.placeholder = label || String(rowIndex + 1);
           editor.setAttribute('aria-label', `${language === 'pt-BR' ? 'Rótulo da linha' : 'Row label'} ${rowIndex + 1}`);
           editor.addEventListener('change', () => {
             const value = editor.value;
@@ -3498,7 +3515,7 @@ function renderTableFields(
           });
           labelCell.append(editor);
         } else {
-          labelCell.textContent = label || `${rowLabelHeader} ${rowIndex + 1}`;
+          labelCell.textContent = label || String(rowIndex + 1);
         }
         row.append(labelCell);
       }
@@ -3575,7 +3592,10 @@ function renderTableFields(
         const formula = columnFormulaMap[field.key];
         if (formula) {
           const value = tableColumnFormulaValue(
-            formula, field.key, columnFormulaContext, fields, evaluatePreviewFormula, columnFormulaExternalValues,
+            formula, field.key, columnFormulaContext, fields,
+            (source, values, slotValue, referenceFields, selfFieldKey) => runtime?.evaluateFormula(source, values, slotValue, selfFieldKey)
+              ?? evaluatePreviewFormula(source, values, slotValue, referenceFields, {}, values, selfFieldKey),
+            columnFormulaExternalValues,
           );
           renderTableCalculatedValue(cell, field, value, block.display === 'signed', block.rollable === true);
         }
@@ -7294,8 +7314,10 @@ function syncNestedLayoutInlineBleedsAfterMount(card: HTMLElement): void {
 export function renderStatblock(options: StatblockRenderOptions): HTMLElement {
   const model = createStatblockRenderModel(options.template, options.layout, options.data);
   const { template, layout, data } = model;
+  const tableReferences = tableCellReferenceIndex(template.layout.blocks);
   const numericRuntime = createNumericFieldRuntime(
     template.fields, data, options.onFieldValueChange, options.language ?? 'en', options.getLiveFieldData,
+    tableReferences,
   );
   const markdownComponent = options.markdownComponent ?? new Component();
   if (!options.markdownComponent) markdownComponent.load();

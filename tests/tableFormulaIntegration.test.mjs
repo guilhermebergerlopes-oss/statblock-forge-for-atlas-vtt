@@ -63,6 +63,8 @@ test('Table renderer computes same-row formulas and adds a Column Formula summar
   assert.match(renderer, /const columnFormulaMap = tableFormulaMap\(block, 'column'\)/);
   assert.match(renderer, /tableColumnAggregateContext\(childFields, rowValues\)/);
   assert.match(renderer, /resolveTableFormulaRowValues\(childFields, rowSample, rowFormulaMap, fields, runtime\)/);
+  assert.match(renderer, /runtime\?\.value\(field, rowSample\)/, 'column aggregates should use each Number/Rating Field display value');
+  assert.match(renderer, /if \(rowFormulaMap\[field\.key\] \|\| !isFormulaCapableNumericField\(field\)\) continue/);
   assert.match(renderer, /resolveTableFormulaRowValues\(\[\], current, \{\}, fields, runtime\)/);
   assert.match(renderer, /statblock-forge__preview-table-formula-footer/);
   assert.match(renderer, /tableColumnFormulaValue\([\s\S]*?columnFormulaExternalValues/);

@@ -57,7 +57,10 @@ function nestedValue(data: JsonRecord, path: string): unknown {
 function lookupValue(template: ForgeTemplate, data: JsonRecord, path: string): unknown {
   const field = template.fields.find((candidate) => candidate.key === path);
   if (field && (field.type === 'number' || field.type === 'rating')) {
-    return calculateNumericFieldValue(field, data, evaluatePreviewFormula) ?? nestedValue(data, path);
+    // Match the value shown by the Field. If its Formula is unavailable, do
+    // not silently fall back to the raw input: the statblock also shows no result.
+    return calculateNumericFieldValue(field, data, (formula, sample, slotValue, selfFieldKey) =>
+      evaluatePreviewFormula(formula, sample, slotValue, template.fields, {}, sample, selfFieldKey)) ?? undefined;
   }
   return nestedValue(data, path);
 }

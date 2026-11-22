@@ -174,7 +174,10 @@ function finiteNumber(value: unknown): number | null {
 function numericFieldValue(data: JsonRecord, template: ForgeTemplate, key: string): number | null {
   const field = template.fields.find((candidate) => candidate.key === key
     && (candidate.type === 'number' || candidate.type === 'rating'));
-  return field ? calculateNumericFieldValue(field, data, evaluatePreviewFormula) : finiteNumber(data[key]);
+  return field
+    ? calculateNumericFieldValue(field, data, (formula, sample, slotValue, selfFieldKey) =>
+      evaluatePreviewFormula(formula, sample, slotValue, template.fields, {}, sample, selfFieldKey))
+    : finiteNumber(data[key]);
 }
 
 interface RestResourceExecutionContext {
@@ -243,7 +246,8 @@ function effectiveRestResource(
   // Atlas plans a Rest against the ResourceValue (including its maximum) read before any rule
   // runs. Keep that maximum fixed for the whole operation even when another tracked field is
   // itself the maximum field or a formula dependency.
-  const calculatedMax = calculateNumericFieldValue(maxField, maxData, evaluatePreviewFormula);
+  const calculatedMax = calculateNumericFieldValue(maxField, maxData, (formula, sample, slotValue) =>
+    evaluatePreviewFormula(formula, sample, slotValue, template.fields));
   if (calculatedMax === null || !Number.isFinite(calculatedMax)) return null;
   const max = Math.max(0, Math.floor(calculatedMax));
   if (max < 1) return null;

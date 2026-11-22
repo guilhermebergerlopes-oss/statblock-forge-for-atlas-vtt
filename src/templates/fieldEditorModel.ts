@@ -148,6 +148,12 @@ function replacePatternReference(pattern: string, from: string, to: string): str
 function formulaUsesField(formula: string, key: string): boolean {
   if (diceFieldFormulaUsesField(formula, key)) return true;
   if (restFormulaReferences(formula).some(({ path }) => path === key || path.startsWith(`${key}.`) || path.startsWith(`${key}-`))) return true;
+  // A Table cell path references both its storage Table and its column Field:
+  // `{table_1.row2.value}` depends on `table_1` and on the child Field `value`.
+  const tableCellPath = /\{[A-Za-z_][A-Za-z0-9_-]*\.row[1-9][0-9]*\.([A-Za-z_][A-Za-z0-9_-]*)\}|@[A-Za-z_][A-Za-z0-9_-]*\.row[1-9][0-9]*\.([A-Za-z_][A-Za-z0-9_-]*)(?![A-Za-z0-9_-])/g;
+  for (const match of formula.matchAll(tableCellPath)) {
+    if ((match[1] ?? match[2]) === key) return true;
+  }
   const pattern = /[A-Za-z_][A-Za-z0-9_.]*/g;
   for (const match of formula.matchAll(pattern)) {
     const token = match[0];
@@ -173,6 +179,12 @@ function renameFormulaFieldReference(formula: string, from: string, to: string):
     if (token === from && next === '(') return token;
     return `${to}${token.slice(from.length)}`;
   });
+  // When a child Field is renamed, update only the last segment of a Table
+  // cell reference. Renaming the first segment is already handled above.
+  updated = updated.replace(
+    /(\{[A-Za-z_][A-Za-z0-9_-]*\.row[1-9][0-9]*\.|@[A-Za-z_][A-Za-z0-9_-]*\.row[1-9][0-9]*\.)([A-Za-z_][A-Za-z0-9_-]*)(?=\}|(?![A-Za-z0-9_-]))/g,
+    (match, prefix: string, columnKey: string) => columnKey === from ? `${prefix}${to}` : match,
+  );
   return updated;
 }
 

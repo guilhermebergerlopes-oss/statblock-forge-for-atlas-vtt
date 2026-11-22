@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluatePreviewFormula } from '../src/render/previewValueModel.ts';
+import { calculateNumericFieldValue } from '../src/templates/numericFieldModel.ts';
 import { resolveDiceFieldFormula, isDiceFieldFormulaSyntaxValid, diceFieldFormulaUsesField, renameDiceFieldFormulaReference } from '../src/statblocks/diceFieldFormulaModel.ts';
 import { fillRestFormula, evaluateRestFormula } from '../src/statblocks/restFormulaModel.ts';
 import { findFieldReferences, renameTemplateFieldKey } from '../src/templates/fieldEditorModel.ts';
@@ -37,6 +38,73 @@ test('bare value reads the current slot while {value} explicitly reads a Field n
     'the unbraced keyword still reads the target cell’s original stored value');
 });
 
+test('references to Number and Rating Fields use their displayed formula result, not their stored input', async () => {
+  const { calculateNumericFieldValue } = await import('../src/templates/numericFieldModel.ts');
+  const fields = [
+    { key: 'base', label: 'Base', type: 'number' },
+    { key: 'strength', label: 'Strength', type: 'number', formula: 'floor((value - 10) / 2)' },
+    { key: 'attack', label: 'Attack', type: 'number', formula: '{strength} + 4' },
+    { key: 'rating', label: 'Rating', type: 'rating', formula: 'value / 2' },
+    { key: 'rating_total', label: 'Rating total', type: 'number', formula: '{rating} * 4' },
+  ];
+  const sample = { base: 0, strength: 18, attack: 999, rating: '1/2', rating_total: 999 };
+  const evaluate = (formula, values, slotValue) => evaluatePreviewFormula(formula, values, slotValue, fields);
+
+  assert.equal(evaluate('{strength}', sample, undefined), 4);
+  assert.equal(calculateNumericFieldValue(fields[2], sample, evaluate), 8);
+  assert.equal(calculateNumericFieldValue(fields[4], sample, evaluate), 1);
+  assert.equal(sample.strength, 18, 'resolving a displayed value must not overwrite the source input');
+  assert.equal(sample.attack, 999, 'resolving a dependent Field must not overwrite its source input');
+});
+
+test('a Field formula reads its own stored input while external references read its displayed result', () => {
+  const fields = [
+    { key: 'strength', label: 'Strength', type: 'number', formula: '{strength} + 2' },
+    { key: 'attack', label: 'Attack', type: 'number', formula: '{strength} + 4' },
+    { key: 'rating', label: 'Rating', type: 'rating', formula: '{rating} * 2' },
+    { key: 'self_at', label: 'Self @', type: 'number', formula: '@self_at + 2' },
+    { key: 'self_bare', label: 'Self bare', type: 'number', formula: 'self_bare + 2' },
+  ];
+  const sample = { strength: 18, attack: 999, rating: '1/2', self_at: 5, self_bare: 7 };
+  const evaluate = (formula, values, slotValue, selfFieldKey) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, {}, values, selfFieldKey);
+
+  assert.equal(calculateNumericFieldValue(fields[0], sample, evaluate), 20,
+    'an explicit self-reference uses Strength input 18, then adds 2');
+  assert.equal(calculateNumericFieldValue(fields[1], sample, evaluate), 24,
+    'Attack references Strength from outside and therefore uses its displayed result 20');
+  assert.equal(calculateNumericFieldValue(fields[2], sample, evaluate), 1,
+    'a self-reference to a fractional Rating uses its numeric input 0.5');
+  assert.equal(calculateNumericFieldValue(fields[3], sample, evaluate), 7,
+    'the @ spelling also uses the current Field input');
+  assert.equal(calculateNumericFieldValue(fields[4], sample, evaluate), 9,
+    'a bare key matching the current Field also uses its input');
+  assert.equal(sample.strength, 18);
+  assert.equal(sample.rating, '1/2');
+});
+
+test('passing evaluatePreviewFormula directly keeps self references on the source input', () => {
+  const field = { key: 'armor', label: 'Armor', type: 'number', formula: '{armor} + 3' };
+  assert.equal(calculateNumericFieldValue(field, { armor: 12 }, evaluatePreviewFormula), 15);
+});
+
+test('calculated Field references resolve chains and reject circular formulas', async () => {
+  const { calculateNumericFieldValue } = await import('../src/templates/numericFieldModel.ts');
+  const fields = [
+    { key: 'raw', label: 'Raw', type: 'number' },
+    { key: 'first', label: 'First', type: 'number', formula: 'value + 2' },
+    { key: 'second', label: 'Second', type: 'number', formula: '{first} * 3' },
+    { key: 'cycle_a', label: 'Cycle A', type: 'number', formula: '{cycle_b} + 1' },
+    { key: 'cycle_b', label: 'Cycle B', type: 'number', formula: '{cycle_a} + 1' },
+  ];
+  const sample = { raw: 0, first: 5, second: 999, cycle_a: 10, cycle_b: 20 };
+  const evaluate = (formula, values, slotValue) => evaluatePreviewFormula(formula, values, slotValue, fields);
+
+  assert.equal(calculateNumericFieldValue(fields[2], sample, evaluate), 21);
+  assert.equal(calculateNumericFieldValue(fields[3], sample, evaluate), null);
+  assert.equal(calculateNumericFieldValue(fields[4], sample, evaluate), null);
+});
+
 test('Dice Field formula syntax and runtime resolution accept both reference spellings', () => {
   const localTemplate = structuredClone(template);
   const fields = localTemplate.fields;
@@ -69,6 +137,32 @@ test('dependency discovery and field renaming recognize both explicit syntaxes',
   assert.equal(findFieldReferences(localTemplate, 'proficiency').some((item) => item.property === 'diceFormula'), true);
   renameTemplateFieldKey(localTemplate, 'might-score', 'might');
   assert.equal(localTemplate.fields[1].formula, '{might} + 1');
+});
+
+test('Rest formulas use displayed Number/Rating results when one formula references another', () => {
+  const chainedTemplate = {
+    ...structuredClone(template),
+    fields: [
+      { key: 'strength', label: 'Strength', type: 'number', formula: 'floor((value - 10) / 2)' },
+      { key: 'proficiency', label: 'Proficiency', type: 'number', formula: '{strength} + 2' },
+    ],
+    sample: { strength: 18, proficiency: 999 },
+  };
+  assert.deepEqual(fillRestFormula('{proficiency}d4', chainedTemplate, chainedTemplate.sample).ok, true);
+  assert.equal(fillRestFormula('{proficiency}d4', chainedTemplate, chainedTemplate.sample).formula, '6d4',
+    'Rest uses Proficiency display value 6, derived from Strength display value 4');
+});
+
+test('Rest formulas do not fall back to a raw input when the referenced Field has no displayed result', () => {
+  const invalidTemplate = {
+    ...structuredClone(template),
+    fields: [
+      { key: 'strength', label: 'Strength', type: 'number', formula: '{missing_field} + 2' },
+    ],
+    sample: { strength: 18 },
+  };
+  const result = fillRestFormula('{strength}d4', invalidTemplate, invalidTemplate.sample);
+  assert.equal(result.ok, false, 'an unavailable displayed result must not expose the stored input 18');
 });
 
 test('Counter row regain formulas accept both reference forms while still requiring dice', async () => {

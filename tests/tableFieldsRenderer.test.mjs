@@ -190,10 +190,14 @@ test('Ctrl-hover preview avoids arbitrary mid-word wrapping while retaining emer
   assert.match(styles, /word-break: normal;/);
 });
 
-test('the row-label column heading is blank whenever Table column Labels are disabled', async () => {
+test('Table row-label column has no visible heading or redundant Row prefix', async () => {
   const renderer = await readFile(rendererUrl, 'utf8');
-  assert.match(renderer, /element\('th', 'statblock-forge__preview-table-row-label-heading', showColumnLabels \? rowLabelHeader : ''\)/);
-  assert.match(renderer, /if \(!showColumnLabels\) th\.setAttribute\('aria-label', rowLabelHeader\)/);
+  assert.match(renderer, /element\('th', 'statblock-forge__preview-table-row-label-heading'\)/);
+  assert.match(renderer, /th\.setAttribute\('aria-label', rowLabelHeader\)/);
+  assert.match(renderer, /editor\.placeholder = label \|\| String\(rowIndex \+ 1\)/);
+  assert.match(renderer, /labelCell\.textContent = label \|\| String\(rowIndex \+ 1\)/);
+  assert.doesNotMatch(renderer, /showColumnLabels \? rowLabelHeader : ''/);
+  assert.doesNotMatch(renderer, /label \|\| `\$\{rowLabelHeader\} \ $\{rowIndex \+ 1\}`/);
 });
 
 test('all editable Table rows use the same rollable value and cell editor', async () => {

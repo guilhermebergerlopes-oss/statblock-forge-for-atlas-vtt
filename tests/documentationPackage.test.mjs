@@ -7,6 +7,7 @@ import {
   documentationFolderForLanguage,
   normalizeDocumentationFolder,
   writeForgeDocumentation,
+  validateForgeDocumentationBundle,
 } from '../src/documentation/documentationPackage.ts';
 import { FORGE_DOCUMENTATION_FILES_EN } from '../src/documentation/documentationPackage.en.ts';
 
@@ -122,3 +123,79 @@ test('downloadable Portuguese and English guides document Table Row and Column F
   assert.match(portuguese.content, /Cada linha usa sua própria quantidade/);
   assert.match(english.content, /Each row uses its own quantity/);
 });
+
+test('both downloadable documentation bundles contain 35 unique, non-empty Markdown notes', () => {
+  for (const files of [FORGE_DOCUMENTATION_FILES, FORGE_DOCUMENTATION_FILES_EN]) {
+    assert.equal(files.length, 35);
+    assert.doesNotThrow(() => validateForgeDocumentationBundle(files));
+    assert.equal(new Set(files.map((file) => file.name)).size, files.length);
+    for (const file of files) {
+      assert.ok(file.content.trim().length > 0, `${file.name} must not be empty`);
+      assert.match(file.content, /^---\n/, `${file.name} must start with Markdown frontmatter`);
+    }
+  }
+});
+
+test('documentation bundle validation rejects missing content and duplicate names', () => {
+  assert.throws(
+    () => validateForgeDocumentationBundle([
+      { name: '01 - Valid.md', content: '# Valid note' },
+      { name: '02 - Empty.md', content: '  ' },
+      { name: '01 - Valid.md', content: '# Duplicate' },
+    ]),
+    /02 - Empty\.md: conteúdo vazio; 01 - Valid\.md: nome duplicado/,
+  );
+});
+
+test('Portuguese and English guides document stable references to specific Table cells', () => {
+  const portugueseNumeric = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '25 - Fórmulas em Number e Rating.md');
+  const englishNumeric = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '25 - Formulas in Number and Rating.md');
+  const portugueseTable = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '34 - Fórmulas em Tables.md');
+  const englishTable = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '34 - Table Formulas.md');
+  for (const guide of [portugueseNumeric?.content, englishNumeric?.content, portugueseTable?.content, englishTable?.content]) {
+    assert.ok(guide);
+    assert.match(guide, /\{table_1\.row2\.value\}/);
+    assert.match(guide, /@table_1\.row2\.value/);
+    assert.match(guide, /row1/);
+    assert.match(guide, /row2/);
+    assert.match(guide, /positional|posicional|posição|position/i);
+  }
+});
+
+test('downloadable Table formula guides distinguish bare value from an explicit value Field reference', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '34 - Fórmulas em Tables.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '34 - Table Formulas.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  for (const guide of [portuguese.content, english.content]) {
+    assert.match(guide, /floor\(\(\{value\}-10\)\/2\)/);
+    assert.match(guide, /@value/);
+    assert.match(guide, /same row|mesma linha/i);
+    assert.match(guide, /original stored value|valor armazenado originalmente/i);
+  }
+});
+
+test('formula guides explain that references use displayed Number/Rating results', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '25 - Fórmulas em Number e Rating.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '25 - Formulas in Number and Rating.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  assert.match(portuguese.content, /resultado que esse Field exibe/);
+  assert.match(portuguese.content, /input bruto/);
+  assert.match(english.content, /result that Field displays/);
+  assert.match(english.content, /raw input/);
+});
+
+test('the index describes the special meaning of value in Table formulas', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '00 - Índice.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '00 - Index.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  for (const guide of [portuguese.content, english.content]) {
+    assert.match(guide, /Row Formula/);
+    assert.match(guide, /Column Formula/);
+    assert.match(guide, /\{value\}/);
+    assert.match(guide, /@value/);
+  }
+});
+

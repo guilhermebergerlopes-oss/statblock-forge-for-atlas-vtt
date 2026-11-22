@@ -5,11 +5,13 @@ import {
   setScoresTableFormula,
   tableColumnAggregateContext,
   tableColumnFormulaValue,
+  tableCellReferenceIndex,
   tableFormulaMap,
   tableFormulaReferencedFieldKeys,
   tableFormulaReferencesField,
 } from '../src/statblocks/tableFormulaModel.ts';
 import { evaluatePreviewFormula } from '../src/render/previewValueModel.ts';
+import { calculateNumericFieldValue } from '../src/templates/numericFieldModel.ts';
 
 const fields = [
   { key: 'quantity', label: 'Quantity', type: 'number' },
@@ -53,6 +55,82 @@ test('Row Formula can read a same-row Field whose key is value', () => {
   assert.deepEqual(tableFormulaReferencedFieldKeys('value', valueAndModFields), []);
 });
 
+test('Number formulas can address a specific cell in any Table by storage key, row, and column key', () => {
+  const fields = [
+    { key: 'table_1', label: 'Table 1', type: 'scores', forgeInternal: 'table-storage' },
+    { key: 'value', label: 'Value', type: 'number' },
+    { key: 'mod', label: 'Mod', type: 'number' },
+    { key: 'external_mod', label: 'External Mod', type: 'number', formula: 'floor(({table_1.row2.value}-10)/2)' },
+  ];
+  const blocks = [{ id: 'table-block-1', type: 'scores', field: 'table_1', fields: ['value', 'mod'] }];
+  const tableReferences = tableCellReferenceIndex(blocks);
+  const sample = {
+    value: 12,
+    mod: 1,
+    table_1: {
+      format: 'statblock-forge-table-rows-v1',
+      firstRowLabel: 'STR',
+      extraRows: [
+        { label: 'DEX', values: { value: 14, mod: 2 } },
+        { label: 'CON', values: { value: 8, mod: -1 } },
+      ],
+    },
+    external_mod: null,
+  };
+  const evaluateWithTables = (formula, values, slotValue) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, tableReferences);
+
+  assert.equal(tableReferences.table_1.includes('value'), true);
+  assert.equal(evaluateWithTables('{table_1.row1.value}', sample, undefined), 12);
+  assert.equal(evaluateWithTables('{table_1.row2.value}', sample, undefined), 14);
+  assert.equal(evaluateWithTables('{table_1.row3.mod}', sample, undefined), -1);
+  assert.equal(evaluateWithTables('floor(({table_1.row2.value}-10)/2)', sample, undefined), 2);
+  assert.equal(evaluateWithTables('floor((@table_1.row2.value-10)/2)', sample, undefined), 2);
+  // Row Formula receives a row-specific sample where its child Fields are
+  // overlaid with the active row. Absolute Table paths must keep using the
+  // original statblock source values instead of that temporary row context.
+  const rowTwoSample = { ...sample, value: 14, mod: null };
+  const firstRowReference = resolveTableRowFormulaValues(
+    fields.slice(1, 3),
+    rowTwoSample,
+    { mod: '{table_1.row1.value}' },
+    (formula, values, slotValue) => evaluatePreviewFormula(formula, values, slotValue, fields, tableReferences, sample),
+    fields,
+  );
+  assert.equal(firstRowReference.mod, 12);
+  assert.equal(evaluateWithTables('{table_1.row4.value}', sample, undefined), null);
+  assert.equal(evaluateWithTables('{table_1.row2.not_a_column}', sample, undefined), null);
+  assert.equal(calculateNumericFieldValue(fields[3], sample, evaluateWithTables), 2);
+});
+
+test('Table cell references use the Number/Rating value shown after its Field formula', () => {
+  const calculatedValueField = {
+    key: 'value', label: 'Value', type: 'number', formula: 'value + {mod}',
+  };
+  const modField = { key: 'mod', label: 'Mod', type: 'number' };
+  const tableField = { key: 'table_1', label: 'Table 1', type: 'scores', forgeInternal: 'table-storage' };
+  const fields = [tableField, calculatedValueField, modField];
+  const tableReferences = tableCellReferenceIndex([
+    { id: 'table-block-1', type: 'scores', field: 'table_1', fields: ['value', 'mod'] },
+  ]);
+  const sample = {
+    value: 12,
+    mod: 1,
+    table_1: {
+      format: 'statblock-forge-table-rows-v1',
+      extraRows: [{ label: 'DEX', values: { value: 14, mod: 2 } }],
+    },
+  };
+  const evaluate = (formula, values, slotValue) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, tableReferences, sample);
+
+  // The value Field displays 13 in row 1 and 16 in row 2, although its inputs are 12 and 14.
+  assert.equal(evaluate('{table_1.row1.value}', sample, undefined), 13);
+  assert.equal(evaluate('{table_1.row2.value}', sample, undefined), 16);
+  assert.equal(sample.value, 12, 'calculation does not mutate the first-row input');
+  assert.equal(sample.table_1.extraRows[0].values.value, 14, 'calculation does not mutate the extra-row input');
+});
+
 test('Row Formula resolves dependencies between calculated columns regardless of order', () => {
   const result = resolveTableRowFormulaValues(
     fields,
@@ -67,6 +145,26 @@ test('Row Formula resolves dependencies between calculated columns regardless of
   assert.equal(result.total, 19);
 });
 
+test('a Table Row Formula self-reference reads that cell input, not a displayed Field formula', () => {
+  const selfField = { key: 'total', label: 'Total', type: 'number', formula: '{total} + 1' };
+  const rowResult = resolveTableRowFormulaValues(
+    [selfField],
+    { total: 7 },
+    { total: '{total} + 2' },
+  );
+  assert.equal(rowResult.total, 9,
+    'the Table Row Formula reads the current cell input of 7 when it references its own Field');
+});
+
+test('a Column Formula self-reference reads the current aggregate input', () => {
+  const context = tableColumnAggregateContext(fields, [
+    { quantity: 2, unitPrice: 10, discount: 1, total: 20 },
+    { quantity: 3, unitPrice: 10, discount: 2, total: 30 },
+  ]);
+  assert.equal(tableColumnFormulaValue('{quantity} + 1', 'quantity', context, fields), 6,
+    'the self-reference uses quantity sum 5, while other Field references still use their normal resolution');
+});
+
 test('Row Formula cycles fail closed instead of using stale stored values', () => {
   const result = resolveTableRowFormulaValues(
     fields,
@@ -76,6 +174,22 @@ test('Row Formula cycles fail closed instead of using stale stored values', () =
   );
   assert.equal(result.total, null);
   assert.equal(result.subtotal, null);
+});
+
+test('Table Row Formula reads the displayed result of a referenced external Number Field', () => {
+  const targetFields = [
+    { key: 'quantity', label: 'Quantity', type: 'number' },
+    { key: 'total', label: 'Total', type: 'number' },
+    { key: 'strength', label: 'Strength', type: 'number', formula: 'floor((value - 10) / 2)' },
+  ];
+  const result = resolveTableRowFormulaValues(
+    targetFields.slice(0, 2),
+    { quantity: 2, total: 0, strength: 18 },
+    { total: '{quantity} + {strength}' },
+    evaluate,
+    targetFields,
+  );
+  assert.equal(result.total, 6, 'the row formula uses Strength display value 4, not its stored input 18');
 });
 
 test('Column Formula exposes numeric aggregates from every row', () => {
@@ -134,6 +248,19 @@ test('Column Formula can read any non-Table Field alongside Table aggregates', (
   assert.equal(tableColumnFormulaValue('{quantity.sum} + {proficiency} + {attributes.strong}', 'total', context, allFields, evaluate, external), 10);
 });
 
+test('Column Formula references use the displayed value of an external formula-backed Field', () => {
+  const allFields = [
+    ...fields,
+    { key: 'proficiency', label: 'Proficiency', type: 'number', formula: 'value + 2' },
+  ];
+  const context = tableColumnAggregateContext(fields, [
+    { quantity: 2, unitPrice: 10, discount: 1, subtotal: 20, total: 20 },
+  ]);
+  const external = { proficiency: 3 };
+  assert.equal(tableColumnFormulaValue('{quantity.sum} + {proficiency}', 'total', context, allFields, evaluate, external), 7,
+    'the Column Formula adds displayed Proficiency 5 rather than its stored input 3');
+});
+
 test('Table formula reference discovery accepts every declared Template Field', () => {
   const tableFields = fields.slice(0, 3);
   const allFields = [...tableFields, { key: 'external', label: 'External', type: 'number' }];
@@ -143,3 +270,22 @@ test('Table formula reference discovery accepts every declared Template Field', 
   assert.equal(tableFormulaReferencesField('{quantity.sum} + {external}', 'external', allFields), true);
   assert.deepEqual(tableFormulaReferencedFieldKeys('value + true + false + max(quantity, external)', allFields), ['quantity', 'external']);
 });
+test('Table cell references count as dependencies of both the Table and its child Field', async () => {
+  const { findFieldReferences, renameTemplateFieldKey } = await import('../src/templates/fieldEditorModel.ts');
+  const template = {
+    format: 'atlas-statblock-template', version: 1, id: 'table-cell-reference-rename',
+    fields: [
+      { key: 'table_1', label: 'Table 1', type: 'scores', forgeInternal: 'table-storage' },
+      { key: 'value', label: 'Value', type: 'number' },
+      { key: 'outside', label: 'Outside', type: 'number', formula: 'floor(({table_1.row2.value}-10)/2)' },
+    ],
+    layout: { maxColumns: 12, blocks: [{ id: 'table-block-1', type: 'scores', field: 'table_1', fields: ['value'] }] },
+    sample: { value: 10, outside: 0, table_1: { format: 'statblock-forge-table-rows-v1', extraRows: [{ label: '', values: { value: 14 } }] } },
+  };
+  assert.equal(findFieldReferences(template, 'table_1').some((entry) => entry.property === 'formula'), true);
+  assert.equal(findFieldReferences(template, 'value').some((entry) => entry.property === 'formula'), true);
+  renameTemplateFieldKey(template, 'value', 'strength');
+  assert.equal(template.fields.find((field) => field.key === 'outside').formula, 'floor(({table_1.row2.strength}-10)/2)');
+  assert.deepEqual(template.layout.blocks[0].fields, ['strength']);
+});
+

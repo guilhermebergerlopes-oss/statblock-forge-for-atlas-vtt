@@ -5,6 +5,9 @@
 import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
 import { readSelectionField, selectionHasValue, selectionOptionIsSelected, selectionOptionNumber, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
 import { checkboxFieldOptions } from '../templates/checkboxFieldModel.ts';
+import { forgeTableCellValue, FORGE_TABLE_MAX_ROWS } from '../statblocks/tableRowsModel.ts';
+import type { TableCellReferenceIndex } from '../statblocks/tableFormulaModel.ts';
+import { calculateNumericFieldValue, isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -196,7 +199,30 @@ export function evaluatePreviewFormula(
   source: string,
   sample: Record<string, unknown>,
   slotValue: unknown,
-  fields: readonly ForgeField[] = [],
+  fieldsOrSelfFieldKey: readonly ForgeField[] | string = [],
+  tableReferences: TableCellReferenceIndex = {},
+  tableSourceValues: Record<string, unknown> = sample,
+  selfFieldKey?: string,
+): number | null {
+  // calculateNumericFieldValue can pass this function directly as its evaluator;
+  // in that callback shape the fourth argument is the Field currently being calculated.
+  const fields = typeof fieldsOrSelfFieldKey === 'string' ? [] : fieldsOrSelfFieldKey;
+  const currentFieldKey = typeof fieldsOrSelfFieldKey === 'string' ? fieldsOrSelfFieldKey : selfFieldKey;
+  return evaluatePreviewFormulaInternal(
+    source, sample, slotValue, fields, tableReferences, tableSourceValues, new Set<string>(), currentFieldKey,
+  );
+}
+
+/** Shared recursion stack makes calculated Field references composable while rejecting cycles. */
+function evaluatePreviewFormulaInternal(
+  source: string,
+  sample: Record<string, unknown>,
+  slotValue: unknown,
+  fields: readonly ForgeField[],
+  tableReferences: TableCellReferenceIndex,
+  tableSourceValues: Record<string, unknown>,
+  resolvingValues: Set<string>,
+  selfFieldKey?: string,
 ): number | null {
   source = source.trim();
   if (!source || source.length > 500) return null;
@@ -415,9 +441,58 @@ export function evaluatePreviewFormula(
   const truthy = (value: FormulaAtom): boolean => typeof value === 'boolean' ? value : value !== 0;
   const selectionFields = new Map(fields.filter((field) => field.type === 'choice').map((field) => [field.key, field]));
   const checkboxFields = new Map(fields.filter((field) => field.type === 'checkboxes').map((field) => [field.key, field]));
+  const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
+
+  /**
+   * Return the number the statblock displays for a Number/Rating Field. A
+   * formula-backed Field must resolve its own formula before another formula
+   * consumes it; the stored input remains untouched for editing.
+   */
+  const resolveDisplayedNumericValue = (
+    field: ForgeField,
+    values: Record<string, unknown>,
+    resolutionKey: string,
+  ): unknown => {
+    if (!isFormulaCapableNumericField(field)) return values[field.key];
+    if (resolvingValues.has(resolutionKey)) return undefined;
+    resolvingValues.add(resolutionKey);
+    try {
+      const result = calculateNumericFieldValue(field, values, (formula, formulaSample, formulaSlotValue, currentFieldKey) =>
+        evaluatePreviewFormulaInternal(
+          formula, formulaSample, formulaSlotValue, fields, tableReferences, tableSourceValues, resolvingValues, currentFieldKey,
+        ));
+      return result === null ? undefined : result;
+    } finally {
+      resolvingValues.delete(resolutionKey);
+    }
+  };
+
   const readRef = (ref: string): unknown => {
     const [rootKey, ...parts] = ref.split('.');
     if (!rootKey) return undefined;
+    const tableColumns = tableReferences[rootKey];
+    if (tableColumns) {
+      // Table references are positional and one-based. Resolve the target
+      // Number/Rating through its display formula using a sample overlaid with
+      // every source cell from the requested row, not the raw first-row input.
+      const rowMatch = parts[0]?.match(/^row([1-9][0-9]*)$/i);
+      const columnKey = parts[1];
+      if (parts.length !== 2 || !rowMatch || !columnKey || !tableColumns.includes(columnKey)) return undefined;
+      const rowNumber = Number(rowMatch[1]);
+      if (!Number.isSafeInteger(rowNumber) || rowNumber > FORGE_TABLE_MAX_ROWS) return undefined;
+
+      const rowSample: Record<string, unknown> = { ...tableSourceValues, ...sample };
+      for (const childKey of tableColumns) {
+        rowSample[childKey] = rowNumber === 1
+          ? tableSourceValues[childKey]
+          : forgeTableCellValue(tableSourceValues[rootKey], rowNumber - 1, childKey);
+      }
+      if (columnKey === selfFieldKey) return rowSample[columnKey];
+      const targetField = fieldsByKey.get(columnKey);
+      if (!targetField) return rowSample[columnKey];
+      return resolveDisplayedNumericValue(targetField, rowSample, `${rootKey}.row${rowNumber}.${columnKey}`);
+    }
+    if (parts.length === 0 && rootKey === selfFieldKey) return slotValue;
     const selectionField = selectionFields.get(rootKey);
     if (selectionField) {
       const raw = sample[rootKey];
@@ -444,6 +519,12 @@ export function evaluatePreviewFormula(
         return option ? (raw[option.key] === true ? 1 : 0) : undefined;
       }
       return undefined;
+    }
+    if (parts.length === 0) {
+      const referencedField = fieldsByKey.get(rootKey);
+      if (referencedField && isFormulaCapableNumericField(referencedField)) {
+        return resolveDisplayedNumericValue(referencedField, sample, rootKey);
+      }
     }
     if (Object.prototype.hasOwnProperty.call(sample, ref)) return sample[ref];
     if (!Object.prototype.hasOwnProperty.call(sample, rootKey)) return undefined;

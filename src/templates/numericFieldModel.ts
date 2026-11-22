@@ -54,16 +54,23 @@ export function setNumericFieldFormula(field: ForgeField, formula: string): bool
 }
 
 /** Evaluate the Field's formula, or return its stored numeric value when no formula is set. */
+export type NumericFieldFormulaEvaluator = (
+  formula: string,
+  sample: Record<string, unknown>,
+  slotValue: unknown,
+  selfFieldKey?: string,
+) => number | null;
+
 export function calculateNumericFieldValue(
   field: ForgeField,
   sample: Record<string, unknown>,
-  evaluate: (formula: string, sample: Record<string, unknown>, slotValue: unknown) => number | null,
+  evaluate: NumericFieldFormulaEvaluator,
 ): number | null {
   if (!isFormulaCapableNumericField(field)) return null;
   const context = numericFieldFormulaContext(field, sample);
   const formula = numericFieldFormula(field).trim();
   const value = formula
-    ? evaluate(formula, context.sample, context.slotValue)
+    ? evaluate(formula, context.sample, context.slotValue, field.key)
     : numericRawValue(field, sample[field.key]);
   return value !== null && Number.isFinite(value) ? value : null;
 }
