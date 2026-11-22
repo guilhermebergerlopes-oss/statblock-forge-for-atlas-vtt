@@ -753,7 +753,8 @@ function preserveInlineFieldFormatting(control: HTMLElement, display: HTMLElemen
   // inputs fixed to the displayed value. A Markdown textarea is different: it
   // must use the full block width and remain comfortably writable even when
   // its current value is empty or only a few characters long.
-  if (control instanceof HTMLInputElement && control.type !== 'checkbox' && control.type !== 'radio') {
+  if (control instanceof HTMLInputElement && control.type !== 'checkbox' && control.type !== 'radio'
+    && control.dataset.noInlineMeasure !== 'true') {
     const bounds = display.getBoundingClientRect();
     // Static editor geometry and chrome are defined by the matching CSS class.
     // Only the measured dimensions vary with the currently rendered Field.
@@ -3561,7 +3562,7 @@ function renderTableFields(
       if (editableRows) {
         const actionCell = element('td', 'statblock-forge__preview-table-row-actions-cell');
         if (isForgeTableRowDeletable(rowIndex, counterRowCount, stored.extraRows.length)) {
-          const removeRow = element('button', 'statblock-forge__inline-scores-table-action', '×') as HTMLButtonElement;
+          const removeRow = element('button', 'statblock-forge__inline-scores-table-action statblock-forge__preview-table-row-remove', '×') as HTMLButtonElement;
           removeRow.type = 'button';
           removeRow.title = removeRowLabel;
           removeRow.setAttribute('aria-label', `${removeRowLabel} ${rowIndex + 1}`);
@@ -3724,9 +3725,12 @@ function createInlineListFieldValue(
   runtime: NumericFieldRuntime,
   look: unknown,
   display: HTMLElement,
+  layout: ForgeLayoutDocument,
+  language: ForgeLanguage,
 ): HTMLElement {
-  const slot = createInlineEditSlot(look === 'comma' ? 'span' : 'div', 'statblock-forge__preview-inline-list-field', display, look !== 'comma');
+  const slot = createInlineEditSlot(look === 'comma' ? 'span' : 'div', `statblock-forge__preview-inline-list-field ${look === 'comma' ? 'is-inline-look' : 'is-block-look'}`, display, look !== 'comma');
   const redraw = (): void => drawTagDisplay(display, look, inlineListItems(sample[field.key]));
+  let refreshEditor: (() => void) | null = null;
   redraw();
   if (runtime.canEdit) {
     registerInlineSlotEditor(slot.slot, field.key, () => {
@@ -3734,40 +3738,59 @@ function createInlineListFieldValue(
       let items = inlineListItems(sample[field.key]);
       let typed = '';
       let lastWrite: Promise<boolean> = Promise.resolve(true);
-      const layer = element(look === 'comma' ? 'span' : 'div', 'atlas-sb-pane-editor atlas-sb-value');
-      const chips = element('span', 'atlas-sb-pane-field atlas-sb-pane-chips statblock-forge__inline-list-chips');
+      const editorLook = ['comma', 'chips', 'bullets', 'numbered'].includes(String(look))
+        ? String(look)
+        : 'chips';
+      const isComma = editorLook === 'comma';
+      const isChips = editorLook === 'chips';
+      const listTag = editorLook === 'numbered' ? 'ol' : 'ul';
+      const layer = element('div', `atlas-sb-pane-editor atlas-sb-value statblock-forge__inline-list-editor ${isComma ? 'is-inline-look' : 'is-block-look'}`);
+      const viewport = element('div', `statblock-forge__inline-list-viewport ${isComma ? 'is-inline-look' : 'is-block-look'}`);
+      // Keep the editor's item flow identical to the selected read-only look:
+      // comma values stay inline, Chips remain wrapping chips, and Bullets / Numbered
+      // keep their original list markers and vertical order.
+      const chips = element(isComma ? 'span' : listTag,
+        `atlas-sb-pane-field atlas-sb-pane-chips statblock-forge__inline-list-chips statblock-forge__inline-list-chips--${editorLook} ${!isComma ? 'statblock-forge__preview-tag-list' : ''}`.trim());
       const input = element('input', 'atlas-sb-pane-input atlas-sb-pane-chips__input statblock-forge__inline-list-input');
       input.type = 'text';
       input.autocomplete = 'off';
+      input.dataset.noInlineMeasure = 'true';
       input.placeholder = field.label || field.key;
       input.setAttribute('aria-label', runtime.language === 'pt-BR' ? `Adicionar item a ${field.label || field.key}` : `Add item to ${field.label || field.key}`);
+      // UL / OL children must be list items; the Add control therefore lives
+      // inside its own marker-free row and scrolls with every Remove button.
+      const inputRow = isComma ? input : element('li', 'statblock-forge__inline-list-editor-add-row');
+      if (inputRow !== input) inputRow.append(input);
       const error = element('span', 'statblock-forge__inline-field-editor-error');
       error.hidden = true;
+      const actions = element('div', 'statblock-forge__entry-actions statblock-forge__inline-list-actions');
+      appendCustomCollectionValueAction(actions, field, runtime, language);
+      appendFieldCompendiumPicker(actions, field, layout, sample, runtime, language);
 
       const renderChips = (): void => {
-        // Reuse keyed chip nodes and keep the input mounted. This preserves its
+        // Reuse keyed item nodes and keep the input mounted. This preserves its
         // caret and prevents a pending blur-commit from detaching the × target
         // before the click event is delivered.
-        if (input.parentElement !== chips) chips.append(input);
+        if (inputRow.parentElement !== chips) chips.append(inputRow);
         const previous = new Map<string, HTMLElement>();
         for (const child of Array.from(chips.children)) {
-          if (child !== input && child instanceof HTMLElement && child.dataset.chipKey) previous.set(child.dataset.chipKey, child);
+          if (child !== inputRow && child instanceof HTMLElement && child.dataset.chipKey) previous.set(child.dataset.chipKey, child);
         }
         const retained = new Set<HTMLElement>();
         for (const [index, item] of items.entries()) {
           const key = `${index}\u0000${item}`;
           let chip = previous.get(key);
           if (!chip) {
-            chip = element('span', 'atlas-sb-pane-chip');
-            const text = element('span', 'atlas-sb-pane-chip__text');
-            const remove = element('button', 'atlas-sb-pane-chip__remove', '×');
+            chip = element(isComma ? 'span' : 'li', `statblock-forge__inline-list-editor-item${isChips ? ' is-chip' : ''}`);
+            const text = element('span', 'statblock-forge__inline-list-editor-item-text');
+            const remove = element('button', 'atlas-sb-pane-chip__remove statblock-forge__inline-list-remove', '×');
             remove.type = 'button';
             remove.dataset.noBlockEdit = 'true';
             chip.append(text, remove);
           }
           chip.dataset.chipKey = key;
-          const text = chip.querySelector<HTMLElement>('.atlas-sb-pane-chip__text');
-          const remove = chip.querySelector<HTMLButtonElement>('.atlas-sb-pane-chip__remove');
+          const text = chip.querySelector<HTMLElement>('.statblock-forge__inline-list-editor-item-text');
+          const remove = chip.querySelector<HTMLButtonElement>('.statblock-forge__inline-list-remove');
           if (text) text.textContent = item;
           if (remove) {
             remove.dataset.removeIndex = String(index);
@@ -3775,10 +3798,15 @@ function createInlineListFieldValue(
             remove.title = remove.getAttribute('aria-label') ?? '';
           }
           retained.add(chip);
-          chips.insertBefore(chip, input);
+          chips.insertBefore(chip, inputRow);
+          if (isComma && index < items.length - 1) {
+            const separator = element('span', 'statblock-forge__inline-list-editor-separator', ', ');
+            retained.add(separator);
+            chips.insertBefore(separator, inputRow);
+          }
         }
         for (const child of Array.from(chips.children)) {
-          if (child !== input && child instanceof HTMLElement && !retained.has(child)) child.remove();
+          if (child !== inputRow && child instanceof HTMLElement && !retained.has(child)) child.remove();
         }
       };
       chips.addEventListener('click', (event) => {
@@ -3797,6 +3825,9 @@ function createInlineListFieldValue(
         lastWrite = lastWrite.then(async () => {
           try {
             await runtime.setBaseValue(field.key, snapshot);
+            // Keep the newest chip and the input visible when a long List has
+            // overflowed its bounded editor viewport.
+            viewport.scrollTop = viewport.scrollHeight;
             error.hidden = true;
             input.removeAttribute('aria-invalid');
             return true;
@@ -3822,7 +3853,14 @@ function createInlineListFieldValue(
       };
       input.addEventListener('input', () => { typed = input.value; });
       renderChips();
-      layer.append(chips, error);
+      refreshEditor = () => {
+        if (!viewport.isConnected) return;
+        items = inlineListItems(sample[field.key]);
+        renderChips();
+      };
+      viewport.append(chips);
+      if (actions.childElementCount > 0) viewport.append(actions);
+      layer.append(viewport, error);
       slot.open(layer, display);
 
       return {
@@ -3852,14 +3890,16 @@ function createInlineListFieldValue(
           return false;
         },
         close: () => {
+          refreshEditor = null;
           slot.close(layer, display);
           redraw();
         },
       };
     }, display);
   }
-  runtime.subscribe(field.key, redraw);
-  runtime.subscribeAll(redraw);
+  const refresh = (): void => { refreshEditor?.(); redraw(); };
+  runtime.subscribe(field.key, refresh);
+  runtime.subscribeAll(refresh);
   return slot.slot;
 }
 
@@ -3879,16 +3919,12 @@ function renderTags(
   ));
   if (field?.type === 'list' && numericRuntime?.canEdit) {
     const display = element(block.look === 'comma' ? 'span' : 'div', 'statblock-forge__preview-tags-value');
-    wrapper.append(createInlineListFieldValue(field, sample, numericRuntime, block.look, display));
+    wrapper.append(createInlineListFieldValue(field, sample, numericRuntime, block.look, display, layout, language));
   } else {
     const display = element(block.look === 'comma' ? 'span' : 'div', 'statblock-forge__preview-tags-value');
     drawTagDisplay(display, block.look, tagItems(valueOf(sample, block.field)));
     wrapper.append(display);
   }
-  const actions = element('div', 'statblock-forge__entry-actions');
-  appendCustomCollectionValueAction(actions, field, numericRuntime, language);
-  appendFieldCompendiumPicker(actions, field, layout, sample, numericRuntime, language);
-  if (actions.childElementCount > 0) wrapper.append(actions);
   return wrapper;
 }
 
@@ -5314,9 +5350,12 @@ function createInlinePairsFieldValue(
   runtime: NumericFieldRuntime | undefined,
   signed: boolean,
   display: HTMLElement,
+  layout: ForgeLayoutDocument,
+  language: ForgeLanguage,
   rollable = false,
 ): HTMLElement {
   display.classList.add('statblock-forge__preview-pair-list');
+  let refreshEditor: (() => void) | null = null;
   const slot = createInlineEditSlot('div', 'statblock-forge__preview-inline-pairs-field', display, true);
   const redraw = (): void => {
     display.replaceChildren();
@@ -5369,7 +5408,10 @@ function createInlinePairsFieldValue(
         : 'Use numbers or dice formulas. E.g. +5 or 2d8+3.');
       const error = element('span', 'statblock-forge__inline-field-editor-error');
       error.hidden = true;
-      layer.append(rowsRoot, helper, addPair, error);
+      const actions = element('div', 'statblock-forge__entry-actions statblock-forge__pairs-editor-actions');
+      appendCustomCollectionValueAction(actions, field, runtime, language);
+      appendFieldCompendiumPicker(actions, field, layout, sample, runtime, language);
+      layer.append(rowsRoot, helper, error);
       slot.open(layer, display);
 
       let primaryControl: HTMLInputElement | null = null;
@@ -5383,31 +5425,32 @@ function createInlinePairsFieldValue(
           rowsRoot.append(empty);
         }
         drafts.forEach((draft, index) => {
-          const row = element('div', 'statblock-forge__pairs-editor-row');
-          const keyLabel = element('label', 'statblock-forge__pairs-editor-control');
-          keyLabel.append(element('span', 'statblock-forge__pairs-editor-label', pt ? 'Nome' : 'Name'));
-          const keyInput = index === 0 && primaryControl ? primaryControl : element('input', 'atlas-sb-pane-input');
+          // Pair values are inline chips in read mode. Keep the same wrapping
+          // flow while editing instead of switching to a full-width grid row.
+          const row = element('span', 'statblock-forge__preview-pair statblock-forge__pairs-editor-row');
+          const keyInput = index === 0 && primaryControl ? primaryControl : element('input', 'atlas-sb-pane-input statblock-forge__pairs-editor-input is-key');
           if (index === 0) primaryControl = keyInput;
           keyInput.type = 'text';
           keyInput.value = draft.key;
-          keyInput.placeholder = pt ? 'Ex.: Destreza' : 'e.g. Dexterity';
+          keyInput.placeholder = pt ? 'Nome' : 'Name';
+          keyInput.title = pt ? 'Nome do par' : 'Pair name';
           keyInput.setAttribute('aria-label', pt ? 'Nome do par' : 'Pair name');
+          keyInput.dataset.noInlineMeasure = 'true';
           keyInput.dataset.pairIndex = String(index);
           keyInput.dataset.pairControl = 'key';
           keyInput.oninput = () => { draft.key = keyInput.value; };
-          keyLabel.append(keyInput);
 
-          const valueLabel = element('label', 'statblock-forge__pairs-editor-control');
-          valueLabel.append(element('span', 'statblock-forge__pairs-editor-label', pt ? 'Valor' : 'Value'));
-          const valueInput = element('input', 'atlas-sb-pane-input');
+          const separator = element('span', 'statblock-forge__pairs-editor-separator', ':');
+          const valueInput = element('input', 'atlas-sb-pane-input statblock-forge__pairs-editor-input is-value');
           valueInput.type = 'text';
           valueInput.value = draft.value;
-          valueInput.placeholder = pt ? 'Ex.: +5 ou 2d8+3' : 'e.g. +5 or 2d8+3';
+          valueInput.placeholder = pt ? 'Valor' : 'Value';
+          valueInput.title = pt ? 'Valor numérico ou fórmula de dados' : 'Number or dice formula';
           valueInput.setAttribute('aria-label', pt ? 'Valor numérico ou fórmula de dados' : 'Number or dice formula');
+          valueInput.dataset.noInlineMeasure = 'true';
           valueInput.dataset.pairIndex = String(index);
           valueInput.dataset.pairControl = 'value';
           valueInput.oninput = () => { draft.value = valueInput.value; };
-          valueLabel.append(valueInput);
 
           const remove = element('button', 'statblock-forge__pairs-editor-remove', '×');
           remove.type = 'button';
@@ -5419,14 +5462,27 @@ function createInlinePairsFieldValue(
             if (drafts.length === 0) drafts.push({ key: '', value: '' });
             renderRows({ index: Math.max(0, index - 1), control: 'key' });
           });
-          row.append(keyLabel, valueLabel, remove);
+          row.append(keyInput, separator, valueInput, remove);
           rowsRoot.append(row);
         });
+        // Add pair stays in the same scrollable flow as the editable chips,
+        // so it scrolls with both the values and their Remove buttons.
+        rowsRoot.append(addPair);
+        if (actions.childElementCount > 0) rowsRoot.append(actions);
         if (focus) {
           const target = rowsRoot.querySelector<HTMLInputElement>(`[data-pair-index="${focus.index}"][data-pair-control="${focus.control}"]`);
           target?.focus();
           target?.select();
         }
+      };
+      refreshEditor = () => {
+        if (!rowsRoot.isConnected || runtime.isSaving) return;
+        const latest = inlinePairsFromValue(sample[field.key]).map((pair) => ({
+          key: pair.key,
+          value: inlinePairValueText(pair.value, false),
+        }));
+        drafts.splice(0, drafts.length, ...latest);
+        renderRows();
       };
       renderRows();
       addPair.addEventListener('click', () => {
@@ -5478,6 +5534,7 @@ function createInlinePairsFieldValue(
         control: primaryControl ?? addPair,
         commit: persist,
         close: () => {
+          refreshEditor = null;
           slot.close(layer, display);
           redraw();
         },
@@ -5485,8 +5542,9 @@ function createInlinePairsFieldValue(
       };
     }, display);
   }
-  runtime?.subscribe(field.key, redraw);
-  runtime?.subscribeAll(redraw);
+  const refresh = (): void => { refreshEditor?.(); redraw(); };
+  runtime?.subscribe(field.key, refresh);
+  runtime?.subscribeAll(refresh);
   return slot.slot;
 }
 
@@ -5506,16 +5564,12 @@ function renderPairs(
   ));
   const display = element('span', 'atlas-sb-value');
   if (field?.type === 'pairs') {
-    wrapper.append(createInlinePairsFieldValue(field, sample, runtime, block.display === 'signed', display, block.rollable === true));
+    wrapper.append(createInlinePairsFieldValue(field, sample, runtime, block.display === 'signed', display, layout, language, block.rollable === true));
   } else {
     const value = readablePreviewValue(valueOf(sample, block.field));
     display.textContent = value || '—';
     wrapper.append(display);
   }
-  const actions = element('div', 'statblock-forge__entry-actions');
-  appendCustomCollectionValueAction(actions, field, runtime, language);
-  appendFieldCompendiumPicker(actions, field, layout, sample, runtime, language);
-  if (actions.childElementCount > 0) wrapper.append(actions);
   return wrapper;
 }
 

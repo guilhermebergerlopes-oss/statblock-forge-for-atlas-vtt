@@ -82,8 +82,8 @@ test('Compendium create and edit form is rendered above the existing item list',
 test('every editable Collection exposes a statblock-only Custom action', async () => {
   assert.match(source, /function appendCustomCollectionValueAction\([\s\S]*?isCollectionFieldType\(field\.type\) \|\| field\.type === 'entries'/);
   assert.match(source, /case 'tags': return renderTags\([\s\S]*?case 'pairs': return renderPairs\([\s\S]*?case 'spells': return renderGroups\(/);
-  assert.match(source, /appendCustomCollectionValueAction\(actions, field, numericRuntime, language\)/);
-  assert.match(source, /appendCustomCollectionValueAction\(actions, field, runtime, language\)/);
+  assert.match(source, /function createInlineListFieldValue\([\s\S]*?appendCustomCollectionValueAction\(actions, field, runtime, language\);[\s\S]*?appendFieldCompendiumPicker\(actions, field, layout, sample, runtime, language\)/);
+  assert.match(source, /function createInlinePairsFieldValue\([\s\S]*?appendCustomCollectionValueAction\(actions, field, runtime, language\);[\s\S]*?appendFieldCompendiumPicker\(actions, field, layout, sample, runtime, language\)/);
   assert.match(source, /card\.addEventListener\('forge:edit-field',[\s\S]*?\}, true\)/);
   assert.match(source, /void schedule\(\(\) => openRegion\(region, fieldKey\)\)/);
   assert.match(source, /if \(field\?\.type === 'entries' && numericRuntime\?\.canEdit\)/);

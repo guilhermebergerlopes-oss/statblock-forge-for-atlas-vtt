@@ -1345,6 +1345,17 @@
 .statblock-forge__preview-table-row-actions-heading { padding-inline: 0.2rem !important; }
 .statblock-forge__preview-table-row-actions-cell { padding-inline: 0.2rem !important; }
 .statblock-forge__preview-table-row-actions-cell > .statblock-forge__inline-scores-table-action { width: 1.65rem; min-width: 1.65rem; min-height: 1.65rem; padding: 0; line-height: 1; }
+.statblock-forge__statblock .statblock-forge__preview-table-row-remove {
+  border-color: var(--forge-theme-border, var(--background-modifier-border));
+  background: var(--forge-theme-raised, var(--background-secondary));
+  color: var(--forge-theme-accent-strong, var(--interactive-accent));
+}
+.statblock-forge__statblock .statblock-forge__preview-table-row-remove:hover {
+  border-color: var(--forge-theme-accent, var(--interactive-accent));
+  background: color-mix(in srgb, var(--forge-theme-accent, var(--interactive-accent)) 16%, var(--forge-theme-surface, var(--background-secondary)));
+  color: var(--forge-theme-accent-strong, var(--interactive-accent));
+}
+.statblock-forge__statblock .statblock-forge__preview-table-row-remove:disabled { opacity: 0.35; cursor: not-allowed; }
 .statblock-forge__table-row-label-editor {
   width: 100%;
   min-width: 4.5rem;
@@ -3004,6 +3015,8 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__statblock[data-forge-theme="modern-blue"] {
   --forge-theme-bg: rgb(15 23 42 / 88%);
   --forge-theme-surface: rgb(30 41 59 / 72%);
+  /* Keep editable controls opaque even though this preset uses translucent cards. */
+  --forge-theme-editor-bg: #1e293b;
   --forge-theme-raised: rgb(51 65 85 / 65%);
   --forge-theme-border: rgb(148 163 184 / 22%);
   --forge-theme-accent: #38bdf8;
@@ -5507,10 +5520,123 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__statblock .statblock-forge__inline-field-editor.is-dice { min-width: 5ch; }
 .statblock-forge__statblock .statblock-forge__dice-average-hint { color: var(--text-faint); font-size: var(--font-ui-smaller); white-space: nowrap; }
 .statblock-forge__statblock .statblock-forge__dice-warning { flex: 0 0 6px; }
-.statblock-forge__statblock .statblock-forge__inline-list-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; min-width: 0; max-width: 100%; }
+.statblock-forge__statblock .statblock-forge__inline-list-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(16rem, 45vh);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  list-style: none;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-chips--bullets,
+.statblock-forge__statblock .statblock-forge__inline-list-chips--numbered {
+  display: block;
+  padding-left: 1.2rem;
+  list-style: revert;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-chips--comma { display: inline-flex; flex-wrap: wrap; align-items: baseline; }
+.statblock-forge__statblock .statblock-forge__inline-list-editor-item { max-width: 100%; overflow-wrap: anywhere; }
+.statblock-forge__statblock .statblock-forge__inline-list-chips--comma .statblock-forge__inline-list-editor-item { display: inline-flex; align-items: baseline; gap: 0.15rem; }
+.statblock-forge__statblock .statblock-forge__inline-list-chips--chips .statblock-forge__inline-list-editor-item.is-chip { display: inline-flex; align-items: baseline; gap: 0.2rem; margin: 0; padding: 0.1rem 0.45rem; border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--background-secondary) 80%, transparent); }
+.statblock-forge__statblock .statblock-forge__inline-list-editor-add-row { list-style: none; }
+.statblock-forge__statblock .statblock-forge__inline-list-editor-add-row::marker { content: ''; }
 .statblock-forge__statblock .statblock-forge__inline-list-input { min-width: 5em; max-width: min(16em, 100%); padding: 0 0.15rem; border: 0; background: transparent; box-shadow: none; }
 .statblock-forge__statblock .statblock-forge__inline-list-input:focus { outline: none; border: 0; box-shadow: none; }
-.statblock-forge__statblock .statblock-forge__inline-list-field.atlas-sb-pane-slot--editing { min-width: 0; }
+.statblock-forge__statblock .statblock-forge__inline-list-remove {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--forge-theme-accent-strong, var(--interactive-accent));
+  font: inherit;
+  font-size: 0.82em;
+  line-height: 1;
+  cursor: pointer;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-remove:hover { background: color-mix(in srgb, var(--forge-theme-accent, var(--interactive-accent)) 16%, transparent); color: var(--forge-theme-accent-strong, var(--interactive-accent)); }
+/* Collection slots must leave the overlay grid when their editors open.
+   The hidden read value is removed from layout and the live editor takes its
+   normal place in the document flow, so growing/wrapping items push later
+   Fields down instead of painting over them. */
+.statblock-forge__statblock .statblock-forge__inline-list-field.atlas-sb-pane-slot--editing,
+.statblock-forge__statblock .statblock-forge__preview-inline-pairs-field.atlas-sb-pane-slot--editing {
+  display: contents;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-field.atlas-sb-pane-slot--editing > .atlas-sb-pane-slot__rest,
+.statblock-forge__statblock .statblock-forge__preview-inline-pairs-field.atlas-sb-pane-slot--editing > .atlas-sb-pane-slot__rest {
+  display: none !important;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-editor,
+.statblock-forge__statblock .statblock-forge__pairs-editor {
+  box-sizing: border-box;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--forge-theme-border, var(--background-modifier-border));
+  border-radius: var(--radius-m, var(--radius-s));
+  background: var(--forge-theme-editor-bg, var(--forge-theme-surface, var(--background-secondary)));
+  color: var(--forge-theme-text, var(--text-normal));
+}
+.statblock-forge__statblock .statblock-forge__inline-list-field.atlas-sb-pane-slot--editing > .statblock-forge__inline-list-editor {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-field.is-block-look.atlas-sb-pane-slot--editing > .statblock-forge__inline-list-editor {
+  display: block;
+  width: 100%;
+}
+.statblock-forge__statblock .statblock-forge__preview-inline-pairs-field.atlas-sb-pane-slot--editing > .statblock-forge__pairs-editor {
+  display: inline-flex;
+  vertical-align: baseline;
+  min-width: 0;
+  max-width: 100%;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-editor.is-inline-look { display: inline-block; max-width: 100%; }
+.statblock-forge__statblock .statblock-forge__inline-list-editor.is-block-look { display: block; width: 100%; }
+.statblock-forge__statblock .statblock-forge__inline-list-viewport {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: min(16rem, 45vh);
+  padding-right: 0.2rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.statblock-forge__statblock .statblock-forge__inline-list-viewport.is-inline-look { display: inline-block; vertical-align: baseline; }
+.statblock-forge__statblock .statblock-forge__inline-list-viewport.is-block-look { display: block; width: 100%; }
+.statblock-forge__statblock .statblock-forge__inline-list-viewport .statblock-forge__inline-list-chips {
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+.statblock-forge__statblock .statblock-forge__preview-inline-pairs-field.atlas-sb-pane-slot--editing .statblock-forge__pairs-editor-rows {
+  display: flex;
+  max-height: min(16rem, 45vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 
 /* Atlas-like Pairs inline editor: the whole value shares the labelled line's baseline. */
 .statblock-forge__inline-pairs-editor {
@@ -7772,35 +7898,78 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__preview-pair-value { font-weight: 600; overflow-wrap: anywhere; }
 .statblock-forge__preview-inline-pairs-field { display: inline-flex; flex-wrap: wrap; max-width: 100%; min-width: 0; }
 
-.statblock-forge__pairs-editor { display: grid; gap: 0.45rem; width: 100%; min-width: 0; max-width: 100%; }
-.statblock-forge__pairs-editor-help { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.statblock-forge__pairs-editor-rows { display: grid; gap: 0.35rem; min-width: 0; }
-.statblock-forge__pairs-editor-row {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) auto;
-  align-items: end;
-  gap: 0.4rem;
+.statblock-forge__statblock .statblock-forge__pairs-editor { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; width: auto; min-width: 0; max-width: 100%; vertical-align: baseline; }
+.statblock-forge__pairs-editor-help,
+.statblock-forge__pairs-editor > .statblock-forge__inline-field-editor-error { flex: 1 1 100%; min-width: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.statblock-forge__pairs-editor-rows {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 0.22rem 0.28rem;
   min-width: 0;
-  padding: 0.45rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-primary);
+  max-width: 100%;
+  max-height: min(16rem, 45vh);
+  box-sizing: border-box;
+  padding-right: 0.2rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
-.statblock-forge__pairs-editor-control { display: grid; gap: 0.18rem; min-width: 0; }
-.statblock-forge__pairs-editor-label { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.statblock-forge__pairs-editor-control input { width: 100%; min-width: 0; box-sizing: border-box; }
-.statblock-forge__pairs-editor-remove {
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
+.statblock-forge__pairs-editor-row {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: 0.18rem;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.08rem 0.38rem;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  border-radius: 0.4rem;
+  background: var(--background-secondary);
+}
+.statblock-forge__pairs-editor-input {
+  box-sizing: content-box;
+  width: auto;
+  min-width: 2ch;
+  max-width: min(14ch, 32vw);
+  padding: 0;
+  border: 0;
   background: transparent;
-  color: var(--text-muted);
+  box-shadow: none;
+  field-sizing: content;
+  vertical-align: baseline;
 }
-.statblock-forge__pairs-editor-remove:hover { border-color: var(--text-error); color: var(--text-error); }
+.statblock-forge__pairs-editor-input:focus { outline: none; border: 0; box-shadow: none; }
+.statblock-forge__pairs-editor-input.is-key { min-width: 3ch; }
+.statblock-forge__pairs-editor-input.is-value { min-width: 3ch; }
+.statblock-forge__pairs-editor-separator { color: var(--text-muted); }
+.statblock-forge__statblock .statblock-forge__pairs-editor-remove {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.1rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  min-height: 1.1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--forge-theme-accent-strong, var(--interactive-accent));
+  font: inherit;
+  font-size: 0.82em;
+  line-height: 1;
+  cursor: pointer;
+}
+.statblock-forge__statblock .statblock-forge__pairs-editor-remove:hover { background: color-mix(in srgb, var(--forge-theme-accent, var(--interactive-accent)) 16%, transparent); color: var(--forge-theme-accent-strong, var(--interactive-accent)); }
 .statblock-forge__pairs-editor-add {
-  justify-self: start;
+  flex: 0 0 auto;
   min-height: 1.9rem;
   padding: 0.2rem 0.55rem;
   border: 1px dashed var(--background-modifier-border);
@@ -7809,7 +7978,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   color: var(--text-muted);
   font-size: var(--font-ui-small);
 }
-.statblock-forge__pairs-editor-add:hover { border-color: var(--interactive-accent); color: var(--text-normal); }
+.statblock-forge__pairs-editor-add:hover { border-color: var(--interactive-accent); background: var(--background-modifier-hover); color: var(--text-normal); }
 
 .statblock-forge__preview-spells { gap: 0.45rem; }
 .statblock-forge__preview-spell-group {
@@ -7848,7 +8017,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__preview-tag-item { overflow-wrap: anywhere; }
 
 @media (max-width: 560px) {
-  .statblock-forge__pairs-editor-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 0.25rem; padding: 0.35rem; }
+  .statblock-forge__pairs-editor-row { gap: 0.12rem; padding: 0.08rem 0.3rem; }
   .statblock-forge .atlas-sb-pane-entry__part { flex-basis: min(100%, 10rem); grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
   .statblock-forge .atlas-sb-pane-entry__counter-part { grid-template-columns: auto auto minmax(0, 1fr); }
 }

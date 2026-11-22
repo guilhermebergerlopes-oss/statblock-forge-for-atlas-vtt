@@ -113,6 +113,9 @@ test('Table delete-row controls use a compact intrinsic-width action column', as
   assert.doesNotMatch(renderer, /actionsHeading\.textContent = .*Actions/);
   assert.match(styles, /\.statblock-forge__preview-table-row-actions-heading,\s*\.statblock-forge__preview-table-row-actions-cell \{ width: 2\.1rem; min-width: 2\.1rem; max-width: 2\.1rem; white-space: nowrap; \}/);
   assert.match(styles, /\.statblock-forge__preview-table-row-actions-cell > \.statblock-forge__inline-scores-table-action \{ width: 1\.65rem; min-width: 1\.65rem; min-height: 1\.65rem; padding: 0; line-height: 1; \}/);
+  assert.match(renderer, /statblock-forge__inline-scores-table-action statblock-forge__preview-table-row-remove/);
+  assert.match(styles, /\.statblock-forge__statblock \.statblock-forge__preview-table-row-remove \{[\s\S]*?background: var\(--forge-theme-raised/);
+  assert.match(styles, /\.statblock-forge__statblock \.statblock-forge__preview-table-row-remove:hover \{[\s\S]*?var\(--forge-theme-accent/);
 });
 
 test('Table uses dedicated styles and no longer carries Pair-cell UI styles', async () => {
