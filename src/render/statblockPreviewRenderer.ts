@@ -3349,7 +3349,10 @@ function renderTableFields(
 
   const showColumnLabels = block.showColumnLabels !== false;
   const showRowLabels = block.showRowLabels === true;
-  const editableRows = editable && block.allowRowAdd === true;
+  // The Template Builder always exposes row controls so authors can shape the
+  // sample Table while constructing the layout. The block option is only a
+  // permission for editing rows in rendered statblocks.
+  const editableRows = editable && (typeof onEdit === 'function' || block.allowRowAdd === true);
   const equalColumnCount = childFields.length + (showRowLabels ? 1 : 0);
   const actionsWidthRem = editableRows ? 2.1 : 0;
   const minimumDataColumnWidthRem = 2.25;

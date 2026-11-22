@@ -199,3 +199,44 @@ test('the index describes the special meaning of value in Table formulas', () =>
   }
 });
 
+
+test('downloadable Table guides explain hidden row-label heading and plain-number fallback', () => {
+  const portugueseCore = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '03 - Conceitos fundamentais.md');
+  const portugueseFields = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '05 - Fields.md');
+  const portugueseContainers = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '10 - Containers: visão geral.md');
+  const englishCore = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '03 - Core Concepts.md');
+  const englishFields = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '05 - Fields.md');
+  const englishContainers = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '10 - Containers Overview.md');
+
+  for (const guide of [portugueseCore?.content, portugueseFields?.content, portugueseContainers?.content]) {
+    assert.ok(guide);
+    assert.match(guide, /Show Labels in rows/);
+    assert.match(guide, /cabeçalho visível/);
+    assert.match(guide, /`1`, `2`, `3`/);
+    assert.match(guide, /Counter/);
+  }
+  for (const guide of [portugueseFields?.content, portugueseContainers?.content]) {
+    assert.ok(guide);
+    assert.match(guide, /rótulo personalizado/);
+  }
+  for (const guide of [englishCore?.content, englishFields?.content, englishContainers?.content]) {
+    assert.ok(guide);
+    assert.match(guide, /Show Labels in rows/);
+    assert.match(guide, /no visible `Row` heading|no visible heading/);
+    assert.match(guide, /`1`, `2`, `3`/);
+    assert.match(guide, /custom label/);
+    assert.match(guide, /Counter/);
+    assert.doesNotMatch(guide, /Show Field labels in rows.*one Field per row/);
+  }
+});
+
+test('downloadable Table guides distinguish always-available Template row controls from statblock permission', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '10 - Containers: visão geral.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '10 - Containers Overview.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  assert.match(portuguese.content, /modo de construção do Template.*adicionar e remover linhas ficam sempre visíveis/i);
+  assert.match(portuguese.content, /Allow adding rows in statblocks.*somente.*statblocks/i);
+  assert.match(english.content, /Template construction mode.*controls.*always visible/i);
+  assert.match(english.content, /Allow adding rows in statblocks.*only in rendered statblocks/i);
+});

@@ -1,5 +1,5 @@
 import { isRecord, type ForgeBlock, type ForgeField, type ForgeTemplate } from './forgeTemplate.ts';
-import { updateForgeTableRows, type ForgeTableRowsEdit } from '../statblocks/tableRowsModel.ts';
+import { readForgeTableRows, updateForgeTableRows, type ForgeTableRowsEdit } from '../statblocks/tableRowsModel.ts';
 
 export type ScoreTableEdit = { type: 'set-slot-value'; fieldKey: string; value: unknown } | ForgeTableRowsEdit;
 
@@ -44,15 +44,18 @@ export function editScoresTable(template: ForgeTemplate, blockId: string, edit: 
   const storageKey = typeof block.field === 'string' ? block.field : '';
   const storageField = template.fields.find((field) => field.key === storageKey && field.type === 'scores');
   if (!storageField) return false;
-  if ((edit.type === 'add-row' || edit.type === 'remove-row') && block.allowRowAdd !== true) return false;
+  // This model is used by the Template Builder. Row creation/deletion there is
+  // always available; `allowRowAdd` is a separate permission that controls
+  // inline editing in saved statblocks, not authoring of the Template sample.
   if (edit.type === 'remove-row' && (!Number.isInteger(edit.row) || edit.row < 1)) return false;
+  const sample = isRecord(template.sample) ? template.sample : {};
+  const previous = sample[storageKey];
+  if (edit.type === 'remove-row' && edit.row > readForgeTableRows(previous).extraRows.length) return false;
   if (edit.type === 'set-row-cell') {
     const field = template.fields.find((item) => item.key === edit.fieldKey && item.type !== 'pairs' && item.type !== 'scores');
     if (!field || !Array.isArray(block.fields) || !block.fields.includes(edit.fieldKey)) return false;
   }
   if (edit.type === 'set-row-label' && block.showRowLabels !== true) return false;
-  const sample = isRecord(template.sample) ? template.sample : {};
-  const previous = sample[storageKey];
   let normalizedEdit = edit;
   if (edit.type === 'set-row-cell') {
     const field = template.fields.find((item) => item.key === edit.fieldKey);

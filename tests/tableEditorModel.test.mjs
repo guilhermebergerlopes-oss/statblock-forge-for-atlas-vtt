@@ -56,7 +56,7 @@ test('Table allows column Labels and row Labels independently', () => {
 
 test('Table adds rows and saves row Labels and per-Field values in its private Scores storage', () => {
   const template = templateWithFields();
-  assert.equal(setScoresBlockOption(template, 'table_block', 'allowRowAdd', true), true);
+  assert.equal(template.layout.blocks[0].allowRowAdd, undefined, 'statblock row editing is disabled by default');
   assert.equal(editScoresTable(template, 'table_block', { type: 'add-row' }), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'set-row-label', row: 1, value: 'Mithril' }), false);
   // Row labels must be enabled before they can be edited.
@@ -68,14 +68,14 @@ test('Table adds rows and saves row Labels and per-Field values in its private S
   assert.equal(rows.extraRows[0].label, 'Mithril');
   assert.equal(rows.extraRows[0].values.speed, 45);
   assert.equal(template.sample.speed, 30, 'extra table rows do not overwrite the base Field value');
+  assert.equal(template.layout.blocks[0].allowRowAdd, undefined, 'building the sample does not enable row editing in statblocks');
 });
 
-test('Table cannot add rows unless enabled and rejects cells from unlinked Fields', () => {
+test('Template Builder can add rows while statblock row editing is disabled and rejects cells from unlinked Fields', () => {
   const template = templateWithFields();
-  assert.equal(editScoresTable(template, 'table_block', { type: 'add-row' }), false);
-  assert.equal(setScoresBlockOption(template, 'table_block', 'allowRowAdd', true), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'add-row' }), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'set-row-cell', row: 1, fieldKey: 'defenses', value: '12' }), false);
+  assert.equal(template.layout.blocks[0].allowRowAdd, undefined);
 });
 
 test('Table retains number display and rollable settings without legacy Columns configuration', () => {
@@ -89,12 +89,12 @@ test('Table retains number display and rollable settings without legacy Columns 
 });
 
 
-test('Table allows deleting manually-added rows only when row addition is enabled', () => {
+test('Template Builder can delete manually-added rows regardless of the statblock row permission', () => {
   const template = templateWithFields();
   assert.equal(editScoresTable(template, 'table_block', { type: 'remove-row', row: 1 }), false);
-  assert.equal(setScoresBlockOption(template, 'table_block', 'allowRowAdd', true), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'add-row' }), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'set-row-cell', row: 1, fieldKey: 'speed', value: 45 }), true);
   assert.equal(editScoresTable(template, 'table_block', { type: 'remove-row', row: 1 }), true);
   assert.equal(readForgeTableRows(template.sample.table_data).extraRows.length, 0);
+  assert.equal(template.layout.blocks[0].allowRowAdd, undefined);
 });

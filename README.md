@@ -22,7 +22,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 - Use a configurable **4–24 column Canvas Grid** (12 columns by default).
 - Compose layouts with blocks and nested containers, including Sections, Rows, and Tabs.
 - Resize and reorder blocks, adjust their placement, and use Dense Layout for more compact arrangements.
-- Build Tables from compatible Fields: each Field becomes a column, or a labeled row when **Show Field labels in rows** is enabled. Pairs Fields remain standalone Collections.
+- Build Tables from compatible Fields: each Field becomes a column. In Template construction mode, add-row and delete-row controls are always visible for manually added rows. **Allow adding rows in statblocks** only controls row editing in rendered statblocks. **Show Labels in rows** adds a separate row-label column at the left; it has no visible `Row` heading, and rows without a custom label or Counter name display only their position number (`1`, `2`, `3`...). Pairs Fields remain standalone Collections.
 - Configure per-Table **Row Formula** calculations for each data row and **Column Formula** summaries in the footer; formulas can reference any Template Field, plus numeric Table-column aggregates.
 - Use the **More options** panel for secondary Canvas controls.
 

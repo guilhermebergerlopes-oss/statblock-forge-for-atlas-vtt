@@ -22,7 +22,7 @@ test('Table preview renders only its ordered child Fields through one renderer',
   assert.match(renderer, /statblock-forge__table-row-label-editor/);
   assert.match(renderer, /type: 'set-row-label', row: rowIndex, value/);
   assert.match(renderer, /th\.scope = 'col'/);
-  assert.match(renderer, /const editableRows = editable && block\.allowRowAdd === true/);
+  assert.match(renderer, /const editableRows = editable && \(typeof onEdit === 'function' \|\| block\.allowRowAdd === true\)/);
   assert.match(renderer, /type: 'add-row'/);
   assert.match(renderer, /type: 'set-row-cell'/);
   assert.match(renderer, /function renderScores\(/);
@@ -38,7 +38,8 @@ test('editable statblocks provide the Table row editor with a persistent Field-v
     readFile(statblockSurfaceUrl, 'utf8'),
   ]);
   assert.match(renderer, /canEdit: typeof onValueChange === 'function'/);
-  assert.match(renderer, /const editableRows = editable && block\.allowRowAdd === true/);
+  assert.match(renderer, /const editableRows = editable && \(typeof onEdit === 'function' \|\| block\.allowRowAdd === true\)/);
+  assert.match(renderer, /Template Builder always exposes row controls/);
   assert.match(surface, /onFieldValueChange: \(fieldKey, value\) => this\.saveInlineFieldValue\(source, fieldKey, value\)/);
   assert.match(renderer, /runtime\.setBaseValue\(storageFieldKey, next\)/);
 });
