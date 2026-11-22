@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
-const themeBlockStart = css.indexOf('0.5.3 — keep Forge-owned controls readable');
+const themeBlockStart = css.indexOf('0.5.4 — keep Forge-owned controls readable');
 const themeBlock = themeBlockStart >= 0 ? css.slice(themeBlockStart) : '';
 
 test('Forge action buttons inherit the active host color scheme', () => {

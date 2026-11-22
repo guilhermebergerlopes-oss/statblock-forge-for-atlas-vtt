@@ -68,6 +68,12 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
 
+## Version 0.5.4
+
+- Fixes the Groups **Custom** editor activation so the generated editor is mounted in the Field slot and can be opened and closed through the same lifecycle as the other collection editors.
+- Improves light/dark theme compatibility for Forge action buttons, including controls inside themed statblocks, destructive/primary actions, hover/focus/disabled states, and Entry drag handles that previously inherited Atlas host colors.
+- Adds theme-aware fallbacks for button text contrast where a theme does not define a dedicated on-accent color.
+
 ## Version 0.5.3
 
 - Keeps Table row controls visible throughout Template construction. The **Allow adding rows in statblocks** setting continues to control only row editing in rendered statblocks.
