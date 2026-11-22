@@ -108,7 +108,7 @@
   border: 1px solid var(--interactive-accent);
   border-radius: var(--radius-s);
   background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
   cursor: pointer;
 }
 
@@ -1559,7 +1559,7 @@
 .statblock-forge__preview-scores.is-editable .atlas-sb-sheet-table__handle[data-selected] {
   opacity: 1;
   background: var(--table-drag-handle-background-active, var(--interactive-accent));
-  color: var(--table-drag-handle-color-active, var(--text-on-accent));
+  color: var(--table-drag-handle-color-active, var(--text-on-accent, var(--text-normal)));
 }
 .statblock-forge__preview-scores.is-editable .atlas-sb-sheet-table__handle--row {
   top: 0;
@@ -1901,7 +1901,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   border: 2px solid var(--background-primary);
   border-radius: 50%;
   background: var(--interactive-accent);
-  color: var(--text-on-accent, white);
+  color: var(--text-on-accent, var(--text-normal));
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
@@ -2236,7 +2236,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 }
 .statblock-forge__dense-toggle.is-active .statblock-forge__dense-toggle-state {
   background: var(--interactive-accent);
-  color: var(--text-on-accent, white);
+  color: var(--text-on-accent, var(--text-normal));
 }
 .statblock-forge__canvas-toolbar > select { width: auto; max-width: 10rem; }
 .statblock-forge__canvas-dropzone {
@@ -2301,7 +2301,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__row-select-handle:focus-visible,
 .statblock-forge__preview-block.is-row.is-forge-selected > .statblock-forge__row-select-handle {
   background: var(--interactive-accent);
-  color: var(--text-on-accent, white);
+  color: var(--text-on-accent, var(--text-normal));
   opacity: 1;
 }
 .statblock-forge__section-select-handle:focus-visible,
@@ -6033,7 +6033,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__rest-panel-footer .statblock-forge__rest-panel-confirm {
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
 }
 .statblock-forge__rest-panel-footer button:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -7529,7 +7529,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   justify-content: center;
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
   font-size: var(--font-ui-medium);
   font-weight: 700;
   letter-spacing: 0.005em;
@@ -7538,7 +7538,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__editor .statblock-forge__recovery-add-rest:hover:not(:disabled) {
   border-color: var(--interactive-accent-hover, var(--interactive-accent));
   background: var(--interactive-accent-hover, var(--interactive-accent));
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
 }
 .statblock-forge__editor .statblock-forge__recovery-add-choice {
   width: 100%;
@@ -7696,14 +7696,14 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   justify-content: center;
   border-color: var(--interactive-accent);
   background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
   font-size: var(--font-ui-medium);
   font-weight: 700;
 }
 .statblock-forge__editor .statblock-forge__properties-primary-action:hover:not(:disabled) {
   border-color: var(--interactive-accent-hover, var(--interactive-accent));
   background: var(--interactive-accent-hover, var(--interactive-accent));
-  color: var(--text-on-accent);
+  color: var(--text-on-accent, var(--text-normal));
 }
 .statblock-forge__editor .statblock-forge__button.statblock-forge__properties-secondary-action {
   width: 100%;
@@ -8605,7 +8605,7 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   border: 1px solid var(--interactive-accent);
   border-radius: var(--radius-s);
   background: var(--interactive-accent);
-  color: var(--text-on-accent, white);
+  color: var(--text-on-accent, var(--text-normal));
   cursor: pointer;
   font-size: var(--font-ui-small);
 }
@@ -9061,3 +9061,149 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   align-self: flex-start;
 }
 /* END GENERATED FORGE ATLAS STATBLOCK LINK STYLES */
+
+
+/* 0.5.3 — keep Forge-owned controls readable in both host color schemes and
+   in statblocks that use a Forge palette instead of the active app palette. */
+.statblock-forge :where(button) {
+  color-scheme: inherit;
+}
+
+/* A built-in or custom Forge theme owns the colors of controls inside its
+   statblock. Controls outside the statblock continue to inherit Atlas/Obsidian
+   light and dark theme variables. */
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) {
+  --forge-action-button-surface: var(--forge-theme-raised, var(--background-secondary));
+  --forge-action-button-surface-hover: color-mix(
+    in srgb,
+    var(--forge-theme-accent, var(--interactive-accent)) 14%,
+    var(--forge-theme-surface, var(--background-secondary))
+  );
+  --forge-action-button-border: var(--forge-theme-border, var(--background-modifier-border));
+  --forge-action-button-text: var(--forge-theme-text, var(--text-normal));
+  --forge-action-button-muted: var(--forge-theme-muted, var(--text-muted));
+  --forge-action-button-accent: var(--forge-theme-accent-strong, var(--interactive-accent));
+  --forge-action-button-primary-bg: var(--forge-theme-accent, var(--interactive-accent));
+  --forge-action-button-primary-hover-bg: var(--forge-theme-accent-strong, var(--interactive-accent));
+  /* The theme's main background is the contrast foreground for its accent. */
+  --forge-action-button-primary-text: var(--forge-theme-bg, var(--background-primary));
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__inline-scores-table-action,
+  .statblock-forge__entry-action-button,
+  .statblock-forge__compendium-picker-add,
+  .statblock-forge__compendium-picker-close,
+  .statblock-forge__pairs-editor-add,
+  .statblock-forge__spell-editor-add,
+  .statblock-forge__spell-editor-add-line,
+  .statblock-forge__spell-editor-remove,
+  .statblock-forge__rest-action-button,
+  .statblock-forge__rest-stepper-button,
+  .statblock-forge__rest-panel-footer button:not(.statblock-forge__rest-panel-confirm),
+  .atlas-sb-counter__step,
+  .statblock-forge__ability-counter-max-button
+) {
+  border-color: var(--forge-action-button-border);
+  background: var(--forge-action-button-surface);
+  color: var(--forge-action-button-text);
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__inline-scores-table-action,
+  .statblock-forge__entry-action-button,
+  .statblock-forge__compendium-picker-add,
+  .statblock-forge__compendium-picker-close,
+  .statblock-forge__pairs-editor-add,
+  .statblock-forge__spell-editor-add,
+  .statblock-forge__spell-editor-add-line,
+  .statblock-forge__spell-editor-remove,
+  .statblock-forge__rest-action-button,
+  .statblock-forge__rest-stepper-button,
+  .statblock-forge__rest-panel-footer button:not(.statblock-forge__rest-panel-confirm),
+  .atlas-sb-counter__step,
+  .statblock-forge__ability-counter-max-button
+):hover:not(:disabled) {
+  border-color: var(--forge-theme-accent, var(--interactive-accent));
+  background: var(--forge-action-button-surface-hover);
+  color: var(--forge-action-button-accent);
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__spell-editor-save,
+  .statblock-forge__rest-panel-confirm
+) {
+  border-color: var(--forge-action-button-primary-bg);
+  background: var(--forge-action-button-primary-bg);
+  color: var(--forge-action-button-primary-text);
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__spell-editor-save,
+  .statblock-forge__rest-panel-confirm
+):hover:not(:disabled) {
+  border-color: var(--forge-action-button-primary-hover-bg);
+  background: var(--forge-action-button-primary-hover-bg);
+  color: var(--forge-action-button-primary-text);
+  filter: none;
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__inline-list-remove,
+  .statblock-forge__pairs-editor-remove,
+  .atlas-sb-pane-chip__remove,
+  .statblock-forge__rest-panel-close
+) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--forge-action-button-accent);
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(
+  .statblock-forge__inline-list-remove,
+  .statblock-forge__pairs-editor-remove,
+  .atlas-sb-pane-chip__remove,
+  .statblock-forge__rest-panel-close
+):hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--forge-theme-accent, var(--interactive-accent)) 16%, transparent);
+  color: var(--forge-action-button-accent);
+}
+
+/* Drag handles are buttons too; their base Atlas styles use !important, so
+   restate the active Forge palette here to prevent host-theme colors leaking
+   into light or dark Forge presets. */
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) .statblock-forge__entry-drag-handle.atlas-sb-handle {
+  border-color: var(--forge-theme-border, var(--background-modifier-border)) !important;
+  background: var(--forge-theme-raised, var(--background-secondary)) !important;
+  box-shadow: none !important;
+  color: var(--forge-theme-muted, var(--text-muted)) !important;
+}
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) .statblock-forge__entry-drag-handle.atlas-sb-handle:hover {
+  border-color: var(--forge-theme-accent, var(--interactive-accent)) !important;
+  background: color-mix(in srgb, var(--forge-theme-accent, var(--interactive-accent)) 12%, var(--forge-theme-raised, var(--background-secondary))) !important;
+  box-shadow: none !important;
+  color: var(--forge-theme-accent-strong, var(--interactive-accent)) !important;
+}
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) .statblock-forge__entry-drag-handle.atlas-sb-handle:focus-visible {
+  border-color: var(--forge-theme-accent, var(--interactive-accent)) !important;
+  outline: 2px solid var(--forge-theme-accent-strong, var(--interactive-accent)) !important;
+  outline-offset: 2px;
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) .statblock-forge__image-socket {
+  color: var(--forge-action-button-text);
+}
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) .statblock-forge__image-socket-prompt {
+  color: var(--forge-action-button-muted);
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(button, [role="button"]):focus-visible {
+  outline-color: var(--forge-theme-accent-strong, var(--interactive-accent));
+}
+
+.statblock-forge__statblock[data-forge-theme]:not([data-forge-theme="default"]) :is(button, [role="button"]):disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+

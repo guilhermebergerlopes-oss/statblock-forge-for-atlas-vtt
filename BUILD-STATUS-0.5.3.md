@@ -195,3 +195,16 @@ The supplied source snapshot does not contain the root `main.ts` entry point (no
 - Focused List / Pairs and Table renderer tests: **22/22 passed**.
 - Full automated suite: **804/815 passed**. The same 11 failures remain due to source-package omissions recorded above (`main.ts` and `docs/user-guide/en/01 - Overview.md`); no focused regression test failed.
 - TypeScript source syntax check passed. No installable plugin build or in-app Obsidian / Atlas visual verification was possible from this incomplete source archive.
+
+## Groups Custom editor activation fix
+
+- Fixed the Groups (`groups` / runtime `spells`) inline editor so its generated editing layer is mounted into the Field slot when the editor opens.
+- The Custom button already dispatched the correct `forge:edit-field` event and the card-level handler resolved the owning inline-edit region. The Groups editor callback, however, created its controls and returned an edit session without calling `slot.open(layer, display)`. As a result, the event path succeeded but no visible editor was inserted.
+- Added the missing slot mount call, matching the established List, Pairs, and other inline editor lifecycle. The existing close callback continues to restore the display with `slot.close(layer, display)`.
+- Added a regression test asserting that Groups mounts and closes its editor layer through the slot lifecycle.
+
+## Validation after Groups Custom activation fix
+
+- Focused Groups, Compendium, and Collection scrolling tests: **23/23 passed**.
+- Full automated suite: **805/816 passed**. The same 11 failures are caused by missing files in the source snapshot: root `main.ts` and `docs/user-guide/en/01 - Overview.md`.
+- No in-app Obsidian/Atlas runtime verification was possible in this environment. The archive is still a source package, not an installable plugin build.

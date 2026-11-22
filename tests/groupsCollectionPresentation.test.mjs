@@ -59,6 +59,20 @@ test('Groups exposes a reliable Custom editor trigger and explicit completion ac
   assert.match(source, /'Concluir' : 'Done'/);
 });
 
+test('Groups mounts its composite editor layer into the inline slot', async () => {
+  const source = await (await import('node:fs/promises')).readFile(
+    new URL('../src/render/statblockPreviewRenderer.ts', import.meta.url), 'utf8',
+  );
+  const groupsStart = source.indexOf('function renderGroups(');
+  const groupsEnd = source.indexOf('function renderCheckboxes(', groupsStart);
+  assert.ok(groupsStart >= 0 && groupsEnd > groupsStart, 'Groups renderer should exist');
+  const groupsSource = source.slice(groupsStart, groupsEnd);
+  assert.match(groupsSource, /slot\.open\(layer, display\)/,
+    'the Groups editor must be mounted before the edit session is returned');
+  assert.match(groupsSource, /slot\.close\(layer, display\)/,
+    'closing the Groups editor must restore its display slot');
+});
+
 test('Groups requires at least one custom value only when the user explicitly finishes editing', async () => {
   const source = await (await import('node:fs/promises')).readFile(
     new URL('../src/render/statblockPreviewRenderer.ts', import.meta.url), 'utf8',

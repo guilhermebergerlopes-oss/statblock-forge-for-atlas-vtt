@@ -6483,6 +6483,10 @@ function renderGroups(
     // The shared inline editor listens to its primary control for navigation.
     // Let the editor's own boundary handler manage Tab for every control.
     const control = primaryControl ?? element('input');
+    // Unlike the simpler List/Pairs editors, this composite editor used to
+    // build its layer and session without mounting the layer into the slot.
+    // The Custom trigger could therefore open the region but nothing appeared.
+    slot.open(layer, display);
     return {
       fieldKey: field.key,
       control,
