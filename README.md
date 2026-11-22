@@ -68,7 +68,16 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
 
-## Version 0.5.2
+## Version 0.5.3
+
+- Keeps Table row controls visible throughout Template construction. The **Allow adding rows in statblocks** setting continues to control only row editing in rendered statblocks.
+- Removes the visible `Row` / `Linha` heading from the optional Table row-label column. Unnamed rows show their position number; custom and Counter-provided labels remain intact.
+- Adds explicit references to individual Table cells, such as `{table_1.row2.value}` and `@table_1.row2.value`, for supported formulas outside the Table.
+- Makes references to other Number/Rating Fields use the value displayed by the referenced Field, including its Formula result. A Field referencing itself continues to use its original input.
+- Keeps Gauge controls compact and continuously usable, with circular increment/decrement buttons and a wider gauge; reduces the Table column minimum width.
+- Completes the Portuguese and English Table/formula documentation for these behaviors.
+
+### Previous release: 0.5.2
 
 - Keeps Forge-linked statblocks in the Atlas DM Screen's native compact Atlas presentation; the full Forge sheet remains available through the Forge/Atlas Ctrl-hover preview where supported by Atlas.
 - Adds a visible **Statblock options** menu above each rendered sheet, with direct linking and unlinking for selected Atlas Characters and generic Tokens.

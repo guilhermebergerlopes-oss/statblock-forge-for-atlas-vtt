@@ -1,6 +1,6 @@
 {
   "name": "statblock-forge",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Create and customize tabletop RPG statblocks with reusable templates, configurable fields, formulas, resources, layouts, and dice tools.",
   "license": "AGPL-3.0-only",
   "engines": {
