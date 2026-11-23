@@ -7,6 +7,7 @@ import {
   type ForgeTemplate,
 } from './forgeTemplate.ts';
 import type { ForgeLayoutDocument } from './forgeTemplate.ts';
+import { MAX_MATH_FORMULA_LENGTH } from './formulaLimits.ts';
 
 /** Atlas stores Metric fields as an unrestricted FieldKey array; Forge intentionally adds no slot cap. */
 export const METRIC_COMPATIBLE_FIELD_TYPES = ['text', 'number', 'rating', 'dice', 'choice'] as const;
@@ -222,7 +223,7 @@ export function setMetricSlotFormula(
   const slots = metricSlots(block);
   if (slotIndex < 0 || slotIndex >= slots.length) return false;
   const cleanFormula = formula.trim();
-  if (cleanFormula.length > 500) return false;
+  if (cleanFormula.length > MAX_MATH_FORMULA_LENGTH) return false;
   const formulas = metricFormulas(block);
   while (formulas.length < slots.length) formulas.push('');
   if ((formulas[slotIndex] ?? '') === cleanFormula && (!cleanFormula || slots[slotIndex] === '')) return false;

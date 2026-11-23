@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   checkboxFieldAllowsMultiple,
+  checkboxFieldOptionLayout,
   checkboxOptionIsEnabled,
   normalizeCheckboxFieldValue,
   withCheckboxOptionValue,
@@ -24,6 +25,17 @@ function checkboxField(key, allowMultiple) {
     options: structuredClone(options),
   };
 }
+
+test('new Checkboxes Fields default to row layout and can select inline layout', () => {
+  const template = createBlankTemplate('Checkbox layout test');
+  const field = registerTemplateField(template, 'Conditions', 'checkboxes');
+  assert.equal(field.optionLayout, 'rows');
+  assert.equal(checkboxFieldOptionLayout(field), 'rows');
+  field.optionLayout = 'inline';
+  assert.equal(checkboxFieldOptionLayout(field), 'inline');
+  field.optionLayout = 'invalid-import-value';
+  assert.equal(checkboxFieldOptionLayout(field), 'rows');
+});
 
 test('new Checkboxes Fields default to single-choice mode', () => {
   const template = createBlankTemplate('Checkbox mode test');

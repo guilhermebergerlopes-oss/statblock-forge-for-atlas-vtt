@@ -16,6 +16,7 @@ import { renameAbilityPartAppearanceField } from '../templates/abilityPartsModel
 import { removePinnedTemplateImageField, renamePinnedTemplateImageField } from '../templates/imageFieldModel.ts';
 import { renameFieldCompendiumIdentity } from '../templates/fieldCompendiumModel.ts';
 import { setNumericFieldFormula } from '../templates/numericFieldModel.ts';
+import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
 import { isDiceFieldFormulaSyntaxValid, setDiceFieldFormula } from '../statblocks/diceFieldFormulaModel.ts';
 import { FIELD_CATEGORY_DEFAULT_TYPES, fieldTypesForCategory, resolveFieldCategory, type ForgeFieldCategory } from '../templates/fieldCategoryModel.ts';
 import { renderChoiceFieldSettings } from './templateChoiceFieldSettings.ts';
@@ -67,7 +68,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEditorContext, 'renderPreviewOnly' | 'language'>, field: ForgeField): HTMLElement {
   const panel = el('div', 'statblock-forge__numeric-field-formula-editor');
   if (field.type === 'number' || field.type === 'rating') {
-    const formula = inputText(typeof field.formula === 'string' ? field.formula : '', 'Formula');
+    const formula = textareaInput(typeof field.formula === 'string' ? field.formula : '', 'Formula', 5);
+    formula.classList.add('statblock-forge__formula-textarea');
+    formula.maxLength = MAX_MATH_FORMULA_LENGTH;
+    formula.wrap = 'soft';
     formula.addEventListener('change', () => {
       setNumericFieldFormula(field, formula.value);
       context.renderPreviewOnly();

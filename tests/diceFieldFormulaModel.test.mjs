@@ -51,6 +51,53 @@ test('Dice Field formulas can reference Number/Rating Values that themselves use
   assert.equal(resolved, '2d6');
 });
 
+test('Dice Field formula supports a calculated dice count together with a dynamic keep-highest count', async () => {
+  const fields = [
+    { key: 'power', label: 'Power', type: 'number' },
+    { key: 'damage', label: 'Damage', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({power}+{damage})d6kh{damage}' },
+  ];
+  const sample = { power: 3, damage: 2 };
+  const resolved = resolveDiceFieldFormula(fields[2], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[2].diceFormula), true);
+  assert.equal(resolved, '5d6kh2');
+  const parsed = (await import('../src/statblocks/diceFieldEditorModel.ts')).parseDiceField(resolved);
+  assert.equal(parsed?.terms[0]?.count, 5);
+  assert.deepEqual(parsed?.terms[0]?.keep, { mode: 'keep', end: 'highest', count: 2 });
+});
+
+test('Dice Field formulas display the evaluated dice count instead of the arithmetic group', async () => {
+  const fields = [
+    { key: 'power', label: 'Power', type: 'number' },
+    { key: 'damage', label: 'Damage', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({power}+{damage})d6kh{damage}' },
+  ];
+  const sample = { power: 10, damage: 10 };
+  const resolved = resolveDiceFieldFormula(fields[2], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(resolved, '20d6kh10');
+  const parsed = (await import('../src/statblocks/diceFieldEditorModel.ts')).parseDiceField(resolved);
+  assert.equal(parsed?.terms[0]?.count, 20);
+  assert.deepEqual(parsed?.terms[0]?.keep, { mode: 'keep', end: 'highest', count: 10 });
+});
+
+test('literal arithmetic dice counts are summed before the d even without Field references', () => {
+  const field = { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '(10+10)d6kh10' };
+  assert.equal(resolveDiceFieldFormula(field, [], {}, () => null), '20d6kh10');
+});
+
+test('Dice Field normalization preserves ordinary parentheses and only sums dice counts', () => {
+  const fields = [
+    { key: 'power', label: 'Power', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({power}+2)d6kh2+(1d8+2)*2' },
+  ];
+  const sample = { power: 3 };
+  const resolved = resolveDiceFieldFormula(fields[1], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(resolved, '5d6kh2+(1d8+2)*2');
+});
+
 test('Dice Field formula syntax accepts placeholders in dice counts, sides, and arithmetic', () => {
   assert.equal(isDiceFieldFormulaSyntaxValid('{proficiency}d{might}+{level}'), true);
   assert.equal(isDiceFieldFormulaSyntaxValid('({proficiency}d{might}+2)*{level}'), true);

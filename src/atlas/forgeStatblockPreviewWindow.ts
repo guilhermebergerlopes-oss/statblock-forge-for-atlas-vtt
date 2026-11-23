@@ -228,6 +228,17 @@ export class ForgeStatblockPreviewWindow {
       if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return;
       this.beginDrag(event);
     });
+    // The Ctrl-hover preview normally closes when the Ctrl key is released.
+    // Once the user interacts with the rendered sheet, pin it automatically so
+    // inline text editors and keyboard-driven controls remain usable after the
+    // modifier key is released. The pin button can still unpin it explicitly.
+    const pinForSheetInteraction = (event: Event): void => {
+      const target = event.target;
+      if (!target || (target as Node).nodeType !== 1) return;
+      if ((target as Element).closest('.statblock-forge__final-card')) this.setPinned(true);
+    };
+    element.addEventListener('pointerdown', pinForSheetInteraction, { capture: true });
+    element.addEventListener('focusin', pinForSheetInteraction, { capture: true });
     element.addEventListener('wheel', this.onWheel, { capture: true, passive: false });
     element.addEventListener('mousedown', () => this.raiseToFront());
 
@@ -302,6 +313,9 @@ export class ForgeStatblockPreviewWindow {
         this.hide(true);
         return;
       }
+      // A pinned preview is now an editing surface. Keep its current DOM/editor
+      // state intact instead of rebuilding it for incidental token name/art changes.
+      if (this.pinned) return;
       void this.renderSession?.updateToken(token);
     }, { equalityFn: sameToken });
   }

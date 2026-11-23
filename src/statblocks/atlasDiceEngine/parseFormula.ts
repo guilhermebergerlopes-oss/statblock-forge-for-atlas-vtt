@@ -6,7 +6,9 @@
 /**
  * Complete, bounded dice grammar. A formula adds, subtracts, multiplies and
  * divides dice and constants, with the usual precedence and parentheses:
- * `2d6+3`, `(1d8+2)*2`, `4d6kh3`, `3dF`, `d%`. A sign may only open a formula
+ * `2d6+3`, `(1d8+2)*2`, `(3+2)d6kh2`, `4d6kh3`, `3dF`, `d%`. A parenthesized
+ * arithmetic expression immediately before `d` can calculate the dice count.
+ * A sign may only open a formula
  * or a parenthesis, so `d20++2` is refused rather than guessed at.
  *
  * Dice terms and their modifiers are read by `formulaTerms.ts`. Division keeps
@@ -84,18 +86,64 @@ class FormulaReader {
   }
 
   private factor(): DraftNode {
-    if (this.take('(') !== null) {
-      if (++this.depth > FORMULA_LIMITS.depth) throw new FormulaSyntaxError('depth');
-      this.skipSpace();
-      const inner = this.expression();
-      if (this.take(')') === null) throw new FormulaSyntaxError('syntax');
-      this.depth -= 1;
-      this.skipSpace();
-      return inner;
+    if (this.text[this.cursor] === '(') {
+      const countedDice = this.parenthesizedDiceTerm();
+      if (countedDice) return countedDice;
+      if (this.take('(') !== null) {
+        if (++this.depth > FORMULA_LIMITS.depth) throw new FormulaSyntaxError('depth');
+        this.skipSpace();
+        const inner = this.expression();
+        if (this.take(')') === null) throw new FormulaSyntaxError('syntax');
+        this.depth -= 1;
+        this.skipSpace();
+        return inner;
+      }
     }
     const read = readTerm(this.text, this.cursor);
     if (!read) throw new FormulaSyntaxError('syntax');
     this.cursor = read.end;
+    this.skipSpace();
+    return { kind: 'term', term: read.term };
+  }
+
+  /**
+   * Reads an arithmetic count such as `(power+damage)d6kh2` as one Dice term.
+   * Ordinary parenthesized expressions keep their existing meaning; this
+   * special form is selected only when the matching `)` is followed by `d`.
+   */
+  private parenthesizedDiceTerm(): DraftNode | null {
+    const start = this.cursor;
+    let nesting = 0;
+    let close = -1;
+    for (let index = start; index < this.text.length; index += 1) {
+      const character = this.text[index];
+      if (character === '(') nesting += 1;
+      else if (character === ')') {
+        nesting -= 1;
+        if (nesting === 0) {
+          close = index;
+          break;
+        }
+      }
+    }
+    if (close < 0) return null;
+
+    let diceStart = close + 1;
+    while (this.text[diceStart] === ' ' || this.text[diceStart] === '\t') diceStart += 1;
+    if (!/[dD]/.test(this.text[diceStart] ?? '')) return null;
+
+    if (++this.depth > FORMULA_LIMITS.depth) throw new FormulaSyntaxError('depth');
+    const countDraft = new FormulaReader(this.text.slice(start + 1, close)).read();
+    this.depth -= 1;
+    const count = constantValue(countDraft);
+    if (count === null || !Number.isSafeInteger(count) || count < 0) throw new FormulaSyntaxError('syntax');
+    if (count > 999) throw new FormulaSyntaxError('dice');
+
+    const countText = String(count);
+    const synthetic = `${countText}${this.text.slice(diceStart)}`;
+    const read = readTerm(synthetic, 0);
+    if (!read || read.term.kind !== 'dice') throw new FormulaSyntaxError('syntax');
+    this.cursor = diceStart + read.end - countText.length;
     this.skipSpace();
     return { kind: 'term', term: read.term };
   }
@@ -113,6 +161,112 @@ class FormulaReader {
     SPACE.exec(this.text);
     this.cursor = SPACE.lastIndex;
   }
+}
+
+/** Evaluate a dice-count group only when it contains arithmetic constants, never dice. */
+function constantValue(node: DraftNode): number | null {
+  if (node.kind === 'term') return node.term.kind === 'constant' ? node.term.value : null;
+  if (node.kind === 'negate') {
+    const value = constantValue(node.operand);
+    return value === null ? null : -value;
+  }
+  const left = constantValue(node.left);
+  const right = constantValue(node.right);
+  if (left === null || right === null) return null;
+  let value: number;
+  switch (node.operator) {
+    case '+': value = left + right; break;
+    case '-': value = left - right; break;
+    case '*': value = left * right; break;
+    case '/':
+      if (right === 0) return null;
+      value = left / right;
+      break;
+  }
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Rewrites arithmetic dice-count groups to the integer count the parser rolls.
+ * For example, `(10+10)d6kh10` becomes `20d6kh10`. Only groups immediately
+ * followed by a dice marker are changed; ordinary grouping parentheses remain
+ * untouched. The input should already have passed `parseFormula` validation.
+ */
+export function normalizeDiceCountExpressions(formula: string): string {
+  let result = '';
+  let cursor = 0;
+
+  while (cursor < formula.length) {
+    const character = formula[cursor]!;
+
+    // Dice labels are opaque text; parentheses inside `[label]` are not syntax.
+    if (character === '[') {
+      const close = formula.indexOf(']', cursor);
+      const end = close < 0 ? formula.length : close + 1;
+      result += formula.slice(cursor, end);
+      cursor = end;
+      continue;
+    }
+
+    if (character !== '(') {
+      result += character;
+      cursor += 1;
+      continue;
+    }
+
+    let nesting = 0;
+    let inLabel = false;
+    let close = -1;
+    for (let index = cursor; index < formula.length; index += 1) {
+      const current = formula[index]!;
+      if (current === '[') inLabel = true;
+      else if (current === ']') inLabel = false;
+      else if (!inLabel && current === '(') nesting += 1;
+      else if (!inLabel && current === ')') {
+        nesting -= 1;
+        if (nesting === 0) {
+          close = index;
+          break;
+        }
+      }
+    }
+
+    if (close < 0) {
+      result += character;
+      cursor += 1;
+      continue;
+    }
+
+    let diceStart = close + 1;
+    while (formula[diceStart] === ' ' || formula[diceStart] === '\t') diceStart += 1;
+    const diceMarker = formula[diceStart]?.toLowerCase();
+    const nextCharacter = formula[diceStart + 1] ?? '';
+    const isDiceBoundary = diceMarker === 'd'
+      && (/\d/.test(nextCharacter) || nextCharacter === '%' || nextCharacter.toLowerCase() === 'f');
+
+    if (!isDiceBoundary) {
+      result += character;
+      cursor += 1;
+      continue;
+    }
+
+    try {
+      const countDraft = new FormulaReader(formula.slice(cursor + 1, close)).read();
+      const count = constantValue(countDraft);
+      if (count !== null && Number.isSafeInteger(count) && count >= 0 && count <= 999) {
+        result += String(count);
+        cursor = close + 1;
+        continue;
+      }
+    } catch {
+      // Leave malformed or non-constant groups unchanged; validation rejects them separately.
+    }
+
+    result += character;
+    cursor += 1;
+  }
+
+  return result;
 }
 
 /** The final tree: every term learns whether an odd number of minus signs leads to it. */

@@ -616,6 +616,9 @@ const strings: Record<string, { en: string; 'pt-BR': string }> = {
   'Checkboxes': { en: 'Checkboxes', 'pt-BR': 'Caixas de seleção' },
   'Checkbox options': { en: 'Checkbox options', 'pt-BR': 'Opções de caixas de seleção' },
   'Multiple choices': { en: 'Multiple choices', 'pt-BR': 'Escolhas múltiplas' },
+  'Option layout': { en: 'Option layout', 'pt-BR': 'Layout das opções' },
+  'Inline, wrap as needed': { en: 'Inline, wrap as needed', 'pt-BR': 'Em linha, com quebra automática' },
+  'Controls how the options are arranged in the preview and statblock.': { en: 'Controls how the options are arranged in the preview and statblock.', 'pt-BR': 'Define como as opções são organizadas na prévia e no statblock.' },
   'When enabled, more than one option can be checked in this set. Other Checkbox Fields are independent.': {
     en: 'When enabled, more than one option can be checked in this set. Other Checkbox Fields are independent.',
     'pt-BR': 'Quando ativado, mais de uma opção pode ser marcada neste conjunto. Outros Fields Checkboxes são independentes.',

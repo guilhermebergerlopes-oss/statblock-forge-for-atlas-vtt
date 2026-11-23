@@ -3,6 +3,7 @@ import { setScoresBlockOption } from '../templates/tableEditorModel.ts';
 import { button, el, labeledControl, selectInput, toggleControl, textareaInput } from './templateEditorDom.ts';
 import { translateForgeText } from '../i18n/localization.ts';
 import { setScoresTableFormula, tableFormulaText } from '../statblocks/tableFormulaModel.ts';
+import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
 import type { TemplateBlockInspectorContext } from './templateBlockInspectorContext.ts';
 
 /** Inspector for the Field-backed Table block. Pair Fields are deliberately not supported here. */
@@ -133,6 +134,9 @@ export function renderScoresBlockInspector(context: TemplateBlockInspectorContex
           '{quantity} * {unitPrice}',
           2,
         );
+        rowFormula.classList.add('statblock-forge__formula-textarea');
+        rowFormula.maxLength = MAX_MATH_FORMULA_LENGTH;
+        rowFormula.wrap = 'soft';
         rowFormula.setAttribute('aria-label', `${field.label.trim() || field.key} — ${translateForgeText('Row Formula', language)}`);
         rowFormula.addEventListener('change', () => {
           if (setScoresTableFormula(block, 'row', field.key, rowFormula.value)) context.renderPreviewOnly();
@@ -149,6 +153,9 @@ export function renderScoresBlockInspector(context: TemplateBlockInspectorContex
           'value',
           2,
         );
+        columnFormula.classList.add('statblock-forge__formula-textarea');
+        columnFormula.maxLength = MAX_MATH_FORMULA_LENGTH;
+        columnFormula.wrap = 'soft';
         columnFormula.setAttribute('aria-label', `${field.label.trim() || field.key} — ${translateForgeText('Column Formula', language)}`);
         columnFormula.addEventListener('change', () => {
           if (setScoresTableFormula(block, 'column', field.key, columnFormula.value)) context.renderPreviewOnly();

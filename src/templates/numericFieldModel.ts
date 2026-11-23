@@ -1,4 +1,5 @@
 import type { ForgeField } from './forgeTemplate.ts';
+import { MAX_MATH_FORMULA_LENGTH } from './formulaLimits.ts';
 
 /** Base arithmetic expression for a numeric Field. Empty means use its stored value. */
 export function numericFieldFormula(field: ForgeField): string {
@@ -46,7 +47,8 @@ export function numericFieldFormulaContext(
 }
 
 export function setNumericFieldFormula(field: ForgeField, formula: string): boolean {
-  const clean = formula.trim().slice(0, 500);
+  const clean = formula.trim();
+  if (clean.length > MAX_MATH_FORMULA_LENGTH) return false;
   if (numericFieldFormula(field) === clean) return false;
   if (clean) field.formula = clean;
   else delete field.formula;

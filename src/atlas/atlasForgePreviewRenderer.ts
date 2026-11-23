@@ -1,11 +1,15 @@
-import { Component, TFile, type App } from 'obsidian';
+import { Component, Notice, TFile, type App } from 'obsidian';
 import type StatblockForgePlugin from '../../main';
 import { createForgeLayout, headerFieldForPart, parseForgeLayout, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
 import { parseTemplateFileText } from '../templates/forgeFileFormat.ts';
-import { applyPinnedTemplateImages } from '../templates/imageFieldModel.ts';
+import { applyPinnedTemplateImages, pinnedTemplateImageValue } from '../templates/imageFieldModel.ts';
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './forgeTemplateLinkResolver.ts';
 import { loadStatblockSource } from '../statblocks/statblockDataSources.ts';
 import { forgeRestDataWithResources } from '../statblocks/forgeResourceValues.ts';
+import { projectForgeStatblockDataForLegacyNote } from './atlasTemplateAdapter.ts';
+import { FORGE_STATBLOCK_IMAGE_FRAMES_KEY, readStatblockImageFrames, withStatblockImageFrame, type StatblockImageFrame, type StatblockImageFrames } from '../statblocks/statblockImageFraming.ts';
+import { VaultImagePickerModal } from '../views/StatblockFilePickers.ts';
+import { openImageSocketActionsMenu } from '../render/imageSocketActionsMenu.ts';
 import { renderStatblock } from '../render/statblockPreviewRenderer.ts';
 import { resolveVaultImageResource } from '../render/vaultImageResolver.ts';
 import { attachForgeStatblockDiceRolling } from '../render/statblockDiceLinks.ts';
@@ -46,6 +50,7 @@ interface ForgeResolvedSource {
   data: JsonRecord;
   basename: string;
   sheetWidth: number;
+  imageFrames: StatblockImageFrames;
 }
 
 async function resolveForgeSource(app: App, plugin: StatblockForgePlugin, sourceId: string): Promise<ForgeResolvedSource | null> {
@@ -76,6 +81,7 @@ async function resolveForgeSource(app: App, plugin: StatblockForgePlugin, source
     data: forgeRestDataWithResources(source.binding.data, source.raw),
     basename: source.basename,
     sheetWidth: resolveForgeSheetWidth(source.raw[FORGE_STATBLOCK_SHEET_WIDTH_KEY], layout.sheetWidth),
+    imageFrames: readStatblockImageFrames(source.raw),
   };
 }
 
@@ -118,6 +124,7 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
       let renderedCard: HTMLElement | null = null;
       let diceCleanup: (() => void) | null = null;
       let drawSequence = 0;
+      let saveQueue: Promise<void> = Promise.resolve();
 
       let activeContext = context;
       const clear = (): void => {
@@ -165,6 +172,91 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
           data[imageField.key] = renderContext.token.imagePath;
         }
 
+        const enqueueSave = (operation: () => Promise<void>): Promise<void> => {
+          const save = saveQueue.catch(() => undefined).then(operation);
+          saveQueue = save.then(() => undefined, () => undefined);
+          return save;
+        };
+        const showSaveError = (error: unknown): void => {
+          const detail = error instanceof Error ? error.message : String(error);
+          new Notice(plugin.settings.language === 'pt-BR'
+            ? `Falha ao salvar a ficha: ${detail}`
+            : `Could not save the statblock: ${detail}`, 7000);
+        };
+        const persistFieldValue = (fieldKey: string, value: unknown): Promise<void> => enqueueSave(async () => {
+          const sourceFile = app.vault.getAbstractFileByPath(resolved.note.path);
+          if (!(sourceFile instanceof TFile)) throw new Error('A nota deste statblock não está disponível no Vault.');
+          const projected = projectForgeStatblockDataForLegacyNote(
+            resolved.template,
+            { ...data, [fieldKey]: value },
+          ).data[fieldKey];
+          await app.fileManager.processFrontMatter(sourceFile, (frontmatter) => {
+            if (value === undefined) delete frontmatter[fieldKey];
+            else frontmatter[fieldKey] = projected;
+          });
+        }).catch((error: unknown) => {
+          showSaveError(error);
+          throw error;
+        });
+        let imageFrames = { ...resolved.imageFrames };
+        const persistImageFrames = (nextFrames: StatblockImageFrames): Promise<void> => enqueueSave(async () => {
+          const sourceFile = app.vault.getAbstractFileByPath(resolved.note.path);
+          if (!(sourceFile instanceof TFile)) throw new Error('A nota deste statblock não está disponível no Vault.');
+          await app.fileManager.processFrontMatter(sourceFile, (frontmatter) => {
+            frontmatter[FORGE_STATBLOCK_IMAGE_FRAMES_KEY] = nextFrames;
+          });
+        });
+        const redrawPreservingScroll = async (): Promise<void> => {
+          const oldBody = renderedCard?.querySelector<HTMLElement>('.statblock-forge__preview-body');
+          const scrollTop = oldBody?.scrollTop ?? 0;
+          await draw();
+          const newBody = renderedCard?.querySelector<HTMLElement>('.statblock-forge__preview-body');
+          if (newBody) newBody.scrollTop = scrollTop;
+        };
+        const openImageActions = (fieldKey: string, socket: HTMLButtonElement): void => {
+          const pinned = pinnedTemplateImageValue(resolved.template, resolved.layout, fieldKey);
+          const language = normalizeForgeLanguage(plugin.settings.language);
+          const portuguese = language === 'pt-BR';
+          const actions = pinned === null ? [
+            {
+              id: 'choose-image',
+              label: portuguese ? 'Escolher do Vault…' : 'Choose from Vault…',
+              icon: 'image' as const,
+              run: () => {
+                new VaultImagePickerModal(app, (file) => {
+                  void (async () => {
+                    data[fieldKey] = file.path;
+                    await persistFieldValue(fieldKey, file.path);
+                    await redrawPreservingScroll();
+                  })().catch(() => undefined);
+                }, language).open();
+              },
+            },
+            {
+              id: 'clear-image',
+              label: portuguese ? 'Remover imagem' : 'Remove image',
+              icon: 'clear' as const,
+              disabled: !(typeof data[fieldKey] === 'string' && String(data[fieldKey]).trim()),
+              run: () => {
+                void (async () => {
+                  data[fieldKey] = null;
+                  await persistFieldValue(fieldKey, null);
+                  await redrawPreservingScroll();
+                })().catch(() => undefined);
+              },
+            },
+          ] : [];
+          openImageSocketActionsMenu(socket, {
+            label: pinned !== null
+              ? (portuguese ? 'Imagem fixada pelo template' : 'Image pinned by template')
+              : (portuguese ? 'Ações da imagem' : 'Image actions'),
+            actions,
+            ...(pinned !== null ? { hint: portuguese
+              ? 'Esta imagem é controlada pelo template e não pode ser substituída ou removida neste statblock.'
+              : 'This image is controlled by the template and cannot be replaced or removed in this statblock.' } : {}),
+          });
+        };
+
         markdownComponent = new Component();
         markdownComponent.load();
         renderedCard = renderStatblock({
@@ -177,6 +269,18 @@ function createForgePreviewRenderer(app: App, plugin: StatblockForgePlugin): For
           language: normalizeForgeLanguage(plugin.settings.language),
           hideTotalHiddenBlocks: true,
           foldSectionsIntoFooter: true,
+          interactiveCounters: true,
+          onFieldValueChange: (fieldKey, value) => persistFieldValue(fieldKey, value),
+          getLiveFieldData: () => data,
+          onAbilityCounterMaxChange: (fieldKey) => {
+            void persistFieldValue(fieldKey, data[fieldKey]).catch(() => undefined);
+          },
+          onImageFieldAction: openImageActions,
+          imageFrames,
+          onImageFrameChange: (blockId: string, frame: StatblockImageFrame) => {
+            imageFrames = withStatblockImageFrame(imageFrames, blockId, frame);
+            void persistImageFrames({ ...imageFrames }).catch(showSaveError);
+          },
           resolveImage: (path) => resolveVaultImageResource(app, path, resolved.note.path),
         });
         renderedCard.classList.add('statblock-forge__final-card');

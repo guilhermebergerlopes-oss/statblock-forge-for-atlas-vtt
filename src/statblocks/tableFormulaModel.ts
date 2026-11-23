@@ -1,5 +1,6 @@
 import { isRecord, type ForgeBlock, type ForgeField } from '../templates/forgeTemplate.ts';
 import { evaluatePreviewFormula } from '../render/previewValueModel.ts';
+import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
 
 export type TableFormulaKind = 'row' | 'column';
 export type TableFormulaEvaluator = (
@@ -101,7 +102,8 @@ export function setScoresTableFormula(
 
   const property = formulaProperty(kind);
   const current = tableFormulaMap(block, kind);
-  const clean = formula.trim().slice(0, 500);
+  const clean = formula.trim();
+  if (clean.length > MAX_MATH_FORMULA_LENGTH) return false;
   if ((current[fieldKey] ?? '') === clean) return false;
   const next = { ...current };
   if (clean) next[fieldKey] = clean;
@@ -128,9 +130,9 @@ export function tableFormulaReferencedFieldKeys(
     const token = match[1] ?? match[2] ?? match[3] ?? '';
     const root = token.split('.')[0] ?? '';
     const explicitReference = match[1] !== undefined || match[2] !== undefined;
-    // Bare keywords belong to the formula language; braced/@ references
-    // always mean a Template Field key, even when that key is `value`.
-    if (!explicitReference && ['value', 'true', 'false'].includes(root.toLowerCase())) continue;
+    // Bare keywords and rowNumber belong to the formula context; braced/@
+    // references normally identify Template Fields.
+    if (!explicitReference && ['value', 'true', 'false', 'rowNumber'].includes(root)) continue;
     if (!candidates.has(root)) continue;
     if (match[3] !== undefined) {
       const next = formula.slice((match.index ?? 0) + token.length).match(/^\s*(.)/)?.[1];

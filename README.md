@@ -15,6 +15,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 
 - Create reusable Templates and use them for multiple characters, creatures, NPCs, or other game entities.
 - Define Fields for Text, Markdown, Number, Rating, Dice, Choice, List, Tabular Data, Entries/Abilities, Pairs, Images, Spells, Counters, and Checkboxes.
+- Configure Checkboxes presentation per Field: one option per row or inline with automatic wrapping; the Template preview and published statblock stay in sync.
 - Keep a Template's definitions separate from the values stored by each statblock.
 
 ### Arrange the information visually
@@ -67,6 +68,14 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 - Right-click also provides the roll menu and access to that statblock's roll history. With Atlas 0.18.0 or newer, choose **Save roll to Atlas collection** to create a named roll in the collection. When the formula can be represented as a Dice Lab look, the save dialog offers to make it an individual roll with its own dice and rules: a matching active Dice Set is copied (including names, colours, critical, explosion, advantage, and disadvantage), while other simple additive dice formulas start with their written dice and natural criticals. You can further edit the saved roll in Atlas' native Dice Lab saved-roll editor. Written `adv`/`dis` and formulas with unsupported modifiers stay as formula presets to preserve their meaning. Right-click the source formula again to **Pin** or **Unpin** matching saved rolls in Atlas' native dice row. The row holds up to 10 positions (including its standard dice); use Atlas' own row editor to reorder or remove entries. Forge retains up to 20 history entries per statblock (500 total) in plugin data; it also reads Atlas map history while the originating map is open. Repeating an Atlas roll uses its original visible map when available, or the saved Dice Set through Forge's local engine after the map closes.
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
+
+## Version 0.5.5
+
+- Makes the final statblock Table use the same configured row structure and labels as the Template preview. Sample cell Values remain blank unless **Copy example values** is enabled; existing per-statblock Table edits remain authoritative.
+- Raises the Formula editor limit to 5,000 characters and changes Number/Rating, Table, and Metric formula inputs to multiline textareas with soft wrapping. The numeric evaluator's token budget is raised to support longer expressions.
+- Adds `+` / `−` controls to tracked Number Fields, clamping the current Value between zero and its configured maximum.
+- Carries forward the Groups Custom editor mounting fix and light/dark theme-aware button styling from 0.5.4.
+- Makes Forge-native Ctrl-hover previews interactive: fields and collections can be edited, Checkboxes toggled, Tables changed, Counters and Tracks/Gauges adjusted, and image fields changed/framed. The preview pins itself on first interaction so keyboard editing can continue after Ctrl is released. Changes are saved to the local Forge statblock note; this does not add Atlas multiplayer synchronization or change native Atlas statblock permissions.
 
 ## Version 0.5.4
 

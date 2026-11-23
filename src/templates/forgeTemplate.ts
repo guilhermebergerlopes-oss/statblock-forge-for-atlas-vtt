@@ -693,6 +693,8 @@ export function registerTemplateField(template: ForgeTemplate, label: string, ty
     field.options = [{ key: 'option_1', label: 'Option 1' }, { key: 'option_2', label: 'Option 2' }];
     // New Checkbox Fields are exclusive by default; multi-choice is opt-in.
     field.allowMultiple = false;
+    // Preserve the current row presentation for new Fields; inline flow is optional.
+    field.optionLayout = 'rows';
   }
   if (type === 'number') field.unit = '';
   template.fields.push(field);

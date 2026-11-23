@@ -13,6 +13,8 @@ const supportedFormulas = [
   '4d6r1',
   '2d6!',
   '4d6kh3',
+  '(2+3)d6kh2',
+  '(2 * 3)d8kh2',
   '2d20kl1',
   '8d10cs>=8',
   '2d6[fire]',
@@ -27,6 +29,15 @@ test('Dice Field validation accepts every formula feature supported by the roll 
     const parsed = parseDiceField(formula);
     assert.equal(parsed?.ok, true, `${formula} should produce a parsed formula`);
   }
+});
+
+test('Dice Field parser evaluates parenthesized arithmetic dice counts before applying keep-highest', () => {
+  const parsed = parseDiceField('(3+2)d6kh2');
+  assert.equal(parsed?.ok, true);
+  assert.equal(parsed?.terms[0]?.kind, 'dice');
+  assert.equal(parsed?.terms[0]?.count, 5);
+  assert.deepEqual(parsed?.terms[0]?.keep, { mode: 'keep', end: 'highest', count: 2 });
+  assert.equal(isDiceFieldValue('(3+2)d6kh6'), false, 'keep count cannot exceed the evaluated dice count');
 });
 
 test('Dice Field validation accepts numeric statblock references alongside dice', () => {

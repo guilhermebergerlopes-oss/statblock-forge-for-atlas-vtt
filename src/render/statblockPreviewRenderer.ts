@@ -50,7 +50,7 @@ import { addInlineListItem, inlineListItems, removeInlineListItem, splitInlineLi
 import { inlinePairName, inlinePairValueText, inlinePairsFromValue, serializeInlinePairsDraftRows, type InlinePairDraft } from '../statblocks/inlinePairsFieldEditorModel.ts';
 import { inlineEntryDraftValue, insertInlineEntryValue, moveInlineEntryValue, removeInlineEntryValue, updateInlineEntriesValue, type InlineEntryDraft } from '../statblocks/inlineEntriesFieldEditorModel.ts';
 import { inlineEntryDropIndex, inlineEntryIndexAfterMove, moveInlineEntryBetweenFields } from '../statblocks/inlineEntryDragModel.ts';
-import { checkboxFieldOptions, checkboxOptionIsEnabled, withCheckboxOptionValue } from '../templates/checkboxFieldModel.ts';
+import { checkboxFieldOptions, checkboxFieldOptionLayout, checkboxOptionIsEnabled, withCheckboxOptionValue } from '../templates/checkboxFieldModel.ts';
 import { parseSelectionFieldPicks, readSelectionField, serializeSelectionFieldPicks, type SelectionFieldPick } from '../templates/selectionFieldModel.ts';
 import { resolveInlineCounterRows, updateInlineCounterUsedValue } from '../statblocks/inlineCountersFieldEditorModel.ts';
 import { counterUsesNumericDisplay, shouldShowCounterNumericValue } from '../statblocks/counterDisplayModel.ts';
@@ -2583,6 +2583,18 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
   let trackedMaximumText: Text | null = null;
   let trackedMaximumContainer: HTMLElement | null = null;
   let trackedMaximumEditor: HTMLElement | null = null;
+  let trackedDecreaseButton: HTMLButtonElement | null = null;
+  let trackedIncreaseButton: HTMLButtonElement | null = null;
+  const changeTrackedCurrent = (delta: number): void => {
+    if (!numericRuntime?.canEdit || !field || field.type !== 'number' || numericRuntime.isSaving) return;
+    const latest = trackedNumberDisplayForField(field, fields, sample, readNumber, sourceBlocks, header);
+    if (!latest) return;
+    const nextCurrent = Math.max(0, Math.min(latest.maximum, latest.current + delta));
+    if (nextCurrent === latest.current) return;
+    const nextData: JsonRecord = { [FORGE_RESOURCE_VALUES_KEY]: sample[FORGE_RESOURCE_VALUES_KEY] };
+    if (!setForgeTrackedResourceCurrent(nextData, field.key, nextCurrent)) return;
+    void numericRuntime.setBaseValue(FORGE_RESOURCE_VALUES_KEY, nextData[FORGE_RESOURCE_VALUES_KEY]).catch(() => undefined);
+  };
   const refreshTrackedDisplay = (): void => {
     if (!field || field.type !== 'number' || !trackedCurrentText || !trackedMaximumText) return;
     const next = trackedNumberDisplayForField(field, fields, sample, readNumber, sourceBlocks, header);
@@ -2591,6 +2603,8 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
       trackedMaximumText.data = '';
       trackedMaximumEditor?.remove();
       trackedMaximumEditor = null;
+      if (trackedDecreaseButton) trackedDecreaseButton.disabled = true;
+      if (trackedIncreaseButton) trackedIncreaseButton.disabled = true;
       return;
     }
     trackedCurrentText.data = String(next.current);
@@ -2607,6 +2621,8 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
       trackedMaximumEditor.setAttribute('aria-label', numericRuntime.language === 'pt-BR' ? `Máximo de ${field.label || field.key}` : `${field.label || field.key} maximum`);
       trackedMaximumContainer.append(trackedMaximumEditor);
     }
+    if (trackedDecreaseButton) trackedDecreaseButton.disabled = next.current <= 0 || Boolean(numericRuntime?.isSaving);
+    if (trackedIncreaseButton) trackedIncreaseButton.disabled = next.current >= next.maximum || Boolean(numericRuntime?.isSaving);
   };
   if (pattern === null && trackedValue) {
     const trackedNode = element('span', 'atlas-sb-tracked statblock-forge__tracked-number');
@@ -2614,7 +2630,31 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
     trackedMaximumText = document.createTextNode(` / ${trackedValue.maximum}`);
     trackedMaximumContainer = element('span', 'atlas-sb-tracked__max statblock-forge__tracked-number-max');
     trackedMaximumContainer.append(trackedMaximumText);
-    trackedNode.append(trackedCurrentText, trackedMaximumContainer);
+    if (numericRuntime?.canEdit) {
+      const stepper = element('span', 'atlas-sb-counter__stepper statblock-forge__tracked-number-stepper');
+      trackedDecreaseButton = element('button', 'atlas-sb-counter__step statblock-forge__tracked-number-step', '−') as HTMLButtonElement;
+      trackedDecreaseButton.type = 'button';
+      trackedDecreaseButton.setAttribute('aria-label', numericRuntime.language === 'pt-BR' ? `Diminuir ${field?.label || key}` : `Decrease ${field?.label || key}`);
+      trackedDecreaseButton.disabled = trackedValue.current <= 0 || numericRuntime.isSaving;
+      trackedDecreaseButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        changeTrackedCurrent(-1);
+      });
+      trackedIncreaseButton = element('button', 'atlas-sb-counter__step statblock-forge__tracked-number-step', '+') as HTMLButtonElement;
+      trackedIncreaseButton.type = 'button';
+      trackedIncreaseButton.setAttribute('aria-label', numericRuntime.language === 'pt-BR' ? `Aumentar ${field?.label || key}` : `Increase ${field?.label || key}`);
+      trackedIncreaseButton.disabled = trackedValue.current >= trackedValue.maximum || numericRuntime.isSaving;
+      trackedIncreaseButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        changeTrackedCurrent(1);
+      });
+      stepper.append(trackedDecreaseButton, trackedCurrentText, trackedMaximumContainer, trackedIncreaseButton);
+      trackedNode.append(stepper);
+    } else {
+      trackedNode.append(trackedCurrentText, trackedMaximumContainer);
+    }
     valueNode.append(trackedNode);
     if (trackedValue.maxField.key === field?.key && numericRuntime?.canEdit) refreshTrackedDisplay();
   } else if (pattern === null && isNumericField && field) valueNode.append(renderNumericFieldValue(field, sample, numericRuntime, block.display === 'signed'));
@@ -3413,7 +3453,7 @@ function renderTableFields(
       Math.max(count, counterRows(valueOf(current, field.key), field)?.length ?? 0), 0);
     const rowCount = Math.min(FORGE_TABLE_MAX_ROWS, Math.max(1 + stored.extraRows.length, counterRowCount));
     const rowValues = Array.from({ length: rowCount }, (_unused, rowIndex) => {
-      const rowSample: JsonRecord = rowIndex === 0 ? { ...current } : { ...current };
+      const rowSample: JsonRecord = { ...current, __forgeTableRowNumber: rowIndex + 1 };
       if (rowIndex > 0) {
         childFields.forEach((field) => {
           if (field.type !== 'counters') rowSample[field.key] = forgeTableCellValue(current[storageFieldKey], rowIndex, field.key);
@@ -3688,10 +3728,22 @@ function tagItems(raw: unknown): string[] {
   return inlineListItems(raw);
 }
 
-function drawTagDisplay(display: HTMLElement, look: unknown, items: readonly string[]): void {
+function drawTagDisplay(
+  display: HTMLElement,
+  look: unknown,
+  items: readonly string[],
+  language: ForgeLanguage = 'en',
+): void {
   display.replaceChildren();
   if (items.length === 0) {
-    display.append(markForgeUiText(element('span', 'statblock-forge__hint', 'Nenhuma tag de exemplo.'), 'Nenhuma tag de exemplo.'));
+    const emptyText = 'Nenhuma tag de exemplo.';
+    // This placeholder can be created again after an inline List edit.
+    // Translate at creation time instead of relying only on the card's initial
+    // localization pass, which has already completed by then.
+    display.append(markForgeUiText(
+      element('span', 'statblock-forge__hint', translateForgeText(emptyText, language)),
+      emptyText,
+    ));
     return;
   }
   if (look === 'comma') {
@@ -3729,7 +3781,7 @@ function createInlineListFieldValue(
   language: ForgeLanguage,
 ): HTMLElement {
   const slot = createInlineEditSlot(look === 'comma' ? 'span' : 'div', `statblock-forge__preview-inline-list-field ${look === 'comma' ? 'is-inline-look' : 'is-block-look'}`, display, look !== 'comma');
-  const redraw = (): void => drawTagDisplay(display, look, inlineListItems(sample[field.key]));
+  const redraw = (): void => drawTagDisplay(display, look, inlineListItems(sample[field.key]), language);
   let refreshEditor: (() => void) | null = null;
   redraw();
   if (runtime.canEdit) {
@@ -3922,7 +3974,7 @@ function renderTags(
     wrapper.append(createInlineListFieldValue(field, sample, numericRuntime, block.look, display, layout, language));
   } else {
     const display = element(block.look === 'comma' ? 'span' : 'div', 'statblock-forge__preview-tags-value');
-    drawTagDisplay(display, block.look, tagItems(valueOf(sample, block.field)));
+    drawTagDisplay(display, block.look, tagItems(valueOf(sample, block.field)), language);
     wrapper.append(display);
   }
   return wrapper;
@@ -6522,7 +6574,7 @@ function renderCheckboxes(
     wrapper.append(markForgeUiText(element('span', 'statblock-forge__hint', 'Nenhuma opção configurada.'), 'Nenhuma opção configurada.'));
     return wrapper;
   }
-  const list = element('div', 'statblock-forge__preview-checkboxes-list');
+  const list = element('div', `statblock-forge__preview-checkboxes-list is-${checkboxFieldOptionLayout(field)}`);
   const syncCheckboxInputs = (): void => {
     for (const input of Array.from(list.querySelectorAll<HTMLInputElement>('input[data-checkbox-option-key]'))) {
       const optionKey = input.dataset.checkboxOptionKey;
@@ -6543,22 +6595,29 @@ function renderCheckboxes(
       const next = withCheckboxOptionValue(data, field, option.key, checkbox.checked);
       data[field.key] = next;
       syncCheckboxInputs();
-      numericRuntime?.refreshAll();
-      try {
-        const result = onFieldValueChange?.(field.key, next);
-        if (result && typeof (result as Promise<void>).then === 'function') {
-          void (result as Promise<void>).catch(() => {
-            if (hadPrevious) data[field.key] = previous;
-            else delete data[field.key];
-            syncCheckboxInputs();
-            numericRuntime?.refreshAll();
-          });
-        }
-      } catch {
+      const refreshDependentFields = (): void => numericRuntime?.refreshAll();
+      const rollbackCheckboxValue = (): void => {
         if (hadPrevious) data[field.key] = previous;
         else delete data[field.key];
         syncCheckboxInputs();
-        numericRuntime?.refreshAll();
+        refreshDependentFields();
+      };
+      try {
+        const result = onFieldValueChange?.(field.key, next);
+        if (result && typeof (result as Promise<void>).then === 'function') {
+          // In the final statblock the live-data provider is updated only after
+          // the Vault write completes. Refreshing before that commit makes
+          // dependent Table formulas read the previous Checkbox state, so the
+          // display appears one interaction behind. Refresh after persistence.
+          void Promise.resolve(result).then(
+            refreshDependentFields,
+            rollbackCheckboxValue,
+          );
+        } else {
+          refreshDependentFields();
+        }
+      } catch {
+        rollbackCheckboxValue();
       }
     });
     optionLabel.append(checkbox, document.createTextNode(option.label));

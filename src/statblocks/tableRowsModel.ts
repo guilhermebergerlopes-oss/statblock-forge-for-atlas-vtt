@@ -67,6 +67,21 @@ export function readForgeTableRows(raw: unknown): ForgeTableRowsData {
   };
 }
 
+/**
+ * Copy only a Table's structural sample data into a new statblock. Row count
+ * and labels define the Template's Table layout; cell values remain optional
+ * example data controlled by the separate "Copy example values" setting.
+ */
+export function forgeTableStructureFromSample(raw: unknown): ForgeTableRowsData | null {
+  if (!isRecord(raw) || raw.format !== FORGE_TABLE_DATA_FORMAT) return null;
+  const sample = readForgeTableRows(raw);
+  return {
+    format: FORGE_TABLE_DATA_FORMAT,
+    firstRowLabel: sample.firstRowLabel,
+    extraRows: sample.extraRows.slice(0, FORGE_TABLE_MAX_ROWS - 1).map((row) => ({ label: row.label, values: {} })),
+  };
+}
+
 export function updateForgeTableRows(raw: unknown, edit: ForgeTableRowsEdit): ForgeTableRowsData {
   const current = readForgeTableRows(raw);
   if (edit.type === 'add-row') {

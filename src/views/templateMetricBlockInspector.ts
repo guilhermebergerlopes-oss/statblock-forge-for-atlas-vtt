@@ -16,7 +16,8 @@ import {
   setMetricSlotFormulaLabel,
 } from '../templates/metricEditorModel.ts';
 import { translateForgeText } from '../i18n/localization.ts';
-import { button, el, fieldTypeLabel, inputText, labeledControl, numberInput, selectInput, toggleControl } from './templateEditorDom.ts';
+import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
+import { button, el, fieldTypeLabel, inputText, labeledControl, numberInput, selectInput, textareaInput, toggleControl } from './templateEditorDom.ts';
 import { renderNumericTrackingControls } from './templateNumericTrackingControls.ts';
 import type { TemplateBlockInspectorContext } from './templateBlockInspectorContext.ts';
 
@@ -47,11 +48,11 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     const slotGroup = el('div', 'statblock-forge__metric-slot-group');
     const row = el('div', 'statblock-forge__metric-slot');
     const title = el('span', 'statblock-forge__metric-slot-index', String(index + 1).padStart(2, '0'));
-    const formula = metricSlotFormula(block, index);
+    const currentFormula = metricSlotFormula(block, index);
     const compatible = metricAvailableFields(template, block.id, index);
     const boundField = template.fields.find((field) => field.key === key);
     const source = inputText(
-      formula || (boundField ? `${boundField.label.trim() || boundField.key} · ${fieldTypeLabel(boundField.type)}` : key),
+      currentFormula ? '' : (boundField ? `${boundField.label.trim() || boundField.key} · ${fieldTypeLabel(boundField.type)}` : key),
       translateForgeText('Compatible Fields: In-line, Number, Rating, Dice and Selection', context.language),
     );
     source.classList.add('statblock-forge__metric-slot-source');
@@ -71,8 +72,12 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
       option.label = boundField.key;
       suggestions.append(option);
     }
+    const formulaEditor = textareaInput(currentFormula, '{fieldKey} + {anotherField}', 4);
+    formulaEditor.classList.add('statblock-forge__formula-textarea', 'statblock-forge__metric-slot-formula');
+    formulaEditor.maxLength = MAX_MATH_FORMULA_LENGTH;
+    formulaEditor.wrap = 'soft';
     const displayLabel = inputText(
-      formula ? metricSlotFormulaLabel(block, index) : (boundField?.label ?? ''),
+      currentFormula ? metricSlotFormulaLabel(block, index) : (boundField?.label ?? ''),
       'Display name',
     );
     displayLabel.classList.add('statblock-forge__metric-slot-name');
@@ -89,6 +94,7 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
         setMetricSlotField(template, block.id, index, null);
         setMetricSlotFormula(template, block.id, index, '');
         setMetricSlotFormulaLabel(template, block.id, index, '');
+        formulaEditor.value = '';
         context.renderPreviewOnly();
         return;
       }
@@ -98,6 +104,28 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
           return;
         }
       }
+      formulaEditor.value = entered;
+      source.value = '';
+      const fallbackLabel = displayLabel.value.trim() || boundField?.label || `Formula ${index + 1}`;
+      setMetricSlotFormulaLabel(template, block.id, index, fallbackLabel);
+      context.renderPreviewOnly();
+    });
+    formulaEditor.addEventListener('change', () => {
+      const entered = formulaEditor.value.trim();
+      if (!entered) {
+        if (!metricSlotFormula(block, index)) return;
+        setMetricSlotFormula(template, block.id, index, '');
+        setMetricSlotFormulaLabel(template, block.id, index, '');
+        context.renderPreviewOnly();
+        return;
+      }
+      if (!setMetricSlotFormula(template, block.id, index, entered)) {
+        if (metricSlotFormula(block, index) !== entered) {
+          context.showNotice('Formula is too long or this Metric slot is unavailable.');
+          return;
+        }
+      }
+      source.value = '';
       const fallbackLabel = displayLabel.value.trim() || boundField?.label || `Formula ${index + 1}`;
       setMetricSlotFormulaLabel(template, block.id, index, fallbackLabel);
       context.renderPreviewOnly();
@@ -128,7 +156,7 @@ export function renderMetricBlockInspector(context: TemplateBlockInspectorContex
     remove.setAttribute('aria-label', 'Remove slot (keeps its field and data)');
     remove.disabled = false;
     row.append(remove);
-    slotGroup.append(row);
+    slotGroup.append(row, labeledControl('Formula', formulaEditor));
     slotList.append(slotGroup);
   });
   panel.append(slotList);

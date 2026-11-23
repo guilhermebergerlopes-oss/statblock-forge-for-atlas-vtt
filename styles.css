@@ -5028,16 +5028,16 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 .statblock-forge__preview-checkboxes-list { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.85rem; }
 .statblock-forge__preview-checkbox-option { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; cursor: pointer; }
 
-/* Template canvas: list-like information is laid out as full-width rows.
-   Metric blocks retain their configured multi-column slots. */
-.statblock-forge__canvas-sheet .statblock-forge__preview-checkboxes-list {
+/* Checkboxes presentation is selected on the Field and shared by the
+   Template preview and published statblock. */
+.statblock-forge__preview-checkboxes-list.is-rows {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 0;
   width: 100%;
 }
-.statblock-forge__canvas-sheet .statblock-forge__preview-checkbox-option {
+.statblock-forge__preview-checkboxes-list.is-rows > .statblock-forge__preview-checkbox-option {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -5045,8 +5045,22 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   padding: 0.2rem 0;
   border-bottom: 0.5px solid color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
 }
-.statblock-forge__canvas-sheet .statblock-forge__preview-checkbox-option:last-child {
+.statblock-forge__preview-checkboxes-list.is-rows > .statblock-forge__preview-checkbox-option:last-child {
   border-bottom: 0;
+}
+.statblock-forge__preview-checkboxes-list.is-inline {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 0.4rem 0.85rem;
+  width: 100%;
+}
+.statblock-forge__preview-checkboxes-list.is-inline > .statblock-forge__preview-checkbox-option {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
 }
 .statblock-forge__canvas-sheet .statblock-forge__preview-entry-list > .statblock-forge__preview-entry,
 .statblock-forge__canvas-sheet .statblock-forge__preview-metric-rows > .statblock-forge__preview-metric-grid,
@@ -6634,8 +6648,23 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 
 /* Tracked Number Values keep Atlas' current/maximum hierarchy while remaining a Number stat. */
 .statblock-forge__preview-stat-value .statblock-forge__tracked-number {
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.statblock-forge__preview-stat-value .statblock-forge__tracked-number-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.statblock-forge__preview-stat-value .statblock-forge__tracked-number-step {
+  width: 1.2rem;
+  height: 1.2rem;
+  min-width: 1.2rem;
+  min-height: 1.2rem;
+  padding: 0;
+  font-size: 0.75em;
 }
 .statblock-forge__preview-stat-value .statblock-forge__tracked-number-max {
   color: var(--text-muted);
@@ -9003,6 +9032,22 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 
 .statblock-forge__preview-table-formula-value {
   font-weight: var(--font-semibold);
+}
+
+/* Shared multiline editor for long numeric expressions. */
+.statblock-forge__formula-textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 6rem;
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: var(--font-monospace);
+  line-height: 1.4;
+  tab-size: 2;
 }
 /* END GENERATED FORGE TABLE FORMULA STYLES */
 

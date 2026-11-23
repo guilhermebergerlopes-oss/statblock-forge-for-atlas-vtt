@@ -1,5 +1,12 @@
 import { isRecord, type ForgeField, type JsonRecord } from './forgeTemplate.ts';
 
+export type CheckboxFieldOptionLayout = 'rows' | 'inline';
+
+/** Layout used by both the Template preview and the published statblock. */
+export function checkboxFieldOptionLayout(field: ForgeField): CheckboxFieldOptionLayout {
+  return field.optionLayout === 'inline' ? 'inline' : 'rows';
+}
+
 export interface CheckboxFieldOption {
   /** Stable boolean property stored inside the Field value object. */
   key: string;

@@ -8,6 +8,7 @@ import { checkboxFieldOptions } from '../templates/checkboxFieldModel.ts';
 import { forgeTableCellValue, FORGE_TABLE_MAX_ROWS } from '../statblocks/tableRowsModel.ts';
 import type { TableCellReferenceIndex } from '../statblocks/tableFormulaModel.ts';
 import { calculateNumericFieldValue, isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
+import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -225,7 +226,7 @@ function evaluatePreviewFormulaInternal(
   selfFieldKey?: string,
 ): number | null {
   source = source.trim();
-  if (!source || source.length > 500) return null;
+  if (!source || source.length > MAX_MATH_FORMULA_LENGTH) return null;
 
   type FormulaAtom = number | boolean;
   type Token =
@@ -261,7 +262,9 @@ function evaluatePreviewFormulaInternal(
       tokens.push({ type: 'op', value: match[4] });
     }
     offset = pattern.lastIndex;
-    if (tokens.length > 300) return null;
+    // Each token consumes at least one source character, so the shared character
+    // budget also provides a strict upper bound on parser work.
+    if (tokens.length > MAX_MATH_FORMULA_LENGTH) return null;
   }
   tokens.push({ type: 'end' });
 
@@ -546,6 +549,11 @@ function evaluatePreviewFormulaInternal(
       // Bare `value` is the current cell's original value. Explicit references
       // such as `{value}` or `@value` must resolve the Template Field key.
       if (node.name === 'value' && !node.explicitReference) return toAtom(slotValue);
+      // `rowNumber` is supplied only while a Table row is being evaluated.
+      // Its hidden context key avoids colliding with a Template Field of the
+      // same name; `{rowNumber}` can still explicitly read that Field.
+      if (node.name === 'rowNumber' && !node.explicitReference
+        && Number.isSafeInteger(sample.__forgeTableRowNumber)) return sample.__forgeTableRowNumber as number;
       return toAtom(readRef(node.name));
     }
     if (node.kind === 'conditional') {

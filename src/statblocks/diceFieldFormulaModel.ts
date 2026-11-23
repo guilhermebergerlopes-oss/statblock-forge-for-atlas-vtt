@@ -3,6 +3,7 @@ import type { ForgeField } from '../templates/forgeTemplate.ts';
 import { isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 import { isDiceFieldValue } from './diceFieldEditorModel.ts';
 import { writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
+import { normalizeDiceCountExpressions } from './atlasDiceEngine/parseFormula.ts';
 
 export const MAX_DICE_FIELD_FORMULA_LENGTH = 500;
 const REFERENCE = /@([A-Za-z_][A-Za-z0-9_.]{0,79})|\{([A-Za-z_][A-Za-z0-9_.-]{0,79})\}/g;
@@ -81,7 +82,8 @@ export function resolveDiceFieldFormula(
   const normalized = expanded.replace(/([0-9)])\s+(?=[dD](?:\d|%|[fF]))/g, '$1');
   // An unmatched brace is almost certainly a misspelled or malformed placeholder.
   if (invalid || /[{}]/.test(normalized) || !isDiceFieldValue(normalized)) return '';
-  return writtenSide.word ? `${normalized} ${writtenSide.word}` : normalized;
+  const resolved = normalizeDiceCountExpressions(normalized);
+  return writtenSide.word ? `${resolved} ${writtenSide.word}` : resolved;
 }
 
 /** Exact `{fieldKey}` references used by dependency validation and rename operations. */

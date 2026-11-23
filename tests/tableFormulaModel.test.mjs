@@ -36,6 +36,62 @@ test('Row Formula calculates a target cell using other cells in the same row', (
   assert.equal(result.unitPrice, 10);
 });
 
+test('Row Formula can identify its one-based position with rowNumber', () => {
+  const formulaFields = [{ key: 'save', label: 'Save', type: 'number' }];
+  const formula = 'rowNumber == 1 ? 10 : rowNumber == 2 ? 20 : rowNumber == 3 ? 30 : 0';
+  const results = [1, 2, 3, 4].map((rowNumber) => resolveTableRowFormulaValues(
+    formulaFields,
+    { save: null, __forgeTableRowNumber: rowNumber },
+    { save: formula },
+    evaluate,
+  ).save);
+  assert.deepEqual(results, [10, 20, 30, 0]);
+  assert.deepEqual(tableFormulaReferencedFieldKeys('rowNumber + {quantity}', [...formulaFields, ...fields]), ['quantity']);
+});
+
+test('the Table renderer injects a one-based row number into each row formula sample', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const renderer = await readFile(new URL('../src/render/statblockPreviewRenderer.ts', import.meta.url), 'utf8');
+  assert.match(renderer, /__forgeTableRowNumber:\s*rowIndex \+ 1/);
+});
+
+test('the D&D saving-throw formula maps proficiency options by rowNumber without sample ability scores', () => {
+  const savingThrowOptions = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+  const formulaFields = [
+    { key: 'mod', label: 'Modifier', type: 'number' },
+    { key: 'save', label: 'Save', type: 'number' },
+    { key: 'proficiency', label: 'Proficiency', type: 'number' },
+    { key: 'st_proficiencies', label: 'Saving Throws', type: 'checkboxes', options: savingThrowOptions.map((key) => ({ key, label: key })) },
+  ];
+  const formula = '{mod} + {proficiency} * (rowNumber == 1 ? {st_proficiencies.strength} : rowNumber == 2 ? {st_proficiencies.dexterity} : rowNumber == 3 ? {st_proficiencies.constitution} : rowNumber == 4 ? {st_proficiencies.intelligence} : rowNumber == 5 ? {st_proficiencies.wisdom} : rowNumber == 6 ? {st_proficiencies.charisma} : 0)';
+  const results = savingThrowOptions.map((selectedOption, index) => {
+    const proficiencies = Object.fromEntries(savingThrowOptions.map((key) => [key, key === selectedOption]));
+    return resolveTableRowFormulaValues(
+      formulaFields.slice(0, 2),
+      { mod: index - 1, save: null, proficiency: 3, st_proficiencies: proficiencies, __forgeTableRowNumber: index + 1 },
+      { save: formula },
+      evaluate,
+      formulaFields,
+    ).save;
+  });
+  assert.deepEqual(results, [-1 + 3, 0 + 3, 1 + 3, 2 + 3, 3 + 3, 4 + 3]);
+});
+
+test('explicit {rowNumber} remains a Template Field reference', () => {
+  const formulaFields = [
+    { key: 'rowNumber', label: 'Stored Row Number', type: 'number' },
+    { key: 'save', label: 'Save', type: 'number' },
+  ];
+  const result = resolveTableRowFormulaValues(
+    formulaFields,
+    { rowNumber: 42, save: null, __forgeTableRowNumber: 2 },
+    { save: '{rowNumber}' },
+    evaluate,
+  );
+  assert.equal(result.save, 42);
+  assert.deepEqual(tableFormulaReferencedFieldKeys('{rowNumber}', formulaFields), ['rowNumber']);
+});
+
 test('Row Formula can read a same-row Field whose key is value', () => {
   const valueAndModFields = [
     { key: 'value', label: 'Value', type: 'number' },

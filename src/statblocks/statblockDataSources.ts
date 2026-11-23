@@ -2,6 +2,7 @@ import type { TFile, App } from 'obsidian';
 import { bindStatblockData, unwrapStatblockJson, type StatblockDataBinding } from '../render/statblockDataModel.ts';
 import { isRecord, type ForgeField, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
 import { restoreForgeStatblockDataFromLegacyNote } from '../atlas/atlasTemplateAdapter.ts';
+import { forgeTableStructureFromSample } from './tableRowsModel.ts';
 
 export type StatblockSourceFormat = 'markdown-frontmatter' | 'json';
 
@@ -39,6 +40,20 @@ export function createLoadedStatblockSource(input: {
   // marks in memory before binding so Forge remains the richer editor.
   const forgeData = restoreForgeStatblockDataFromLegacyNote(input.template, input.raw);
   const binding = bindStatblockData(input.template, forgeData);
+  const templateSample = isRecord(input.template.sample) ? input.template.sample : {};
+  // Older statblocks were created before Table structure was retained when
+  // "Copy example values" was unchecked. Restore only missing Table skeletons
+  // here as a read-time fallback so existing notes match the Template preview
+  // without importing sample cell Values into a real statblock.
+  for (const field of input.template.fields) {
+    if (field.type !== 'scores' || field.forgeInternal !== 'table-storage') continue;
+    // A valid per-statblock Table, even an intentionally reduced one-row Table,
+    // always wins. Only missing or legacy/invalid storage receives the fallback.
+    if (forgeTableStructureFromSample(binding.data[field.key])) continue;
+    if (!Object.prototype.hasOwnProperty.call(templateSample, field.key)) continue;
+    const structure = forgeTableStructureFromSample(templateSample[field.key]);
+    if (structure) binding.data[field.key] = structure;
+  }
   for (const field of input.template.fields) {
     if (Object.prototype.hasOwnProperty.call(binding.data, field.key)) {
       binding.data[field.key] = normalizeObsidianImageLink(field, binding.data[field.key], input.resolveImageLink);

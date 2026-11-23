@@ -1,5 +1,6 @@
 import { cloneJson, headerFieldForPart, isRecord, type ForgeLayoutDocument, type ForgeTemplate, type JsonRecord } from './forgeTemplate.ts';
 import { pinnedTemplateImageValue } from './imageFieldModel.ts';
+import { forgeTableStructureFromSample } from '../statblocks/tableRowsModel.ts';
 
 /**
  * Build the initial field data for a new statblock note.
@@ -22,6 +23,16 @@ export function createInitialStatblockData(
       if (Object.prototype.hasOwnProperty.call(sample, field.key) && sample[field.key] !== undefined) {
         data[field.key] = cloneJson(sample[field.key]);
       }
+    }
+  } else {
+    // A Table's row count and row labels are part of its configured structure,
+    // not optional example Values. Keep that structure in every new statblock
+    // while leaving its example cell contents blank unless the user opted in.
+    for (const field of template.fields) {
+      if (field.type !== 'scores' || field.forgeInternal !== 'table-storage') continue;
+      if (!Object.prototype.hasOwnProperty.call(sample, field.key)) continue;
+      const structure = forgeTableStructureFromSample(sample[field.key]);
+      if (structure) data[field.key] = structure;
     }
   }
 

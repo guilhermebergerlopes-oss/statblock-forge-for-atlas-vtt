@@ -1,6 +1,7 @@
 import type { ForgeField, JsonRecord } from '../templates/forgeTemplate.ts';
 import {
   checkboxFieldAllowsMultiple,
+  checkboxFieldOptionLayout,
   checkboxFieldOptions,
   normalizeCheckboxFieldValue,
   checkboxAliasBooleanValue,
@@ -12,7 +13,7 @@ import {
   type CheckboxFieldOption,
 } from '../templates/checkboxFieldModel.ts';
 import { normalizeForgeLanguage, translateForgeText } from '../i18n/localization.ts';
-import { button, el, inputText, labeledControl, toggleControl } from './templateEditorDom.ts';
+import { button, el, inputText, labeledControl, selectInput, toggleControl } from './templateEditorDom.ts';
 import type { TemplateSpecializedFieldEditorContext } from './templateSpecializedFieldEditorContext.ts';
 
 function asRecord(value: unknown): JsonRecord {
@@ -48,6 +49,18 @@ export function renderCheckboxFieldOptions(
   panel.append(multipleChoices);
   panel.append(el('p', 'statblock-forge__hint', translateForgeText(
     'When enabled, more than one option can be checked in this set. Other Checkbox Fields are independent.', language,
+  )));
+  const optionLayout = selectInput(checkboxFieldOptionLayout(field), [
+    { value: 'rows', label: translateForgeText('One option per row', language) },
+    { value: 'inline', label: translateForgeText('Inline, wrap as needed', language) },
+  ]);
+  optionLayout.addEventListener('change', () => {
+    field.optionLayout = optionLayout.value === 'inline' ? 'inline' : 'rows';
+    context.renderPreviewOnly();
+  });
+  panel.append(labeledControl(translateForgeText('Option layout', language), optionLayout));
+  panel.append(el('p', 'statblock-forge__hint', translateForgeText(
+    'Controls how the options are arranged in the preview and statblock.', language,
   )));
   const list = el('div', 'statblock-forge__checkbox-field-option-list');
 

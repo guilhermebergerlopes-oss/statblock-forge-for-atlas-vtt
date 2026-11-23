@@ -111,6 +111,18 @@ test('tracked Number defaults follow counts down/up and ignores a maximum below 
   assert.equal(trackedNumberDisplayForField(hp, template.fields, { hp: 4, hpMax: 0 }, (field) => Number(field.key === 'hp' ? 4 : 0)), null);
 });
 
+test('editable tracked Number Values render bounded plus/minus controls that persist their current resource value', () => {
+  assert.match(renderer, /statblock-forge__tracked-number-stepper/);
+  assert.match(renderer, /trackedDecreaseButton = element\('button',[\s\S]*?'−'/);
+  assert.match(renderer, /trackedIncreaseButton = element\('button',[\s\S]*?'\+'/);
+  assert.match(renderer, /changeTrackedCurrent\(-1\)/);
+  assert.match(renderer, /changeTrackedCurrent\(1\)/);
+  assert.match(renderer, /Math\.max\(0, Math\.min\(latest\.maximum, latest\.current \+ delta\)\)/);
+  assert.match(renderer, /setBaseValue\(FORGE_RESOURCE_VALUES_KEY, nextData\[FORGE_RESOURCE_VALUES_KEY\]\)/);
+  assert.match(renderer, /trackedDecreaseButton\.disabled = next\.current <= 0/);
+  assert.match(renderer, /trackedIncreaseButton\.disabled = next\.current >= next\.maximum/);
+});
+
 test('the Number Value inspector exposes Tracking independently of Number/Boxes/Gauge display', () => {
   assert.match(valueInspector, /if \(isNumberValueField\) \{[\s\S]*?renderNumericTrackingControls\(context, valueFieldForMode, panel\)/);
   assert.match(trackingControls, /if \(field\.type !== 'number'\) return/);

@@ -118,7 +118,7 @@ test('downloadable Portuguese and English guides document Table Row and Column F
     assert.match(guide, /\{fieldKey\.sum\}/);
     assert.match(guide, /\{fieldKey\.average\}/);
     assert.match(guide, /any Field|qualquer Field/i);
-    assert.match(guide, /500 characters|500 caracteres/);
+    assert.match(guide, /5,000 characters|5\.000 caracteres/);
   }
   assert.match(portuguese.content, /Cada linha usa sua própria quantidade/);
   assert.match(english.content, /Each row uses its own quantity/);
