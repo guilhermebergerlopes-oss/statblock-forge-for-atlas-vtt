@@ -4,6 +4,7 @@ import { normalizeStatblockThemeId, normalizeThemeOverrides, type StatblockTheme
 import { normalizeForgeCustomBorder, normalizeForgeCustomTheme, type ForgeCustomBorder, type ForgeCustomTheme } from './styleLibrary.ts';
 import { DEFAULT_FORGE_SHEET_WIDTH, normalizeForgeSheetWidth } from './sheetWidth.ts';
 import { normalizeFieldCompendium, normalizeFieldCompendiumSources, normalizeFieldIds } from './fieldCompendiumModel.ts';
+import { normalizeFieldTypographyMap } from './fieldTypographyModel.ts';
 import { DEFAULT_COUNTERS_PER_ROW, normalizeCountersPerRow } from './counterLayoutModel.ts';
 import { normalizeForgeJsonFieldTypes, serializeForgeJsonFieldTypes } from './fieldTypeJsonModel.ts';
 /**
@@ -64,6 +65,30 @@ export interface BlockAppearance {
   labelColor?: string;
   /** Color for the primary displayed value (the lower/value text). */
   valueColor?: string;
+  /** Typography shared by every text role inside this block. */
+  fontSize?: number;
+  fontWeight?: '400' | '500' | '600' | '700';
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline' | 'line-through';
+  letterSpacing?: number;
+  /** Unitless line-height multiplier shared by all text roles inside this block. */
+  lineHeight?: number;
+  /** Typography overrides for field labels and headings. */
+  labelFontSize?: number;
+  labelFontWeight?: '400' | '500' | '600' | '700';
+  labelFontStyle?: 'normal' | 'italic';
+  labelTextDecoration?: 'none' | 'underline' | 'line-through';
+  labelLetterSpacing?: number;
+  /** Unitless line-height multiplier for field labels and headings. */
+  labelLineHeight?: number;
+  /** Typography overrides for field values and descriptions. */
+  valueFontSize?: number;
+  valueFontWeight?: '400' | '500' | '600' | '700';
+  valueFontStyle?: 'normal' | 'italic';
+  valueTextDecoration?: 'none' | 'underline' | 'line-through';
+  valueLetterSpacing?: number;
+  /** Unitless line-height multiplier for field values and descriptions. */
+  valueLineHeight?: number;
   padding?: number;
   textAlign?: 'start' | 'center' | 'end';
   verticalAlign?: 'start' | 'center' | 'end';
@@ -76,6 +101,13 @@ export interface BlockAppearance {
   imagePositionX?: number;
   imagePositionY?: number;
 }
+
+/** Typography overrides for one native Field, independent of its block placement. */
+export type FieldTypographyAppearance = Pick<BlockAppearance,
+  | 'fontSize' | 'fontWeight' | 'fontStyle' | 'textDecoration' | 'letterSpacing' | 'lineHeight'
+  | 'labelFontSize' | 'labelFontWeight' | 'labelFontStyle' | 'labelTextDecoration' | 'labelLetterSpacing' | 'labelLineHeight'
+  | 'valueFontSize' | 'valueFontWeight' | 'valueFontStyle' | 'valueTextDecoration' | 'valueLetterSpacing' | 'valueLineHeight'
+>;
 
 export interface ForgeBlockLayout {
   /** Preserve per-block layout metadata introduced by later Forge versions. */
@@ -131,6 +163,8 @@ export interface ForgeLayoutDocument {
   containers?: ForgeContainerDefinition[];
   /** Forge-only appearance by native field key and Ability Part key. */
   abilityParts: Record<string, Record<string, BlockAppearance>>;
+  /** Field typography is keyed by stable Field ID so it survives Field key renames. */
+  fieldTypography?: Record<string, FieldTypographyAppearance>;
   /** Forge-only field category used when a registered field is later dragged to the canvas. */
   fieldKinds?: Record<string, 'values' | 'choice' | 'text' | 'image' | 'collections' | 'value' | 'metric' | 'table' | 'resources' | 'abilities' | 'counters' | 'checkboxes' | 'tags' | 'pairs' | 'spells'>;
   /** Image Fields whose template sample is copied into every new statblock and locked from note-level removal/replacement. */
@@ -450,7 +484,7 @@ export function createForgeLayout(template: ForgeTemplate): ForgeLayoutDocument 
   addContainerMetadata(template.layout.blocks);
   return {
     format: 'statblock-forge-layout', version: 1, templateId: template.id,
-    columns: DEFAULT_GRID_COLUMN_COUNT, dense: true, sheetWidth: DEFAULT_FORGE_SHEET_WIDTH, themeId: 'default', tokenAppearance: { enabled: false }, blocks, containers, abilityParts: {}, fieldKinds: {}, pinnedImageFields: [],
+    columns: DEFAULT_GRID_COLUMN_COUNT, dense: true, sheetWidth: DEFAULT_FORGE_SHEET_WIDTH, themeId: 'default', tokenAppearance: { enabled: false }, blocks, containers, abilityParts: {}, fieldTypography: {}, fieldKinds: {}, pinnedImageFields: [],
     fieldIds: normalizeFieldIds({}, template.fields), compendiumByFieldId: {}, compendiumSourceByFieldId: {},
   };
 }
@@ -508,7 +542,7 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
       || parsed.templateId !== template.id || !isRecord(parsed.blocks)) return createForgeLayout(template);
     normalizeForgeJsonFieldTypes(parsed);
     const defaults = createForgeLayout(template);
-    const knownRootKeys = new Set(['format', 'version', 'templateId', 'columns', 'dense', 'sheetWidth', 'themeId', 'themeOverrides', 'customTheme', 'frame', 'tokenAppearance', 'blocks', 'containers', 'abilityParts', 'fieldKinds', 'pinnedImageFields', 'fieldIds', 'compendiumByFieldId', 'compendiumSourceByFieldId']);
+    const knownRootKeys = new Set(['format', 'version', 'templateId', 'columns', 'dense', 'sheetWidth', 'themeId', 'themeOverrides', 'customTheme', 'frame', 'tokenAppearance', 'blocks', 'containers', 'abilityParts', 'fieldTypography', 'fieldKinds', 'pinnedImageFields', 'fieldIds', 'compendiumByFieldId', 'compendiumSourceByFieldId']);
     const futureRootProperties = Object.fromEntries(Object.entries(parsed).filter(([key]) => !knownRootKeys.has(key)));
     const customTheme = normalizeForgeCustomTheme(parsed.customTheme);
     const frame = normalizeForgeCustomBorder(parsed.frame);
@@ -541,6 +575,8 @@ export function parseForgeLayout(text: string, template: ForgeTemplate): ForgeLa
       };
     });
     base.fieldIds = normalizeFieldIds(parsed.fieldIds, template.fields);
+    const validFieldIds = new Set(Object.values(base.fieldIds));
+    base.fieldTypography = normalizeFieldTypographyMap(parsed.fieldTypography, validFieldIds);
     base.compendiumByFieldId = normalizeFieldCompendium(
       parsed.compendiumByFieldId,
       new Set(Object.values(base.fieldIds)),

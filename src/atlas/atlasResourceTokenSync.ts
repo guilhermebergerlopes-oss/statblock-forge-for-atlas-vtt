@@ -4,7 +4,14 @@ import { loadStatblockSource } from '../statblocks/statblockDataSources.ts';
 import { forgeStatblockTemplateLinkFromFrontmatter } from '../statblocks/forgeTemplateLink.ts';
 import type { ForgeTemplate } from '../templates/forgeTemplate.ts';
 import { getAtlasMapViewContexts, inspectAtlasRuntime } from './atlasRuntime.ts';
-import { atlasResourceReadsForgeField, effectiveAtlasCampaignResources, effectiveAtlasCollectionResources } from './atlasResourceCatalog.ts';
+import {
+  atlasResourceReadsForgeField, atlasWithLegacyResourceBars,
+  effectiveAtlasCampaignResources, effectiveAtlasCollectionResources,
+} from './atlasResourceCatalog.ts';
+import { loadAtlasPlayedCampaignSystem } from './atlasPlayedCampaignSystem.ts';
+import { atlasCollectionUsesLegacySecondaryResource } from './atlasLegacyResourceScenes.ts';
+import { invalidateAtlasSystemPresetRules, isAtlasSystemPresetPath } from './atlasSystemPresetRules.ts';
+import { atlasCanWriteTokenResources } from './atlasResourceWriteAccess.ts';
 import {
   atlasResourceSourceValues,
   syncAtlasResourcesForToken,
@@ -30,6 +37,7 @@ interface AtlasStoreStateLike {
   isMapLoading?: boolean;
   isPlayerView?: boolean;
   objects?: { tokens?: Record<string, AtlasPlacedTokenLike> };
+  tokenSettings?: unknown;
   updateTokens?: (entries: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }>) => void;
 }
 
@@ -60,13 +68,17 @@ interface VaultFileLike extends TFile {
   readonly extension: string;
 }
 
-const PLAYED_CAMPAIGN_STORAGE_KEY = 'atlas-vtt:table-campaign';
+interface AtlasResourceRuleTransition {
+  readonly definitions: ReturnType<typeof effectiveAtlasCollectionResources>;
+  readonly currentFields: Map<string, string>;
+  readonly refieldedKeys: Set<string>;
+}
+
 const CAMPAIGNS_FOLDER = 'atlas-vtt/campaigns/';
-const SYSTEM_PRESETS_FOLDER = 'atlas-vtt/system-presets/';
 
 function isAtlasRulesRecordPath(path: string): boolean {
   return (path.startsWith(CAMPAIGNS_FOLDER) && /^atlas-vtt\/campaigns\/[^/]+\/campaign\.json$/i.test(path))
-    || (path.startsWith(SYSTEM_PRESETS_FOLDER) && path.toLowerCase().endsWith('.json'));
+    || isAtlasSystemPresetPath(path);
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -78,17 +90,6 @@ function isVaultFile(value: unknown): value is VaultFileLike {
     && typeof value.basename === 'string' && typeof value.extension === 'string';
 }
 
-function isUsableCampaignGridDefaults(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  if (!['feet', 'yards', 'meters', 'units', 'custom'].includes(String(value.unitType))) return false;
-  if (value.measurementMode !== 'metric' && value.measurementMode !== 'abstract') return false;
-  if (typeof value.unitDistance !== 'number' || !Number.isFinite(value.unitDistance)
-    || value.unitDistance < 0.000001 || value.unitDistance > 1_000_000) return false;
-  if (Array.isArray(value.abstractRangeBands) && value.abstractRangeBands.some((band) =>
-    !isRecord(band) || typeof band.name !== 'string'
-      || typeof band.maxSquares !== 'number' || !Number.isInteger(band.maxSquares) || band.maxSquares < 1)) return false;
-  return true;
-}
 
 function assetServiceForMap(map: AtlasRuntimeMapLike): AtlasAssetServiceLike | null {
   if (!isRecord(map.assetService)) return null;
@@ -150,19 +151,27 @@ export class AtlasForgeResourceTokenSync {
       if (file?.extension?.toLowerCase() === 'md') this.scheduleNote(file.path);
     });
     this.vaultModifyRef = app.vault.on('modify', (file) => {
-      if (file?.extension?.toLowerCase() === 'forgetemplate' || isAtlasRulesRecordPath(file?.path ?? '')) this.scheduleAll();
+      const path = file?.path ?? '';
+      if (isAtlasSystemPresetPath(path)) invalidateAtlasSystemPresetRules(this.app);
+      if ((isVaultFile(file) && file.extension.toLowerCase() === 'forgetemplate') || isAtlasRulesRecordPath(path)) this.scheduleAll();
     });
     this.vaultCreateRef = app.vault.on('create', (file) => {
-      if (isAtlasRulesRecordPath(file?.path ?? '')) this.scheduleAll();
+      const path = file?.path ?? '';
+      if (isAtlasSystemPresetPath(path)) invalidateAtlasSystemPresetRules(this.app);
+      if (isAtlasRulesRecordPath(path)) this.scheduleAll();
     });
     this.vaultDeleteRef = app.vault.on('delete', (file) => {
-      if (isAtlasRulesRecordPath(file?.path ?? '')) this.scheduleAll();
+      const path = file?.path ?? '';
+      if (isAtlasSystemPresetPath(path)) invalidateAtlasSystemPresetRules(this.app);
+      if (isAtlasRulesRecordPath(path)) this.scheduleAll();
     });
     this.vaultRenameRef = app.vault.on('rename', (file, oldPath) => {
-      if (file?.extension?.toLowerCase() === 'forgetemplate'
-        || file?.extension?.toLowerCase() === 'md'
-        || isAtlasRulesRecordPath(file?.path ?? '')
-        || isAtlasRulesRecordPath(typeof oldPath === 'string' ? oldPath : '')) this.scheduleAll();
+      const path = file?.path ?? '';
+      const previousPath = typeof oldPath === 'string' ? oldPath : '';
+      if (isAtlasSystemPresetPath(path) || isAtlasSystemPresetPath(previousPath)) invalidateAtlasSystemPresetRules(this.app);
+      if ((isVaultFile(file) && ['forgetemplate', 'md'].includes(file.extension.toLowerCase()))
+        || isAtlasRulesRecordPath(path)
+        || isAtlasRulesRecordPath(previousPath)) this.scheduleAll();
     });
     const workspace = app.workspace as unknown as { on?: (name: string, callback: (...args: unknown[]) => void) => EventRef };
     if (typeof workspace.on === 'function') {
@@ -226,8 +235,8 @@ export class AtlasForgeResourceTokenSync {
       const assets = assetServiceForMap(map);
       if (!store || !assets) continue;
       const state = store.getState();
-      if (state.isPlayerView === true || state.mapLoaded !== true || state.isMapLoading === true) continue;
       const mapPath = typeof state.mapPath === 'string' ? state.mapPath : '';
+      if (!mapPath || !atlasCanWriteTokenResources(state, mapPath)) continue;
       let rules = sharedRules?.get(mapPath) ?? localRules.get(mapPath);
       if (!rules) {
         const definitions = await this.resourceDefinitionsForMap(mapPath, assets);
@@ -238,17 +247,22 @@ export class AtlasForgeResourceTokenSync {
       const specs = resourceSpecsForTemplate(parsedTemplate.template, rules.definitions);
       if (specs.length === 0) continue;
       // loadStatblockSource exposes its allow-listed Field values through binding.data.
-      const sources = atlasResourceSourceValues(source.binding.data, specs);
-      const liveTokens = store.getState().objects?.tokens ?? {};
+      const sources = atlasResourceSourceValues(source.binding.data, specs, {
+        templateFields: parsedTemplate.template.fields,
+      });
+      // Resource resolution above awaits Atlas' campaign/scene catalog. The view may have
+      // changed to the player window or another map during that wait, so take one fresh
+      // state snapshot and authorize the write against the map we resolved.
+      const liveState = store.getState();
+      if (!atlasCanWriteTokenResources(liveState, mapPath)) continue;
+      const liveTokens = liveState.objects?.tokens ?? {};
       const updates: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }> = [];
       for (const [id, token] of Object.entries(liveTokens)) {
         if (token.statblockPath !== note.path) continue;
         const result = syncAtlasResourcesForToken(token, sources, { refieldedKeys: rules.refieldedKeys });
         if (result.changed) updates.push({ id, changes: { resources: result.resources } });
       }
-      if (updates.length === 0) continue;
-      const liveState = store.getState();
-      if (typeof liveState.updateTokens !== 'function') continue;
+      if (updates.length === 0 || typeof liveState.updateTokens !== 'function') continue;
       runAtlasUntracked(store, () => liveState.updateTokens?.(updates));
       updated += updates.length;
     }
@@ -274,11 +288,15 @@ export class AtlasForgeResourceTokenSync {
       if (!store || !assets) continue;
       const state = store.getState();
       const mapPath = typeof state.mapPath === 'string' ? state.mapPath : '';
-      if (mapPath) seenMapPaths.add(mapPath);
-      if (state.isPlayerView === true || state.mapLoaded !== true || state.isMapLoading === true) continue;
+      if (!mapPath || !atlasCanWriteTokenResources(state, mapPath)) continue;
       const definitions = await this.resourceDefinitionsForMap(mapPath, assets);
+      // Do not collect tokens from the pre-await snapshot if this view was switched to
+      // player mode, unloaded, or navigated to a different scene while rules were read.
+      const liveState = store.getState();
+      if (!atlasCanWriteTokenResources(liveState, mapPath)) continue;
+      seenMapPaths.add(mapPath);
       rulesByMap.set(mapPath, this.createRuleTransition(mapPath, definitions));
-      for (const token of Object.values(state.objects?.tokens ?? {})) {
+      for (const token of Object.values(liveState.objects?.tokens ?? {})) {
         if (typeof token.statblockPath === 'string' && token.statblockPath.length > 0) paths.add(token.statblockPath);
       }
     }
@@ -371,38 +389,24 @@ export class AtlasForgeResourceTokenSync {
     mapPath: string,
     assets: AtlasAssetServiceLike,
   ) {
-    const played = await this.playedCampaignSystem();
-    if (played) return this.resourceDefinitionsForCampaign(played);
+    const played = await loadAtlasPlayedCampaignSystem(this.app);
+    if (played) return effectiveAtlasCampaignResources(played.settings);
+
     const collectionId = assets.getCollectionForMap?.(mapPath) ?? null;
-    if (collectionId) return effectiveAtlasCollectionResources(assets.getCollectionSettings?.(collectionId));
-    // Atlas maps outside collections use the legacy HP + secondary resource bars.
-    return effectiveAtlasCollectionResources({ defaultWidgets: { stressBar: true } });
-  }
-
-  private resourceDefinitionsForCampaign(system: UnknownRecord) {
-    return effectiveAtlasCampaignResources(system);
-  }
-
-  private async playedCampaignSystem(): Promise<UnknownRecord | null> {
-    const app = this.app as App & { loadLocalStorage?: (key: string) => unknown };
-    let campaignId: unknown;
-    try { campaignId = app.loadLocalStorage?.(PLAYED_CAMPAIGN_STORAGE_KEY); }
-    catch { return null; }
-    if (typeof campaignId !== 'string' || !campaignId) return null;
-    const files = this.app.vault.getFiles().filter((file) => file.path.startsWith(CAMPAIGNS_FOLDER)
-      && file.path.endsWith('/campaign.json'));
-    for (const file of files) {
-      try {
-        const parsed: unknown = JSON.parse(await this.app.vault.cachedRead(file));
-        if (!isRecord(parsed) || parsed.id !== campaignId || !isRecord(parsed.system)) continue;
-        // Mirror Atlas parseSystemRules(): campaigns without valid measurement rules are not played systems.
-        if (!isUsableCampaignGridDefaults(parsed.system.gridDefaults) || !Array.isArray(parsed.system.conditions)) return null;
-        return parsed.system;
-      } catch {
-        // A partially synced campaign file is treated like Atlas' not-yet-loaded campaign entry.
-        return null;
-      }
+    if (collectionId) {
+      const settings = assets.getCollectionSettings?.(collectionId);
+      const usedInScenes = await atlasCollectionUsesLegacySecondaryResource(
+        this.app, collectionId, (path) => assets.getCollectionForMap?.(path),
+      );
+      return effectiveAtlasCollectionResources(settings, null, usedInScenes);
     }
-    return null;
+
+    // Atlas distinguishes maps outside collections from a map in a collection
+    // whose index entry has not loaded yet: only the former keeps both legacy bars.
+    const isOutsideCollections = !mapPath || !/collections\/[^/]+\//i.test(mapPath);
+    return isOutsideCollections
+      ? atlasWithLegacyResourceBars([{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false }], undefined, true)
+      : effectiveAtlasCollectionResources({});
   }
+
 }

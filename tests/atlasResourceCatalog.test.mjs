@@ -3,10 +3,12 @@ import test from 'node:test';
 import {
   atlasResourceReadsForgeField,
   atlasResourceSharesForgeFieldKey,
+  atlasSceneFileShowsLegacySecondaryResource,
   atlasRoleTemplateIdsForCollection,
   effectiveAtlasCampaignResources,
   effectiveAtlasCollectionResources,
   parseAtlasCollectionResourceDefinitions,
+  slottedAtlasCollectionResources,
 } from '../src/atlas/atlasResourceCatalog.ts';
 
 const field = (key, extra = {}) => ({ key, label: key, type: 'number', ...extra });
@@ -55,7 +57,45 @@ test('Resource parser rejects malformed definitions, duplicate keys, and sockets
   assert.equal(parsed[2].slot, undefined);
 });
 
-test('built-in preset defaults preserve Atlas 0.17.0 defeat rules', () => {
+test('Atlas socket assignment reserves explicit slots, fills collisions and missing slots, and returns socket order', () => {
+  const definitions = [
+    resource('first', { slot: 4 }),
+    resource('second'),
+    resource('third', { slot: 4 }),
+    resource('fourth', { slot: 1 }),
+    resource('fifth'),
+    resource('sixth'),
+  ];
+  assert.deepEqual(slottedAtlasCollectionResources(definitions).map(({ definition, slot }) => [definition.key, slot]), [
+    ['second', 0], ['fourth', 1], ['third', 2], ['fifth', 3], ['first', 4], ['sixth', 5],
+  ]);
+});
+
+test('custom preset Roles are inherited, while custom Resources are read from the applied collection settings', () => {
+  const customRules = {
+    resources: [resource('focus', { field: 'stats.focus', direction: 'fills', slot: 2 })],
+    statblockRoles: [{ id: 'hero', name: 'Hero', templateId: 'custom-hero-template' }],
+  };
+  assert.deepEqual(effectiveAtlasCollectionResources({ systemPresetId: 'custom:preset' }, customRules).map(({ key, field, direction }) => [key, field, direction]), [
+    ['hp', 'hp', 'drains'],
+  ]);
+  assert.deepEqual(effectiveAtlasCollectionResources({
+    systemPresetId: 'custom:preset',
+    resources: customRules.resources,
+  }).map(({ key, field, direction }) => [key, field, direction]), [['focus', 'stats.focus', 'fills']]);
+  assert.deepEqual(atlasRoleTemplateIdsForCollection({ systemPresetId: 'custom:preset' }, customRules), ['custom-hero-template']);
+  assert.deepEqual(atlasRoleTemplateIdsForCollection({ systemPresetId: 'custom:preset', statblockRoles: [{ id: 'npc', name: 'NPC', templateId: 'collection-template' }] }, customRules), ['collection-template']);
+  assert.deepEqual(effectiveAtlasCollectionResources({ systemPresetId: 'custom:preset', resources: [] }, customRules), []);
+});
+
+test('campaign custom Resources come from the applied campaign system list, including explicit empty lists', () => {
+  const customResources = [resource('momentum', { field: 'momentum', direction: 'fills' })];
+  assert.deepEqual(effectiveAtlasCampaignResources({ systemPresetId: 'custom:preset' }).map(({ key }) => key), ['hp']);
+  assert.deepEqual(effectiveAtlasCampaignResources({ systemPresetId: 'custom:preset', resources: customResources }).map(({ key }) => key), ['momentum']);
+  assert.deepEqual(effectiveAtlasCampaignResources({ systemPresetId: 'custom:preset', resources: [] }), []);
+});
+
+test('built-in preset defaults preserve Atlas defeat rules', () => {
   const cairn = effectiveAtlasCollectionResources({ systemPresetId: 'builtin:cairn' });
   assert.deepEqual(cairn.map(({ key, defeatedWhenSpent }) => [key, defeatedWhenSpent]), [
     ['hp', undefined],
@@ -87,6 +127,33 @@ test('campaign Resource fallback inherits its preset unless an explicit list, ev
   assert.deepEqual(effectiveAtlasCampaignResources({ systemPresetId: 'builtin:daggerheart', resources: [resource('focus')] }).map(({ key }) => key), ['focus']);
 });
 
+
+test('legacy scene detection reads secondary Resources stored in Atlas statblockResources', () => {
+  const scene = (token) => JSON.stringify({ state: {
+    tokenSettings: { hiddenResources: [] },
+    objects: { tokens: { token } },
+  } });
+
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { stress: { current: 3, max: 8 } },
+  })), true);
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { stress: 3 },
+  })), true);
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { focus: { current: 3, max: 8 } },
+  })), false);
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { stress: null },
+  })), false);
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { stress: '3' },
+  })), false);
+  assert.equal(atlasSceneFileShowsLegacySecondaryResource(scene({
+    statblockResources: { stress: { current: Number.NaN, max: 8 } },
+  })), false);
+});
+
 test('legacy collection fallback follows Atlas stress-bar switches and unknown-preset HP default', () => {
   assert.deepEqual(
     effectiveAtlasCollectionResources({ systemPresetId: 'builtin:daggerheart', defaultWidgets: { stressBar: false } }).map((item) => item.key),
@@ -95,6 +162,11 @@ test('legacy collection fallback follows Atlas stress-bar switches and unknown-p
   assert.deepEqual(
     effectiveAtlasCollectionResources({ systemPresetId: 'builtin:dnd5e', defaultWidgets: { stressBar: true } }).map(({ key, name }) => [key, name]),
     [['hp', 'HP'], ['stress', 'Secondary resource']],
+  );
+  assert.deepEqual(
+    effectiveAtlasCollectionResources({ systemPresetId: 'builtin:dnd5e', defaultWidgets: { stressBar: false } }, null, true).map(({ key, name }) => [key, name]),
+    [['hp', 'HP'], ['stress', 'Secondary resource']],
+    'a scene using the old bar keeps it even when the collection switch is off',
   );
   assert.deepEqual(
     effectiveAtlasCollectionResources({ systemPresetId: 'unknown:preset' }).map(({ key, defeatedWhenSpent }) => [key, defeatedWhenSpent]),

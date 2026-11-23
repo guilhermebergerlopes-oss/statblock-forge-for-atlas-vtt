@@ -218,9 +218,30 @@ export function normalizeBlockAppearance(value: unknown): BlockAppearance {
     ['imagePositionX', 0, 100],
     ['imagePositionY', 0, 100],
   ];
-  for (const [key, min, max] of numeric) {
+  const typographyNumeric: Array<[keyof BlockAppearance, number, number]> = [
+    ['fontSize', 8, 48], ['letterSpacing', -1, 8], ['lineHeight', 0.8, 3],
+    ['labelFontSize', 8, 48], ['labelLetterSpacing', -1, 8], ['labelLineHeight', 0.8, 3],
+    ['valueFontSize', 8, 48], ['valueLetterSpacing', -1, 8], ['valueLineHeight', 0.8, 3],
+  ];
+  for (const [key, min, max] of [...numeric, ...typographyNumeric]) {
     const parsed = clamp(record[key as string], min, max);
     if (parsed !== undefined) Object.assign(result, { [key]: parsed });
+    else delete (result as Record<string, unknown>)[key];
+  }
+  const typographyChoices: Array<[keyof BlockAppearance, readonly string[]]> = [
+    ['fontWeight', ['400', '500', '600', '700']],
+    ['labelFontWeight', ['400', '500', '600', '700']],
+    ['valueFontWeight', ['400', '500', '600', '700']],
+    ['fontStyle', ['normal', 'italic']],
+    ['labelFontStyle', ['normal', 'italic']],
+    ['valueFontStyle', ['normal', 'italic']],
+    ['textDecoration', ['none', 'underline', 'line-through']],
+    ['labelTextDecoration', ['none', 'underline', 'line-through']],
+    ['valueTextDecoration', ['none', 'underline', 'line-through']],
+  ];
+  for (const [key, allowed] of typographyChoices) {
+    const candidate = record[key as string];
+    if (typeof candidate === 'string' && allowed.includes(candidate)) Object.assign(result, { [key]: candidate });
     else delete (result as Record<string, unknown>)[key];
   }
   return result;
@@ -342,6 +363,31 @@ export function buildBlockAppearanceCss(appearance: BlockAppearance): Record<str
   }
   if (appearance.labelColor !== undefined) css['--forge-block-label-color'] = appearance.labelColor;
   if (appearance.valueColor !== undefined) css['--forge-block-value-color'] = appearance.valueColor;
+
+  const typographyVariables: Array<[keyof BlockAppearance, string, (value: string | number) => string]> = [
+    ['fontSize', '--forge-block-font-size', (value) => `${value}px`],
+    ['fontWeight', '--forge-block-font-weight', String],
+    ['fontStyle', '--forge-block-font-style', String],
+    ['textDecoration', '--forge-block-text-decoration', String],
+    ['letterSpacing', '--forge-block-letter-spacing', (value) => `${value}px`],
+    ['lineHeight', '--forge-block-line-height', String],
+    ['labelFontSize', '--forge-block-label-font-size', (value) => `${value}px`],
+    ['labelFontWeight', '--forge-block-label-font-weight', String],
+    ['labelFontStyle', '--forge-block-label-font-style', String],
+    ['labelTextDecoration', '--forge-block-label-text-decoration', String],
+    ['labelLetterSpacing', '--forge-block-label-letter-spacing', (value) => `${value}px`],
+    ['labelLineHeight', '--forge-block-label-line-height', String],
+    ['valueFontSize', '--forge-block-value-font-size', (value) => `${value}px`],
+    ['valueFontWeight', '--forge-block-value-font-weight', String],
+    ['valueFontStyle', '--forge-block-value-font-style', String],
+    ['valueTextDecoration', '--forge-block-value-text-decoration', String],
+    ['valueLetterSpacing', '--forge-block-value-letter-spacing', (value) => `${value}px`],
+    ['valueLineHeight', '--forge-block-value-line-height', String],
+  ];
+  for (const [key, variable, format] of typographyVariables) {
+    const value = appearance[key];
+    if (typeof value === 'string' || typeof value === 'number') css[variable] = format(value);
+  }
   if (appearance.shape !== undefined) {
     css.borderRadius = appearance.shape === 'oval' ? '9999px'
       : appearance.shape === 'square' ? '0px' : `${appearance.cornerRadius ?? 14}px`;

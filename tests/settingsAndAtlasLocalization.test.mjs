@@ -35,19 +35,19 @@ test('Forge shortcut setting labels are localized according to the selected inte
   assert.equal(translateForgeText('Language', 'pt-BR'), 'Idioma');
 });
 
-test('package metadata and bundled documentation remain on release 0.5.5', async () => {
+test('package metadata and bundled documentation remain on release 0.5.6', async () => {
   const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   const lock = JSON.parse(await readFile(resolve(root, 'package-lock.json'), 'utf8'));
   const ptDocs = await readFile(resolve(root, 'src/documentation/documentationPackage.ts'), 'utf8');
   const enDocs = await readFile(resolve(root, 'src/documentation/documentationPackage.en.ts'), 'utf8');
   const previewRenderer = await readFile(resolve(root, 'src/atlas/atlasForgePreviewRenderer.ts'), 'utf8');
-  assert.equal(packageJson.version, '0.5.5');
-  assert.equal(manifest.version, '0.5.5');
-  assert.equal(lock.version, '0.5.5');
-  assert.equal(lock.packages?.['']?.version, '0.5.5');
-  assert.match(ptDocs, /v0\.5\.5/);
-  assert.match(enDocs, /v0\.5\.5/);
+  assert.equal(packageJson.version, '0.5.6');
+  assert.equal(manifest.version, '0.5.6');
+  assert.equal(lock.version, '0.5.6');
+  assert.equal(lock.packages?.['']?.version, '0.5.6');
+  assert.match(ptDocs, /v0\.5\.6/);
+  assert.match(enDocs, /v0\.5\.6/);
   assert.match(previewRenderer, /renderForgeStatblockPreview/);
   assert.ok(manifest.description.length < 250);
   assert.ok(packageJson.description.length < 250);

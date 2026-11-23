@@ -59,6 +59,18 @@ Depending on the block type, custom appearance can control:
 
 Changing from **Custom** to **Theme** suspends the overrides but does not delete them. Switching back to **Custom** restores them. **Reset** removes the individual appearance and returns to **Theme** mode. See [[21 - Per-Block Appearance]].
 
+### Per-Field typography
+
+In the Template's **Appearance** tab, open **Field typography** to choose a Field and customize its typography everywhere it appears in the statblock. Three independent groups are available:
+
+- **All text:** size, weight, normal/italic style, decoration, and letter spacing for both labels and values.
+- **Labels:** overrides only the typography of names and headings associated with the Field.
+- **Values:** overrides only the typography of the Field's displayed values.
+
+Each property can remain at the theme default. Per-Field typography takes priority over block typography for that Field, without changing the theme or block colors. For example, the HP value can be bold in every block where HP appears, even when those blocks use different appearances.
+
+The settings follow the Field's stable ID, so they remain attached to the Field when its key is renamed. **Reset field typography** removes only that Field's typography overrides. Settings are stored in Forge layout metadata and do not modify the Atlas-native Template JSON.
+
 ## 5. Where appearance data is stored
 
 | Data | Storage | Effect when reusing the template |

@@ -22,6 +22,7 @@ import { openForgeStatblockNoteForEditing } from './src/statblocks/forgeStatbloc
 import { readForgeTemplateLink, resolveForgeTemplateForNote } from './src/atlas/forgeTemplateLinkResolver';
 import { startForgeAtlasPreviewBridge } from './src/atlas/forgeAtlasPreviewBridge.ts';
 import { AtlasForgeResourceTokenSync } from './src/atlas/atlasResourceTokenSync.ts';
+import { AtlasNativeRoleTemplateSync } from './src/atlas/atlasNativeTemplateBridge.ts';
 import { refreshForgeStatblockTemplateLinkPath } from './src/statblocks/forgeTemplateLink';
 import { ForgeTemplateLinkMaintenance } from './src/statblocks/forgeTemplateLinkMaintenance.ts';
 import { assessAtlasTokenCreation, dispatchAtlasCreateTokenCommand } from './src/atlas/atlasTokenWorkflow';
@@ -133,6 +134,11 @@ export default class StatblockForgePlugin extends Plugin {
     // Forge-native v2 token notes and supplies its renderer; all other previews
     // continue through Atlas' original NotePreviewUIManager implementation.
     startForgeAtlasPreviewBridge(this.app, this);
+    // Atlas Roles only list native .atlastemplate files. Keep an Atlas-native
+    // mirror for every saved Forge template so it appears in the Role picker.
+    const atlasRoleTemplateSync = new AtlasNativeRoleTemplateSync(this.app, () => this.statblockNotePanels?.refresh());
+    atlasRoleTemplateSync.start();
+    this.register(() => atlasRoleTemplateSync.stop());
     const atlasResourceTokenSync = new AtlasForgeResourceTokenSync(this.app);
     atlasResourceTokenSync.start();
     this.register(() => atlasResourceTokenSync.stop());

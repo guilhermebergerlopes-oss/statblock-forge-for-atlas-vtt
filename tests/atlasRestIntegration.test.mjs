@@ -6,9 +6,11 @@ import {
   atlasResourceFieldKeysForTemplate,
   atlasResourceMatchesForTemplate,
   atlasRestResourceContextForNote,
+  atlasRestResourceDefinitionsForNote,
   persistAtlasRestResourceChangesWithReceipt,
   rollbackAtlasRestResourceChanges,
 } from '../src/atlas/atlasRestResources.ts';
+import { loadAtlasSystemPresetRules } from '../src/atlas/atlasSystemPresetRules.ts';
 
 const NOTE = 'Characters/Ayla.md';
 const COLLECTION = 'heroes';
@@ -282,6 +284,159 @@ test('Template Resource catalog identifies every matching collection Resource wi
   assert.equal(updateCalls, 0);
 });
 
+
+test('REST Resource catalog follows custom preset Roles and collection Resources saved when the preset is applied', async () => {
+  const template = {
+    ...TEMPLATE,
+    id: 'custom-hero-template',
+    fields: [...TEMPLATE.fields, { key: 'focus', label: 'Focus', type: 'number' }],
+  };
+  const customPresetFile = {
+    path: 'atlas-vtt/system-presets/renamed-file.json',
+    content: JSON.stringify({
+      id: 'custom-system-id',
+      rules: {
+        statblockRoles: [{ id: 'hero', name: 'Hero', templateId: template.id }],
+        resources: [{ key: 'focus', name: 'Focus', field: 'focus', direction: 'fills', color: '#0ea5e9' }],
+      },
+    }),
+  };
+  const store = makeStore();
+  const collection = { id: COLLECTION, name: 'Heroes', settings: {
+    systemPresetId: 'custom-system-id',
+    resources: [{ key: 'focus', name: 'Focus', field: 'focus', direction: 'fills', color: '#0ea5e9' }],
+  } };
+  const service = {
+    loadedTokenAssets: () => [],
+    loadedCollections: () => [collection],
+    getCollectionSettings: () => collection.settings,
+    getCollectionForMap: () => COLLECTION,
+  };
+  const app = makeApp([{ serviceManager: { getAssetService: () => service, getStore: () => store } }]);
+  app.vault = {
+    getFiles: () => [customPresetFile],
+    cachedRead: async (file) => file.content,
+  };
+  await loadAtlasSystemPresetRules(app, 'custom-system-id');
+
+  const matches = atlasResourceMatchesForTemplate(app, template);
+  assert.deepEqual(matches.map((match) => [match.collectionId, match.resource.key, match.fieldKey, match.recoverable]), [
+    [COLLECTION, 'focus', 'focus', true],
+  ]);
+  assert.deepEqual(atlasResourceFieldKeysForTemplate(app, template), ['focus']);
+});
+
+test('REST definitions include a legacy secondary Resource used by a closed scene', async () => {
+  const assets = linkedAssets();
+  const store = makeStore({}, {}, { mapPath: 'atlas-vtt/collections/heroes/scenes/hero.atlasmap' });
+  const collection = {
+    id: COLLECTION, name: 'Heroes',
+    settings: { systemPresetId: 'unknown-system', defaultWidgets: { stressBar: false } },
+  };
+  const service = {
+    loadedTokenAssets: () => assets,
+    loadedCollections: () => [collection],
+    getCollectionSettings: () => collection.settings,
+    getCollectionForMap: (path) => path.includes('/heroes/') ? COLLECTION : null,
+  };
+  const sceneFile = {
+    path: 'atlas-vtt/collections/heroes/scenes/closed.atlasmap', extension: 'atlasmap',
+    content: JSON.stringify({ state: {
+      tokenSettings: { showStressBars: true },
+      objects: { tokens: { old: { stress: 2, maxStress: 10 } } },
+    } }),
+  };
+  const app = makeApp([{
+    containerEl: { isShown: () => true },
+    serviceManager: { getAssetService: () => service, getStore: () => store },
+  }]);
+  app.vault = { getFiles: () => [sceneFile], cachedRead: async (file) => file.content };
+
+  const definitions = await atlasRestResourceDefinitionsForNote(app, NOTE);
+  assert.deepEqual(definitions.map(({ key, name }) => [key, name]), [
+    ['hp', 'HP'], ['stress', 'Secondary resource'],
+  ]);
+});
+
+test('REST definitions include a legacy secondary Resource stored in statblockResources on a closed scene', async () => {
+  const assets = linkedAssets();
+  const store = makeStore({}, {}, { mapPath: 'atlas-vtt/collections/heroes/scenes/hero.atlasmap' });
+  const collection = {
+    id: COLLECTION, name: 'Heroes',
+    settings: { systemPresetId: 'unknown-system', defaultWidgets: { stressBar: false } },
+  };
+  const service = {
+    loadedTokenAssets: () => assets,
+    loadedCollections: () => [collection],
+    getCollectionSettings: () => collection.settings,
+    getCollectionForMap: (path) => path.includes('/heroes/') ? COLLECTION : null,
+  };
+  const sceneFile = {
+    path: 'atlas-vtt/collections/heroes/scenes/closed.atlasmap', extension: 'atlasmap',
+    content: JSON.stringify({ state: {
+      tokenSettings: { hiddenResources: [] },
+      objects: { tokens: { old: { statblockResources: { stress: { current: 2, max: 10 } } } } },
+    } }),
+  };
+  const app = makeApp([{
+    containerEl: { isShown: () => true },
+    serviceManager: { getAssetService: () => service, getStore: () => store },
+  }]);
+  app.vault = { getFiles: () => [sceneFile], cachedRead: async (file) => file.content };
+
+  const definitions = await atlasRestResourceDefinitionsForNote(app, NOTE);
+  assert.deepEqual(definitions.map(({ key, name }) => [key, name]), [
+    ['hp', 'HP'], ['stress', 'Secondary resource'],
+  ]);
+});
+
+test('played campaign Resources override collection Resources for the Rest chooser context', async () => {
+  const assets = linkedAssets();
+  const store = makeStore({
+    main: { assetId: 'pc-main', resources: { resolve: { current: 2, max: 6 }, hp: { current: 4, max: 20 } } },
+  }, {}, { mapPath: 'atlas-vtt/collections/heroes/scenes/hero.atlasmap' });
+  const collection = {
+    id: COLLECTION, name: 'Heroes',
+    settings: { resources: [{ key: 'hp', name: 'Health', field: 'hp', direction: 'drains', color: '#22c55e' }] },
+  };
+  const service = {
+    loadedTokenAssets: () => assets,
+    loadedCollections: () => [collection],
+    getCollectionSettings: () => collection.settings,
+    getCollectionForMap: () => COLLECTION,
+  };
+  const view = {
+    containerEl: { isShown: () => true },
+    serviceManager: { getAssetService: () => service, getStore: () => store },
+  };
+  const campaignFile = {
+    path: 'atlas-vtt/campaigns/session/campaign.json', extension: 'json',
+    content: JSON.stringify({
+      id: 'session',
+      system: {
+        resources: [{ key: 'resolve', name: 'Resolve', field: 'stress', direction: 'fills', color: '#0ea5e9' }],
+        gridDefaults: { unitType: 'feet', measurementMode: 'metric', unitDistance: 5 },
+        conditions: [],
+      },
+    }),
+  };
+  const app = makeApp([view]);
+  app.loadLocalStorage = (key) => key === 'atlas-vtt:table-campaign' ? 'session' : null;
+  app.vault = {
+    getFiles: () => [campaignFile],
+    cachedRead: async (file) => file.content,
+  };
+
+  const definitions = await atlasRestResourceDefinitionsForNote(app, NOTE);
+  assert.deepEqual(definitions.map(({ key, name, direction }) => [key, name, direction]), [
+    ['resolve', 'Resolve', 'fills'],
+  ]);
+  const context = atlasRestResourceContextForNote(app, NOTE, definitions);
+  assert.ok(context);
+  assert.deepEqual(context.resources.map(({ key, current, max, holder }) => [key, current, max, holder]), [
+    ['resolve', 2, 6, 'token'],
+  ]);
+});
 
 test('a calculated Atlas Resource recovery is compensated when frontmatter persistence fails', async () => {
   const store = makeStore({

@@ -1,15 +1,13 @@
 import { isRecord, type ForgeBlock, type ForgeField } from '../templates/forgeTemplate.ts';
 import { evaluatePreviewFormula } from '../render/previewValueModel.ts';
 import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
+import { resolveTableRowFormulaValues as resolveTableRowFormulaValuesModel, tableFormulaReferencedFieldKeys } from './tableRowFormulaResolver.ts';
+import type { TableFormulaEvaluator } from './tableRowFormulaResolver.ts';
+
+export type { TableFormulaEvaluator } from './tableRowFormulaResolver.ts';
+export { tableFormulaReferencedFieldKeys } from './tableRowFormulaResolver.ts';
 
 export type TableFormulaKind = 'row' | 'column';
-export type TableFormulaEvaluator = (
-  formula: string,
-  sample: Record<string, unknown>,
-  slotValue: unknown,
-  fields: readonly ForgeField[],
-  selfFieldKey?: string,
-) => number | null;
 
 const evaluateTableFormulaDefault: TableFormulaEvaluator = (formula, sample, slotValue, fields, selfFieldKey) =>
   evaluatePreviewFormula(formula, sample, slotValue, fields, {}, sample, selfFieldKey);
@@ -23,23 +21,34 @@ export interface TableColumnAggregate {
   count: number;
 }
 
-/** Maps each Table's private storage Field key to the public column Field keys it owns. */
-export type TableCellReferenceIndex = Readonly<Record<string, readonly string[]>>;
+/** Metadata required to resolve a Table cell exactly as it is displayed. */
+export interface TableCellReferenceDefinition {
+  /** Public Template Field keys assigned to this Table's columns. */
+  columns: readonly string[];
+  /** Table-level Row Formulas take precedence over the child Field's own formula. */
+  rowFormulas: Readonly<Record<string, string>>;
+}
+
+/** Maps each Table's private storage Field key to its columns and display formulas. */
+export type TableCellReferenceIndex = Readonly<Record<string, TableCellReferenceDefinition>>;
 
 /**
  * Builds the stable lookup needed by formulas such as `{table_1.row2.value}`.
  * The storage Field identifies the Table, while the `fields` array on its
  * Scores block identifies which Template Fields are valid columns.
  */
-export function tableCellReferenceIndex(blocks: readonly ForgeBlock[]): Record<string, string[]> {
-  const index: Record<string, string[]> = {};
+export function tableCellReferenceIndex(blocks: readonly ForgeBlock[]): Record<string, TableCellReferenceDefinition> {
+  const index: Record<string, TableCellReferenceDefinition> = {};
   const visit = (items: readonly ForgeBlock[]): void => {
     for (const block of items) {
       if (block.type === 'scores' && typeof block.field === 'string' && block.field.trim()) {
-        const keys = Array.isArray(block.fields)
+        const columns = Array.isArray(block.fields)
           ? [...new Set(block.fields.filter((key): key is string => typeof key === 'string' && key.trim().length > 0))]
           : [];
-        index[block.field] = keys;
+        index[block.field] = {
+          columns,
+          rowFormulas: tableFormulaMap(block, 'row'),
+        };
       }
       if (Array.isArray(block.blocks)) {
         visit(block.blocks.filter(isRecord) as ForgeBlock[]);
@@ -113,35 +122,6 @@ export function setScoresTableFormula(
   return true;
 }
 
-/**
- * Reads references used by a Table formula. Every declared Template Field is
- * eligible; `field.sum`/`field.average` etc. are resolved when that Field is a
- * numeric column in this Table. The evaluator resolves external Number/Rating
- * references to their displayed formula-calculated value.
- */
-export function tableFormulaReferencedFieldKeys(
-  formula: string,
-  fields: readonly ForgeField[],
-): string[] {
-  const candidates = new Map(fields.map((field) => [field.key, field]));
-  const references = new Set<string>();
-  const pattern = /\{([A-Za-z_][A-Za-z0-9_.-]*)\}|@([A-Za-z_][A-Za-z0-9_.-]*)|\b([A-Za-z_][A-Za-z0-9_.-]*)\b/g;
-  for (const match of formula.matchAll(pattern)) {
-    const token = match[1] ?? match[2] ?? match[3] ?? '';
-    const root = token.split('.')[0] ?? '';
-    const explicitReference = match[1] !== undefined || match[2] !== undefined;
-    // Bare keywords and rowNumber belong to the formula context; braced/@
-    // references normally identify Template Fields.
-    if (!explicitReference && ['value', 'true', 'false', 'rowNumber'].includes(root)) continue;
-    if (!candidates.has(root)) continue;
-    if (match[3] !== undefined) {
-      const next = formula.slice((match.index ?? 0) + token.length).match(/^\s*(.)/)?.[1];
-      if (next === '(') continue;
-    }
-    references.add(root);
-  }
-  return [...references];
-}
 
 export function tableFormulaReferencesField(
   formula: string,
@@ -168,11 +148,9 @@ function numericValue(raw: unknown): number | null {
 }
 
 /**
- * Resolves every Row Formula in one row. Formula dependencies are evaluated
- * first, allowing a calculated column to use another calculated column in
- * the same row. References to Number/Rating Fields outside the Table are
- * resolved by the evaluator to their displayed (formula-calculated) value.
- * Cycles safely return null.
+ * Resolves every Row Formula in one row using the supplied or default safe
+ * formula evaluator. The resolver itself lives in a dependency-free module so
+ * previewValueModel can use it without creating a circular import.
  */
 export function resolveTableRowFormulaValues(
   fields: readonly ForgeField[],
@@ -181,36 +159,7 @@ export function resolveTableRowFormulaValues(
   evaluate: TableFormulaEvaluator = evaluateTableFormulaDefault,
   referenceFields: readonly ForgeField[] = fields,
 ): Record<string, unknown> {
-  // Keep the entire statblock sample so formulas can read any Template Field.
-  // Row-specific Table values already overlaid by the renderer take precedence.
-  const base: Record<string, unknown> = { ...rowValues };
-  for (const field of fields) {
-    if (!Object.prototype.hasOwnProperty.call(base, field.key)) base[field.key] = rowValues[field.key];
-  }
-  const resolved: Record<string, unknown> = { ...base };
-  const states = new Map<string, 'resolving' | 'resolved'>();
-  const resolve = (fieldKey: string): unknown => {
-    const formula = formulas[fieldKey]?.trim();
-    if (!formula) return base[fieldKey];
-    if (states.get(fieldKey) === 'resolved') return resolved[fieldKey];
-    if (states.get(fieldKey) === 'resolving') {
-      resolved[fieldKey] = null;
-      states.set(fieldKey, 'resolved');
-      return null;
-    }
-
-    states.set(fieldKey, 'resolving');
-    for (const dependency of tableFormulaReferencedFieldKeys(formula, referenceFields)) {
-      if (dependency !== fieldKey && formulas[dependency]) resolve(dependency);
-    }
-    const result = evaluate(formula, resolved, base[fieldKey], referenceFields, fieldKey);
-    resolved[fieldKey] = result !== null && Number.isFinite(result) ? result : null;
-    states.set(fieldKey, 'resolved');
-    return resolved[fieldKey];
-  };
-
-  for (const field of fields) resolve(field.key);
-  return resolved;
+  return resolveTableRowFormulaValuesModel(fields, rowValues, formulas, evaluate, referenceFields);
 }
 
 /**

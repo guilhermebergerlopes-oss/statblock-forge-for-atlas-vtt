@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { forgeRestDiceSetById, forgeRestDefaultDiceSet, parseForgeRestDiceSet, type ForgeRestDiceSet } from '../statblocks/restDiceRoller.ts';
 import { parseRollGroups } from '../statblocks/atlasDiceEngine/diceSetNotation.ts';
+import { loadAtlasSystemPresetRules } from './atlasSystemPresetRules.ts';
 
 interface VaultFileLike {
   path: string;
@@ -97,17 +98,6 @@ async function customDiceSetsOf(app: App): Promise<ForgeRestDiceSet[]> {
   return result;
 }
 
-async function customPresetRules(app: App, presetId: string): Promise<Record<string, unknown> | null> {
-  const vault = (app as unknown as { vault?: VaultLike }).vault;
-  for (const file of vault?.getFiles?.() ?? []) {
-    if (!file.path.startsWith('atlas-vtt/system-presets/') || !file.path.toLowerCase().endsWith('.json') || !vault?.cachedRead) continue;
-    try {
-      const raw: unknown = JSON.parse(await vault.cachedRead(file));
-      if (isRecord(raw) && raw.id === presetId && isRecord(raw.rules)) return raw.rules;
-    } catch { /* skip unreadable preset */ }
-  }
-  return null;
-}
 
 function legacyDiceRules(raw: unknown): ForgeRestDiceSet | null {
   if (!isRecord(raw) || typeof raw.defaultRoll !== 'string'
@@ -163,7 +153,7 @@ export async function loadForgeAtlasCollectionDiceSet(app: App, statblockPath: s
       const builtIn = forgeRestDiceSetById(builtInSetId);
       if (builtIn) return builtIn;
     } else if (!presetId.startsWith('builtin:')) {
-      const rules = await customPresetRules(app, presetId);
+      const rules = await loadAtlasSystemPresetRules(app, presetId);
       if (rules) {
         if (typeof rules.diceSetId === 'string') {
           const selected = resolveSetId(rules.diceSetId, customSets);

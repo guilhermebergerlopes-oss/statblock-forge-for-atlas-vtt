@@ -6,6 +6,7 @@ import { isRecord, type ForgeField } from '../templates/forgeTemplate.ts';
 import { readSelectionField, selectionHasValue, selectionOptionIsSelected, selectionOptionNumber, selectionOptionReferences } from '../templates/selectionFieldModel.ts';
 import { checkboxFieldOptions } from '../templates/checkboxFieldModel.ts';
 import { forgeTableCellValue, FORGE_TABLE_MAX_ROWS } from '../statblocks/tableRowsModel.ts';
+import { resolveTableRowFormulaValues, TABLE_DISPLAYED_FIELD_KEYS_CONTEXT } from '../statblocks/tableRowFormulaResolver.ts';
 import type { TableCellReferenceIndex } from '../statblocks/tableFormulaModel.ts';
 import { calculateNumericFieldValue, isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
@@ -456,7 +457,7 @@ function evaluatePreviewFormulaInternal(
     values: Record<string, unknown>,
     resolutionKey: string,
   ): unknown => {
-    if (!isFormulaCapableNumericField(field)) return values[field.key];
+    if (field.type !== 'number' && field.type !== 'rating') return values[field.key];
     if (resolvingValues.has(resolutionKey)) return undefined;
     resolvingValues.add(resolutionKey);
     try {
@@ -473,27 +474,79 @@ function evaluatePreviewFormulaInternal(
   const readRef = (ref: string): unknown => {
     const [rootKey, ...parts] = ref.split('.');
     if (!rootKey) return undefined;
-    const tableColumns = tableReferences[rootKey];
-    if (tableColumns) {
-      // Table references are positional and one-based. Resolve the target
-      // Number/Rating through its display formula using a sample overlaid with
-      // every source cell from the requested row, not the raw first-row input.
+    const tableDefinition = tableReferences[rootKey];
+    if (tableDefinition) {
+      // Table references are positional and one-based. Resolve the complete
+      // row using the same precedence as the renderer: Table Row Formula first,
+      // otherwise the child Number/Rating Field's own displayed formula.
       const rowMatch = parts[0]?.match(/^row([1-9][0-9]*)$/i);
       const columnKey = parts[1];
+      const tableColumns = tableDefinition.columns;
       if (parts.length !== 2 || !rowMatch || !columnKey || !tableColumns.includes(columnKey)) return undefined;
       const rowNumber = Number(rowMatch[1]);
       if (!Number.isSafeInteger(rowNumber) || rowNumber > FORGE_TABLE_MAX_ROWS) return undefined;
 
-      const rowSample: Record<string, unknown> = { ...tableSourceValues, ...sample };
+      const rowSample: Record<string, unknown> = {
+        ...tableSourceValues,
+        ...sample,
+        __forgeTableRowNumber: rowNumber,
+      };
       for (const childKey of tableColumns) {
         rowSample[childKey] = rowNumber === 1
           ? tableSourceValues[childKey]
           : forgeTableCellValue(tableSourceValues[rootKey], rowNumber - 1, childKey);
       }
+      // A formula explicitly referencing its own Table cell reads that cell's
+      // input, matching the renderer's editable-input/self-reference behavior.
       if (columnKey === selfFieldKey) return rowSample[columnKey];
-      const targetField = fieldsByKey.get(columnKey);
-      if (!targetField) return rowSample[columnKey];
-      return resolveDisplayedNumericValue(targetField, rowSample, `${rootKey}.row${rowNumber}.${columnKey}`);
+
+      const resolutionKey = `table:${rootKey}.row${rowNumber}.${columnKey}`;
+      if (resolvingValues.has(resolutionKey)) return undefined;
+      resolvingValues.add(resolutionKey);
+      try {
+        // Only child Fields participate in this row's display calculation.
+        // External numeric Fields are resolved lazily by readRef when a Row
+        // Formula actually references them. Eagerly evaluating every numeric
+        // Field in the statblock here caused unrelated formulas (and their
+        // other Table dependencies) to be recalculated for every cell lookup.
+        const childFields = tableColumns
+          .map((key) => fieldsByKey.get(key))
+          .filter((field): field is ForgeField => field !== undefined);
+        const formulaBase: Record<string, unknown> = { ...rowSample };
+        const displayedFieldKeys: string[] = [];
+        for (const field of childFields) {
+          if ((field.type !== 'number' && field.type !== 'rating') || typeof field.formula !== 'string' || !field.formula.trim()) continue;
+          const displayed = resolveDisplayedNumericValue(
+            field,
+            formulaBase,
+            `${resolutionKey}:field:${field.key}`,
+          );
+          formulaBase[field.key] = displayed ?? null;
+          if (displayed !== undefined && displayed !== null) displayedFieldKeys.push(field.key);
+        }
+        if (displayedFieldKeys.length > 0) formulaBase[TABLE_DISPLAYED_FIELD_KEYS_CONTEXT] = displayedFieldKeys;
+
+        const resolvedRow = resolveTableRowFormulaValues(
+          childFields,
+          formulaBase,
+          { ...tableDefinition.rowFormulas },
+          (formula, formulaSample, formulaSlotValue, _referenceFields, currentFieldKey) =>
+            evaluatePreviewFormulaInternal(
+              formula,
+              formulaSample,
+              formulaSlotValue,
+              fields,
+              tableReferences,
+              tableSourceValues,
+              resolvingValues,
+              currentFieldKey,
+            ),
+          fields,
+        );
+        return resolvedRow[columnKey];
+      } finally {
+        resolvingValues.delete(resolutionKey);
+      }
     }
     if (parts.length === 0 && rootKey === selfFieldKey) return slotValue;
     const selectionField = selectionFields.get(rootKey);
@@ -524,6 +577,8 @@ function evaluatePreviewFormulaInternal(
       return undefined;
     }
     if (parts.length === 0) {
+      const displayedKeys = sample[TABLE_DISPLAYED_FIELD_KEYS_CONTEXT];
+      if (Array.isArray(displayedKeys) && displayedKeys.includes(rootKey)) return sample[rootKey];
       const referencedField = fieldsByKey.get(rootKey);
       if (referencedField && isFormulaCapableNumericField(referencedField)) {
         return resolveDisplayedNumericValue(referencedField, sample, rootKey);

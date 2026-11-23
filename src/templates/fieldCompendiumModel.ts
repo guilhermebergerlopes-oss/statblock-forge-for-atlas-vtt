@@ -225,6 +225,7 @@ export function removeFieldCompendium(
 ): void {
   const id = layout.fieldIds?.[fieldKey];
   if (layout.fieldIds) delete layout.fieldIds[fieldKey];
+  if (id && layout.fieldTypography) delete layout.fieldTypography[id];
   if (id && layout.compendiumByFieldId) delete layout.compendiumByFieldId[id];
   if (id && layout.compendiumSourceByFieldId) {
     delete layout.compendiumSourceByFieldId[id];

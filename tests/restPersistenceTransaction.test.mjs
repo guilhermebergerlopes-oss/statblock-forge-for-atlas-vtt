@@ -8,6 +8,10 @@ import {
 
 function makeStore() {
   let state = {
+    mapLoaded: true,
+    isMapLoading: false,
+    isPlayerView: false,
+    mapPath: 'atlas-vtt/collections/heroes/scenes/test.atlasmap',
     objects: { tokens: { hero: { id: 'hero', resources: { hp: { current: 4, max: 20 } } } } },
     updateTokens(entries) {
       const tokens = { ...state.objects.tokens };
@@ -24,11 +28,11 @@ function makeContext(store) {
     resources: [{
       key: 'hp', name: 'Health', field: 'hp', direction: 'drains', current: 4, max: 20, holder: 'token',
       tokenEntries: [{
-        store, tokenId: 'hero', value: { current: 4, max: 20 },
+        store, mapPath: 'atlas-vtt/collections/heroes/scenes/test.atlasmap', tokenId: 'hero', value: { current: 4, max: 20 },
         rawValue: { current: 4, max: 20 }, overriddenMax: undefined,
       }],
     }],
-    stores: [{ store, tokenIds: ['hero'] }],
+    stores: [{ store, tokenIds: ['hero'], mapPath: 'atlas-vtt/collections/heroes/scenes/test.atlasmap' }],
   };
 }
 

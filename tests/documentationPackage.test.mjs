@@ -11,6 +11,17 @@ import {
 } from '../src/documentation/documentationPackage.ts';
 import { FORGE_DOCUMENTATION_FILES_EN } from '../src/documentation/documentationPackage.en.ts';
 
+test('downloadable Portuguese and English appearance guides document block and Field line spacing', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.map((file) => file.content).join('\n');
+  const english = FORGE_DOCUMENTATION_FILES_EN.map((file) => file.content).join('\n');
+  assert.match(portuguese, /Line spacing \(×\)/);
+  assert.match(portuguese, /0,8× a 3×/);
+  assert.match(portuguese, /Tipografia do Field/);
+  assert.match(english, /Line spacing \(×\)/);
+  assert.match(english, /0\.8×–3×/);
+  assert.match(english, /Field-level overrides follow the Field/);
+});
+
 function createVaultMock() {
   const folders = new Set();
   const files = new Map();
@@ -239,4 +250,17 @@ test('downloadable Table guides distinguish always-available Template row contro
   assert.match(portuguese.content, /Allow adding rows in statblocks.*somente.*statblocks/i);
   assert.match(english.content, /Template construction mode.*controls.*always visible/i);
   assert.match(english.content, /Allow adding rows in statblocks.*only in rendered statblocks/i);
+});
+
+test('downloadable per-block appearance guides explain copy and paste without changing destination content', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '21 - Aparência individual dos blocos.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '21 - Per-Block Appearance.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  for (const guide of [portuguese.content, english.content]) {
+    assert.match(guide, /Copy appearance|Copiar aparência/);
+    assert.match(guide, /Paste appearance|Colar aparência/);
+    assert.match(guide, /Ctrl\+C.*Ctrl\+V/);
+    assert.match(guide, /content.*unchanged|conteúdo.*inalterados/i);
+  }
 });

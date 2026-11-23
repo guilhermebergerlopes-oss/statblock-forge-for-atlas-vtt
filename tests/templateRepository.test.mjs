@@ -11,6 +11,7 @@ import {
 } from '../src/templates/templateRepository.ts';
 import { parseTemplateFileText, serializeForgeTemplateFile } from '../src/templates/forgeFileFormat.ts';
 import { listTemplateBackups } from '../src/templates/templateBackup.ts';
+import { reservesForgeTemplateId } from '../src/templates/atlasRoleMirrorMetadata.ts';
 
 class MemoryTemplateStorage {
   files = new Map();
@@ -63,7 +64,7 @@ class MemoryTemplateStorage {
       if (!/\.(?:forgetemplate|atlastemplate)$/i.test(path)) continue;
       try {
         const parsed = JSON.parse(text);
-        if (parsed?.format === 'atlas-statblock-template' && typeof parsed.id === 'string') rows.push({ path, id: parsed.id });
+        if (parsed?.format === 'atlas-statblock-template' && typeof parsed.id === 'string' && reservesForgeTemplateId(path, parsed)) rows.push({ path, id: parsed.id });
       } catch { /* malformed files do not reserve an unverifiable id */ }
     }
     return rows;
@@ -290,4 +291,37 @@ test('confirmed Forge replacement keeps the backup when a concurrent edit wins',
   const backups = await listTemplateBackups(storage, 'Templates');
   assert.equal(backups.length, 1);
   assert.equal(backups[0].canRestore, true);
+});
+
+
+test('saving a Forge template in place ignores its own generated Atlas Role mirror ID', async () => {
+  const storage = new MemoryTemplateStorage();
+  const template = templateFixture('Wolf');
+  template.id = 'wolf-abc123';
+  const layout = createForgeLayout(template);
+  const sourcePath = 'Templates/Wolf.forgetemplate';
+  const originalText = serializeForgeTemplateFile(template, layout);
+  storage.files.set(sourcePath, originalText);
+  storage.files.set('atlas-vtt/statblock-templates/Forge Mirrors/Wolf (abc123).atlastemplate', JSON.stringify({
+    ...template,
+    statblockForgeRoleMirror: {
+      format: 'statblock-forge-atlas-role-mirror',
+      version: 1,
+      sourceTemplateId: template.id,
+      sourceTemplatePath: sourcePath,
+    },
+  }));
+
+  template.fields.find((field) => field.key === 'hp').label = 'Health';
+  const result = await saveTemplateDocument({
+    storage,
+    templateFolder: 'Templates',
+    name: 'Wolf',
+    template,
+    layout,
+    sourcePath,
+    originalText,
+  });
+  assert.equal(result.file.path, sourcePath);
+  assert.match(storage.files.get(sourcePath), /"label": "Health"/);
 });

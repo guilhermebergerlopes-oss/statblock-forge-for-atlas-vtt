@@ -33,7 +33,8 @@ import { loadForgeRestDiceSet, rollForgeRestFormula } from '../statblocks/restDi
 import { rollForgeRestWithAtlasDiceTool } from '../statblocks/atlasRestDiceTool.ts';
 import { runRestNotePersistenceWithAtlasRollback } from '../statblocks/restPersistenceTransaction.ts';
 import {
-  atlasRestResourceContextForNote, persistAtlasRestResourceChangesWithReceipt, rollbackAtlasRestResourceChanges,
+  atlasRestResourceContextForNote, atlasRestResourceDefinitionsForNote,
+  persistAtlasRestResourceChangesWithReceipt, rollbackAtlasRestResourceChanges,
   type AtlasRestResourceContext, type AtlasRestResourceRollbackReceipt,
 } from '../atlas/atlasRestResources.ts';
 import { RestResultModal, type ForgeRestResultAction, type ForgeRestResultSpend } from './RestResultModal.ts';
@@ -503,18 +504,30 @@ export class StatblockRenderSurface {
       control.dataset.state = 'closed';
       if (hasChoices || hasDirectSpend) {
         control.setAttribute('aria-haspopup', 'dialog');
-        control.addEventListener('click', () => {
+        control.addEventListener('click', async () => {
           if (control.dataset.state === 'open') {
             this.restChooserClose?.();
             this.restChooserClose = null;
             return;
           }
+          if (control.dataset.resolving === 'true') return;
           this.restChooserClose?.();
-          const collectionResources = atlasRestResourceContextForNote(this.app, source.path)?.resources ?? [];
-          this.restChooserClose = openForgeRestChooser(control, rest, template, forgeRestDataWithResources(source.binding.data, source.raw), language, async (picks, spends) => {
-            await this.executeRestRecovery(template, source, rest, picks, spends, language);
-            this.restChooserClose = null;
-          }, collectionResources);
+          control.dataset.resolving = 'true';
+          control.disabled = true;
+          try {
+            // Atlas campaigns override collection Resources for every map; resolve the active
+            // SystemRules before presenting the Rest choices.
+            const definitions = await atlasRestResourceDefinitionsForNote(this.app, source.path);
+            if (!control.isConnected) return;
+            const resourceContext = atlasRestResourceContextForNote(this.app, source.path, definitions);
+            this.restChooserClose = openForgeRestChooser(control, rest, template, forgeRestDataWithResources(source.binding.data, source.raw), language, async (picks, spends) => {
+              await this.executeRestRecovery(template, source, rest, picks, spends, language);
+              this.restChooserClose = null;
+            }, resourceContext?.resources ?? []);
+          } finally {
+            delete control.dataset.resolving;
+            if (control.isConnected) control.disabled = false;
+          }
         });
       } else {
         control.addEventListener('click', () => {
@@ -565,6 +578,9 @@ export class StatblockRenderSurface {
     if (!(sourceFile instanceof TFile)) throw new Error('A nota deste statblock não está disponível no Vault.');
 
     const diceSet = await loadForgeRestDiceSet(this.app, template);
+    // Resolve map-effective Resources once; the context below rereads live token/PartySync values
+    // inside the latest-file callback while keeping the campaign/collection rules consistent.
+    const atlasResourceDefinitions = await atlasRestResourceDefinitionsForNote(this.app, source.path);
     const rolledFormulas: Array<{ formula: string; label: string; total: number; engine: 'atlas' | 'forge' }> = [];
     const requestedDiceSet = typeof template.diceSetId === 'string' ? template.diceSetId : '';
     const explicitDiceSet = requestedDiceSet && diceSet.id === requestedDiceSet ? diceSet : null;
@@ -581,9 +597,9 @@ export class StatblockRenderSurface {
         path: source.path, basename: source.basename, format: source.format, raw: record, template,
       });
       const currentData = forgeRestDataWithResources(currentSource.binding.data, record);
-      // Collection Resources belong to the linked Atlas player character, not to the statblock file.
-      // Resolve the current values from open Atlas maps at execution time, not from the chooser snapshot.
-      const atlasResourceContext = atlasRestResourceContextForNote(this.app, source.path);
+      // Atlas Resources belong to the linked player character, not the statblock file. Resolve
+      // current values from open maps at execution time using the active campaign's rules.
+      const atlasResourceContext = atlasRestResourceContextForNote(this.app, source.path, atlasResourceDefinitions);
       atlasResourceContextState.value = atlasResourceContext;
       const collectionResources = atlasResourceContext?.resources ?? [];
       // Rebuild the offer against the latest note contents inside the serialized write callback.

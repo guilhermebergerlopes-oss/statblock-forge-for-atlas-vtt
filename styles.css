@@ -861,8 +861,10 @@
 .statblock-forge__preview-block p { margin: 0; }
 .statblock-forge__preview-value { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: baseline; }
 .statblock-forge__preview-divider { display: block; box-sizing: border-box; flex: 1 1 auto; align-self: center; width: 100%; height: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-top: 1px solid var(--forge-theme-border, var(--background-modifier-border)); background: transparent; opacity: 0.95; }
-.statblock-forge__preview-block.is-divider { display: flex; align-items: center; justify-content: stretch; align-self: stretch; min-height: 0; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
-.statblock-forge__preview-block.is-vertical-divider { display: flex; align-items: stretch; justify-content: center; align-self: stretch; min-height: var(--forge-preview-grid-row-height, 3.5rem); padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible; }
+.statblock-forge__preview-block.is-divider { display: flex; align-items: center; justify-content: stretch; align-self: stretch; min-height: 0; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+.statblock-forge__preview-block.is-vertical-divider { display: flex; align-items: stretch; justify-content: center; align-self: stretch; min-height: var(--forge-preview-grid-row-height, 3.5rem); border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible; }
+.statblock-forge__preview-block.is-divider:not([data-appearance-mode="custom"]),
+.statblock-forge__preview-block.is-vertical-divider:not([data-appearance-mode="custom"]) { padding: 0 !important; }
 .statblock-forge__preview-vertical-divider { display: block; flex: 0 0 1px; align-self: stretch; width: 1px; min-height: 100%; margin: 0 auto; padding: 0; border: 0; border-radius: 1px; background: var(--forge-theme-border, var(--background-modifier-border)); opacity: 0.95; }
 .statblock-forge__preview-grid.is-row > .statblock-forge__preview-block.is-vertical-divider,
 .statblock-forge__preview-row > .statblock-forge__preview-block.is-vertical-divider { align-self: stretch; }
@@ -3810,6 +3812,462 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   color: var(--forge-block-value-color) !important;
 }
 
+/* Per-block typography overrides. Label and value settings are independent;
+   omitted settings keep the selected theme's original typography. */
+.statblock-forge__preview-block[data-custom-text-font-size="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level,
+.statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-size: var(--forge-block-font-size) !important;
+}
+.statblock-forge__preview-block[data-custom-label-font-size="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level
+) {
+  font-size: var(--forge-block-label-font-size) !important;
+}
+.statblock-forge__preview-block[data-custom-value-font-size="true"] :is(
+  .statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-size: var(--forge-block-value-font-size) !important;
+}
+.statblock-forge__preview-block[data-custom-text-font-weight="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level,
+.statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-weight: var(--forge-block-font-weight) !important;
+}
+.statblock-forge__preview-block[data-custom-label-font-weight="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level
+) {
+  font-weight: var(--forge-block-label-font-weight) !important;
+}
+.statblock-forge__preview-block[data-custom-value-font-weight="true"] :is(
+  .statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-weight: var(--forge-block-value-font-weight) !important;
+}
+.statblock-forge__preview-block[data-custom-text-font-style="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level,
+.statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-style: var(--forge-block-font-style) !important;
+}
+.statblock-forge__preview-block[data-custom-label-font-style="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level
+) {
+  font-style: var(--forge-block-label-font-style) !important;
+}
+.statblock-forge__preview-block[data-custom-value-font-style="true"] :is(
+  .statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  font-style: var(--forge-block-value-font-style) !important;
+}
+.statblock-forge__preview-block[data-custom-text-text-decoration="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level,
+.statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  text-decoration: var(--forge-block-text-decoration) !important;
+}
+.statblock-forge__preview-block[data-custom-label-text-decoration="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level
+) {
+  text-decoration: var(--forge-block-label-text-decoration) !important;
+}
+.statblock-forge__preview-block[data-custom-value-text-decoration="true"] :is(
+  .statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  text-decoration: var(--forge-block-value-text-decoration) !important;
+}
+.statblock-forge__preview-block[data-custom-text-letter-spacing="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level,
+.statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  letter-spacing: var(--forge-block-letter-spacing) !important;
+}
+.statblock-forge__preview-block[data-custom-label-letter-spacing="true"] :is(
+  .statblock-forge__preview-stat-label,
+.statblock-forge__preview-field-label,
+.statblock-forge__preview-entry-part-label,
+.statblock-forge__preview-block-heading,
+.statblock-forge__preview-section-heading,
+.statblock-forge__preview-heading,
+.statblock-forge__preview-entry-name,
+.statblock-forge__preview-line-label,
+.statblock-forge__preview-pair-key,
+.statblock-forge__preview-counter-name,
+.statblock-forge__preview-score-table th,
+.statblock-forge__preview-score-lines-table th,
+.statblock-forge__preview-score-derived-heading,
+.statblock-forge__preview-score-derived-label,
+.statblock-forge__preview-spell-level
+) {
+  letter-spacing: var(--forge-block-label-letter-spacing) !important;
+}
+.statblock-forge__preview-block[data-custom-value-letter-spacing="true"] :is(
+  .statblock-forge__preview-title,
+.statblock-forge__preview-stat-value,
+.statblock-forge__preview-field-value,
+.statblock-forge__preview-metric-value,
+.statblock-forge__preview-text-content,
+.statblock-forge__preview-entry-description,
+.statblock-forge__preview-entry-part-value,
+.statblock-forge__preview-line-value,
+.statblock-forge__preview-pair-value,
+.statblock-forge__preview-counter-value,
+.statblock-forge__preview-score-table td,
+.statblock-forge__preview-score-lines-table td,
+.statblock-forge__preview-tag-list li,
+.statblock-forge__preview-spell-list li
+) {
+  letter-spacing: var(--forge-block-value-letter-spacing) !important;
+}
+
+/* Per-block line spacing. Values are unitless multipliers so they scale with the
+   effective font size and remain independent for labels and displayed values. */
+.statblock-forge__preview-block[data-custom-text-line-height="true"] :is(
+  .atlas-sb-label,
+  .atlas-sb-value,
+  .statblock-forge__preview-stat-label,
+  .statblock-forge__preview-field-label,
+  .statblock-forge__preview-entry-part-label,
+  .statblock-forge__preview-block-heading,
+  .statblock-forge__preview-section-heading,
+  .statblock-forge__preview-heading,
+  .statblock-forge__preview-entry-name,
+  .statblock-forge__preview-line-label,
+  .statblock-forge__preview-pair-key,
+  .statblock-forge__preview-counter-name,
+  .statblock-forge__preview-score-table th,
+  .statblock-forge__preview-score-lines-table th,
+  .statblock-forge__preview-score-derived-heading,
+  .statblock-forge__preview-score-derived-label,
+  .statblock-forge__preview-spell-level,
+  .statblock-forge__preview-table-column-label,
+  .statblock-forge__preview-table-row-label-heading,
+  .statblock-forge__preview-name,
+  .statblock-forge__preview-title,
+  .statblock-forge__preview-stat-value,
+  .statblock-forge__preview-field-value,
+  .statblock-forge__preview-metric-value,
+  .statblock-forge__preview-text-content,
+  .statblock-forge__preview-inline-text-value,
+  .statblock-forge__preview-tags-value,
+  .statblock-forge__preview-numeric-field-value,
+  .statblock-forge__preview-table-cell,
+  .statblock-forge__preview-table-formula-value,
+  .statblock-forge__preview-checkbox-option,
+  .statblock-forge__preview-spell-name,
+  .statblock-forge__preview-spell-header,
+  .statblock-forge__preview-description,
+  .statblock-forge__preview-entry-description,
+  .statblock-forge__preview-entry-part-value,
+  .statblock-forge__preview-line-value,
+  .statblock-forge__preview-pair-value,
+  .statblock-forge__preview-counter-value,
+  .statblock-forge__preview-score-table td,
+  .statblock-forge__preview-score-lines-table td,
+  .statblock-forge__preview-tag-list li,
+  .statblock-forge__preview-tag-item,
+  .statblock-forge__preview-spell-list li
+) {
+  line-height: var(--forge-block-line-height) !important;
+}
+.statblock-forge__preview-block[data-custom-label-line-height="true"] :is(
+  .atlas-sb-label,
+  .statblock-forge__preview-stat-label,
+  .statblock-forge__preview-field-label,
+  .statblock-forge__preview-entry-part-label,
+  .statblock-forge__preview-block-heading,
+  .statblock-forge__preview-section-heading,
+  .statblock-forge__preview-heading,
+  .statblock-forge__preview-entry-name,
+  .statblock-forge__preview-line-label,
+  .statblock-forge__preview-pair-key,
+  .statblock-forge__preview-counter-name,
+  .statblock-forge__preview-score-table th,
+  .statblock-forge__preview-score-lines-table th,
+  .statblock-forge__preview-score-derived-heading,
+  .statblock-forge__preview-score-derived-label,
+  .statblock-forge__preview-spell-level,
+  .statblock-forge__preview-table-column-label,
+  .statblock-forge__preview-table-row-label-heading
+) {
+  line-height: var(--forge-block-label-line-height) !important;
+}
+.statblock-forge__preview-block[data-custom-value-line-height="true"] :is(
+  .atlas-sb-value,
+  .statblock-forge__preview-name,
+  .statblock-forge__preview-title,
+  .statblock-forge__preview-stat-value,
+  .statblock-forge__preview-field-value,
+  .statblock-forge__preview-metric-value,
+  .statblock-forge__preview-text-content,
+  .statblock-forge__preview-inline-text-value,
+  .statblock-forge__preview-tags-value,
+  .statblock-forge__preview-numeric-field-value,
+  .statblock-forge__preview-table-cell,
+  .statblock-forge__preview-table-formula-value,
+  .statblock-forge__preview-checkbox-option,
+  .statblock-forge__preview-spell-name,
+  .statblock-forge__preview-spell-header,
+  .statblock-forge__preview-description,
+  .statblock-forge__preview-entry-description,
+  .statblock-forge__preview-entry-part-value,
+  .statblock-forge__preview-line-value,
+  .statblock-forge__preview-pair-value,
+  .statblock-forge__preview-counter-value,
+  .statblock-forge__preview-score-table td,
+  .statblock-forge__preview-score-lines-table td,
+  .statblock-forge__preview-tag-list li,
+  .statblock-forge__preview-tag-item,
+  .statblock-forge__preview-spell-list li
+) {
+  line-height: var(--forge-block-value-line-height) !important;
+}
+
 /* Canvas toolbar layout: keep controls compact and group related actions. */
 .statblock-forge__canvas-toolbar {
   display: flex;
@@ -6239,6 +6697,19 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   gap: 0.4rem;
   margin-top: 0.45rem;
 }
+.statblock-forge__block-appearance-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0.6rem;
+}
+.statblock-forge__block-appearance-copy-actions .statblock-forge__button {
+  flex: 1 1 auto;
+}
+.statblock-forge__block-appearance-copy-actions .statblock-forge__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .statblock-forge__frame-preview {
   min-height: 3rem;
   margin-top: 0.65rem;
@@ -6320,7 +6791,9 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 }
 
 /* v0.27.171 — Value blocks: remove trailing inset and make text alignment visible. */
-.statblock-forge__preview-block.is-forge-value-block {
+/* Theme-following value blocks suppress Atlas' trailing inset. Custom block
+   appearance owns the complete padding shorthand, including the right side. */
+.statblock-forge__preview-block.is-forge-value-block:not([data-appearance-mode="custom"]) {
   padding-right: 0 !important;
 }
 .statblock-forge__preview-grid > .statblock-forge__preview-block.is-forge-value-block.has-forge-value-alignment {
@@ -9252,3 +9725,6 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   cursor: not-allowed;
 }
 
+
+/* Field-specific typography wrapper for one entry in a multi-Field Line. */
+.statblock-forge__preview-line-field { display: contents; }

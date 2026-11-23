@@ -1,4 +1,6 @@
 import type { ForgeField, JsonRecord } from '../templates/forgeTemplate.ts';
+import { calculateNumericFieldValue, numericFieldFormula } from '../templates/numericFieldModel.ts';
+import { evaluatePreviewFormula } from '../render/previewValueModel.ts';
 import type { AtlasCollectionResourceDefinition } from './atlasResourceCatalog.ts';
 
 export interface AtlasResourceValue {
@@ -12,7 +14,8 @@ export interface AtlasResourceSourceSpec {
 }
 
 export type AtlasResourceSourceValue =
-  | { readonly status: 'missing' | 'invalid'; readonly spec: AtlasResourceSourceSpec }
+  | { readonly status: 'missing'; readonly spec: AtlasResourceSourceSpec }
+  | { readonly status: 'invalid'; readonly spec: AtlasResourceSourceSpec }
   | { readonly status: 'empty'; readonly spec: AtlasResourceSourceSpec }
   | { readonly status: 'value'; readonly value: AtlasResourceValue; readonly spec: AtlasResourceSourceSpec };
 
@@ -66,8 +69,15 @@ interface PathRead {
   value: unknown;
 }
 
+function matchingPathKey(record: Record<string, unknown>, wanted: string): string | undefined {
+  // Atlas matchingKey(): an exact key wins, then case/separator-insensitive lookup.
+  if (Object.prototype.hasOwnProperty.call(record, wanted)) return wanted;
+  const normalized = normalizedKey(wanted);
+  return Object.keys(record).find((candidate) => normalizedKey(candidate) === normalized);
+}
+
 function readPath(root: JsonRecord, path: string): PathRead {
-  const parts = path.split('.').filter(Boolean);
+  const parts = path.split('.').map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) return { exists: false, value: undefined };
   let current: unknown = root;
   for (const part of parts) {
@@ -76,10 +86,10 @@ function readPath(root: JsonRecord, path: string): PathRead {
       current = current[Number(part)];
       continue;
     }
-    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, part)) {
-      return { exists: false, value: undefined };
-    }
-    current = current[part];
+    if (!isRecord(current)) return { exists: false, value: undefined };
+    const matched = matchingPathKey(current, part);
+    if (matched === undefined) return { exists: false, value: undefined };
+    current = current[matched];
   }
   return { exists: true, value: current };
 }
@@ -89,7 +99,7 @@ function numeric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-/** Mirrors Atlas 0.17.0 `parseResourceValue()` without importing Atlas source into the Forge bundle. */
+/** Mirrors Atlas 0.19.0 `parseResourceValue()` without importing Atlas source into the Forge bundle. */
 export function parseAtlasResourceValue(value: unknown, direction: AtlasCollectionResourceDefinition['direction']): AtlasResourceValue | null {
   const spent = direction === 'fills';
   if (isRecord(value)) {
@@ -122,12 +132,35 @@ function holdsValue(resource: AtlasCollectionResourceDefinition, value: AtlasRes
  * Missing values are ignored, explicitly empty values remove a token-held Resource,
  * and prose/invalid quantities do not destroy a value that Atlas cannot interpret.
  */
+export interface AtlasResourceSourceValueOptions {
+  /** Full template field list lets Number/Rating formulas resolve other calculated fields. */
+  readonly templateFields?: readonly ForgeField[];
+}
+
 export function readAtlasResourceSourceValue(
   data: JsonRecord,
   spec: AtlasResourceSourceSpec,
+  options: AtlasResourceSourceValueOptions = {},
 ): AtlasResourceSourceValue {
   const path = atlasResourceSourcePath(spec);
   if (!path) return { status: 'invalid', spec };
+
+  // Atlas reads the displayed numeric value of a native statblock Field. Forge's Number and
+  // Rating formulas are metadata rather than values written into frontmatter, so resolve the
+  // same displayed value before handing the Resource maximum to Atlas. Do not fall back to the
+  // stale raw value when a configured formula cannot be evaluated.
+  const formula = numericFieldFormula(spec.field).trim();
+  if (path === spec.field.key && formula && (spec.field.type === 'number' || spec.field.type === 'rating')) {
+    const templateFields = options.templateFields ?? [spec.field];
+    const calculated = calculateNumericFieldValue(spec.field, data, (source, sample, slotValue, selfFieldKey) =>
+      evaluatePreviewFormula(source, sample, slotValue, templateFields, {}, data, selfFieldKey));
+    if (calculated === null) return { status: 'invalid', spec };
+    const parsed = parseAtlasResourceValue(calculated, spec.resource.direction);
+    if (!parsed) return { status: 'invalid', spec };
+    if (!holdsValue(spec.resource, parsed)) return { status: 'empty', spec };
+    return { status: 'value', value: parsed, spec };
+  }
+
   const read = readPath(data, path);
   if (!read.exists || read.value === undefined) return { status: 'missing', spec };
   if (read.value === null || (typeof read.value === 'string' && read.value.trim() === '')) return { status: 'empty', spec };
@@ -168,8 +201,9 @@ export function syncAtlasResourcesForToken(
         // token was still at its previous direction-specific starting value.
         next[key] = { ...source.value };
       } else {
+        const current = Number.isFinite(held.current) ? held.current : source.value.current;
         next[key] = {
-          current: Math.max(0, Math.min(source.value.max, held.current)),
+          current: Math.max(0, Math.min(source.value.max, current)),
           max: source.value.max,
         };
       }
@@ -185,6 +219,7 @@ export function syncAtlasResourcesForToken(
     if (key !== nextKeys[index]) return true;
     const left = before[key];
     const right = next[key];
+    if (!left || !right) return true;
     return left.current !== right.current || left.max !== right.max;
   });
   return { changed, resources: next };
@@ -194,8 +229,9 @@ export function syncAtlasResourcesForToken(
 export function atlasResourceSourceValues(
   data: JsonRecord,
   specs: readonly AtlasResourceSourceSpec[],
+  options: AtlasResourceSourceValueOptions = {},
 ): Map<string, AtlasResourceSourceValue> {
   const result = new Map<string, AtlasResourceSourceValue>();
-  for (const spec of specs) result.set(spec.resource.key, readAtlasResourceSourceValue(data, spec));
+  for (const spec of specs) result.set(spec.resource.key, readAtlasResourceSourceValue(data, spec, options));
   return result;
 }

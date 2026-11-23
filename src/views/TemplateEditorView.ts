@@ -21,6 +21,7 @@ import {
   type TemplateOverwriteConfirmation,
 } from '../templates/templateRepository';
 import { createTemplateVaultStorage } from '../templates/templateVaultStorage.ts';
+import { ensureAtlasNativeTemplateMirror } from '../atlas/atlasNativeTemplateBridge.ts';
 import {
   captureTemplateEditorDirtyBaseline,
   hasUnsavedTemplateEditorChanges,
@@ -121,6 +122,8 @@ import { renderCountersBlockInspector } from './templateCountersBlockInspector.t
 import { hasNumericTrackingForBlock, renderValueBlockInspector } from './templateValueBlockInspector.ts';
 import { renderPlayerAccessInspector } from './templatePlayerAccessInspector.ts';
 import { renderBlockAppearanceInspector, type BlockAppearanceSectionKey } from './templateBlockAppearanceInspector.ts';
+import { renderTemplateFieldTypographyInspector } from './templateFieldTypographyInspector.ts';
+import { captureDisclosureOpenState, restoreDisclosureOpenState, type DisclosureOpenState } from './disclosureOpenState.ts';
 import { renderTemplateCanvasSurface, restoreTemplateCanvasTabs } from './templateCanvasSurface.ts';
 import { renderStatblock, renderStatblockPreview } from '../render/statblockPreviewRenderer.ts';
 import { renderCompendiumAbilityPreview } from '../render/compendiumAbilityPreview.ts';
@@ -227,11 +230,13 @@ export class TemplateEditorView extends FileView {
   private compendiumFieldId: string | null = null;
   private compendiumEditingItemId: string | null = null;
   private selectedTemplateFieldKey: string | null = null;
+  private appearanceFieldKey: string | null = null;
   private addFieldFormOpen = false;
   private addFieldCategory: ForgeFieldCategory = 'values';
   private addFieldType = 'number';
   private headerFieldsOpen = false;
   private readonly propertiesDisclosureOpen = new Map<string, boolean>();
+  private readonly persistentDisclosureOpen: DisclosureOpenState = new Map();
   private jsonDraftText: string | null = null;
   private jsonAppliedText: string | null = null;
   private jsonStatus = '';
@@ -1235,6 +1240,8 @@ export class TemplateEditorView extends FileView {
     }
 
     dismissActiveComponentHelpTooltip();
+    // Preserve explicitly keyed disclosure panels through the sidebar rebuild.
+    captureDisclosureOpenState(this.contentEl, this.persistentDisclosureOpen);
     const ancestorScrollPositions = readEditorAncestorScrollPositions(this.contentEl);
     const sidebarScrollTop = sidebar.scrollTop;
     const nextSidebar = this.renderSidebar();
@@ -1282,6 +1289,11 @@ export class TemplateEditorView extends FileView {
 
   private render(): void {
     if (!this.template || !this.layout) return;
+    // Capture every keyed disclosure before any full editor rebuild. Some
+    // confirmation actions call render() directly (rather than
+    // refreshSelectionView()), so relying on the selection refresh path alone
+    // makes the Text/Field Typography panels collapse after confirmation.
+    captureDisclosureOpenState(this.contentEl, this.persistentDisclosureOpen);
     this.statblockPreviewDiceCleanup?.();
     this.statblockPreviewDiceCleanup = null;
     // Preserve the two independent scroll positions when the editor rerenders
@@ -1374,6 +1386,7 @@ export class TemplateEditorView extends FileView {
     // the top even though the inner Canvas/sidebar scrollTop values are restored.
     const nextHeader = root.querySelector<HTMLElement>('.statblock-forge__editor-header');
     const nextSidebar = root.querySelector<HTMLElement>('.statblock-forge__editor-sidebar');
+    if (nextSidebar) restoreDisclosureOpenState(nextSidebar, this.persistentDisclosureOpen);
     const nextCanvas = root.querySelector<HTMLElement>('.statblock-forge__editor-preview-column');
     const nextColumns = root.querySelector<HTMLElement>('.statblock-forge__editor-columns');
     const currentHeader = existingRoot?.querySelector<HTMLElement>(':scope > .statblock-forge__editor-header');
@@ -2574,7 +2587,7 @@ export class TemplateEditorView extends FileView {
   }
 
   private renderThemeAppearanceSettings(): HTMLElement {
-    return renderTemplateThemeAppearance({
+    const content = renderTemplateThemeAppearance({
       layout: this.layout as ForgeLayoutDocument,
       language: normalizeForgeLanguage(this.plugin.settings.language),
       advancedOpen: this.themeAdvancedOpen,
@@ -2613,6 +2626,18 @@ export class TemplateEditorView extends FileView {
       renderPreviewOnly: () => this.renderPreviewOnly(),
       confirmReset: (itemName, onConfirm) => this.confirmResetAppearance(itemName, onConfirm),
     });
+    if (this.template && this.layout) {
+      content.append(renderTemplateFieldTypographyInspector({
+        template: this.template,
+        layout: this.layout,
+        language: normalizeForgeLanguage(this.plugin.settings.language),
+        selectedFieldKey: this.appearanceFieldKey ?? this.selectedTemplateFieldKey,
+        setSelectedFieldKey: (key) => { this.appearanceFieldKey = key; },
+        render: () => this.render(),
+        renderPreviewOnly: () => this.renderPreviewOnly(),
+      }));
+    }
+    return content;
   }
 
   private renderBlockInspector(): HTMLElement {
@@ -3876,6 +3901,15 @@ export class TemplateEditorView extends FileView {
       }
       const savedAbstract = this.app.vault.getAbstractFileByPath(result.file.path);
       if (!(savedAbstract instanceof TFile)) throw new Error('O arquivo salvo não foi encontrado no Vault.');
+      // Atlas' Role selector only reads native .atlastemplate files. Publish
+      // the matching native mirror as part of every successful Forge save.
+      // A mirror failure must not roll back the user's already-saved Forge file.
+      try {
+        await ensureAtlasNativeTemplateMirror(this.app, savedAbstract);
+      } catch (mirrorError) {
+        console.error('[Statblock Forge] Template was saved, but its Atlas Role mirror could not be updated:', mirrorError);
+        this.showNotice(`Template salvo, mas não apareceu nas Roles do Atlas: ${mirrorError instanceof Error ? mirrorError.message : String(mirrorError)}`, 10000);
+      }
       const currentPath = this.file?.path ?? null;
       const wasRecoveryDraft = this.recoveryDraftId !== null;
       this.canOverwriteCurrentFile = true;

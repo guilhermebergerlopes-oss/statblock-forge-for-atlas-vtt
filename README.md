@@ -31,6 +31,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 
 - Choose a built-in theme or create a reusable custom theme with an eight-color palette.
 - Adjust the outer frame, token-art frame, borders, shapes, and individual block appearance.
+- Customize typography per block and per Field, independently for all text, labels, and values (font size, weight, italic style, text decoration, letter spacing, and line spacing). Field overrides follow the Field across blocks and take priority over block typography.
 - Import and export reusable themes and frames with `.forgestyle` packages.
 - Frame and reposition images directly in the statblock.
 
@@ -69,13 +70,13 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
 
-## Version 0.5.5
+## Version 0.5.6
 
-- Makes the final statblock Table use the same configured row structure and labels as the Template preview. Sample cell Values remain blank unless **Copy example values** is enabled; existing per-statblock Table edits remain authoritative.
-- Raises the Formula editor limit to 5,000 characters and changes Number/Rating, Table, and Metric formula inputs to multiline textareas with soft wrapping. The numeric evaluator's token budget is raised to support longer expressions.
-- Adds `+` / `−` controls to tracked Number Fields, clamping the current Value between zero and its configured maximum.
-- Carries forward the Groups Custom editor mounting fix and light/dark theme-aware button styling from 0.5.4.
-- Makes Forge-native Ctrl-hover previews interactive: fields and collections can be edited, Checkboxes toggled, Tables changed, Counters and Tracks/Gauges adjusted, and image fields changed/framed. The preview pins itself on first interaction so keyboard editing can continue after Ctrl is released. Changes are saved to the local Forge statblock note; this does not add Atlas multiplayer synchronization or change native Atlas statblock permissions.
+- Keeps the plugin/package version at **0.5.6**; this maintenance update does not increment the version.
+- Applies configurable Custom block padding equally to the top, right, bottom, and left sides. Theme-only spacing resets no longer override Custom padding, including on value and divider blocks.
+- Publishes native `.atlastemplate` mirrors so Forge Templates appear in Atlas collection Roles. Each mirror has its own stable Atlas ID, and notes created from a Role resolve back to the original `.forgetemplate`.
+- Includes independent typography controls for all block text, labels, values, and individual Fields.
+- Retains the existing Table, formula, Counter, preview-editing, Atlas Resource, Rest, PartySync, and token-linking improvements included in this maintained source.
 
 ## Version 0.5.4
 
@@ -113,7 +114,9 @@ Forge v2 statblocks are also listed in Atlas' native **Link Statblock** dialog f
 
 Forge's reserved **Token art** field can create an Atlas **TokenAsset** directly from a supported local image on a Forge v2 statblock, copying it into Atlas' shared `atlas-vtt/assets` folder and linking the new asset to the Forge note. This operation requires an initialized Atlas map so Forge can obtain Atlas' `AssetService`; changing the note's Token art later does not update an already registered TokenAsset. Existing Atlas **Character** and generic **Token** instances can be linked or unlinked from either the statblock's **Statblock options** menu above the sheet or the reserved **Token art** field actions: select one or more tokens in an Atlas scene, open the menu, and choose **Link selected Atlas tokens** or **Unlink selected Atlas tokens**. The statblock options menu remains available even when the Template has no Token art field. The Atlas DM Screen keeps its native compact Atlas statblock presentation; the full Forge sheet is available through Ctrl-hover where supported by Atlas. Generic Tokens can still be linked, while their appearance in the DM Screen follows Atlas' own feed eligibility. Asset persistence and cross-map synchronization remain Atlas-owned.
 
-For Forge v2 notes linked to Atlas Characters, Forge keeps the matching Atlas **Resources** in step with the statblock Fields. Each map follows the active campaign's Resource rules when one applies, otherwise its collection's rules; legacy campaign and collection definitions inherit their built-in preset Resources. Changes update linked Characters in open GM maps through Atlas' own token store, allowing Atlas' PartySync to observe them. Current values are preserved and clamped, manually overridden maxima remain untouched, and newly added Resources start according to their `drains` or `fills` direction. An explicitly emptied Field removes that Resource; a missing or non-numeric Field does not erase it. Closed maps are synchronized when opened, and player views are not directly modified. Rest rules update Atlas-owned Resources through the original token stores, with compensating rollback when the linked note cannot be saved.
+For Forge v2 notes linked to Atlas Characters, Forge keeps the matching Atlas **Resources** in step with the statblock Fields. Each map follows the active campaign's Resource rules when one applies, otherwise its collection's rules; legacy campaign and collection definitions inherit their built-in preset Resources. Changes update linked Characters in open GM maps through Atlas' own token store, allowing Atlas' PartySync to observe them. Current values are preserved and clamped, manually overridden maxima remain untouched, and newly added Resources start according to their `drains` or `fills` direction. Number/Rating formulas are resolved to their displayed value before they are used as a Resource maximum. An explicitly emptied Field removes that Resource; a missing or non-numeric Field does not erase it. Closed maps are synchronized when opened, and player views are not directly modified. Writes re-check the live GM view and originating map immediately before updating, so a pending sync or Rest cannot write after the view switches to player mode or another scene. Rest rules update Atlas-owned Resources through the original token stores, with compensating rollback when the linked note cannot be saved.
+
+Resource display and viewer permissions remain entirely Atlas-owned. Atlas' player view filters Resources by `visibleToPlayers`; a token owner sees the Resources of their own token even when they are not public to other players, and the DM view follows Atlas' own rules. The scene-level `hiddenResources` option controls the GM canvas and is not a substitute for player visibility. Forge preserves these settings and does not draw a second set of Resource bars or add its own owner/player visibility filter.
 
 > **Integration:** Ctrl-hover previews, token links, Resources, Rest, in-map rolls, scene-independent rolls, statblock history, and roll repetition use the original Atlas 0.17.0/0.18.0 runtime baselines. Newer Atlas versions are attempted through capability checks rather than blocked by their version number. The Forge renderer is mounted only for Forge-native v2 token notes; all other previews remain native. No roll, history, or repeat operation calls the compatibility fork API.
 
@@ -212,3 +215,4 @@ The Forge runtime observes Atlas' existing `.atlas-statblock-link` dialog withou
 ### Atlas-native DM Screen and Forge preview (0.5.2)
 
 The GM/DM Screen intentionally keeps Atlas' compact native statblock cards. Forge does not mount a second feed, hide Atlas cards, or render a full Forge sheet inside the DM Screen. Use Ctrl-hover where supported, or open the Forge statblock note, to inspect the complete Template layout. Token-to-statblock linking remains Atlas-owned and is independent of the DM Screen presentation.
+

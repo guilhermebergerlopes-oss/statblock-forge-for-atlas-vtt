@@ -31,6 +31,24 @@ test('resolves nested Atlas paths through Forge current and former Field keys', 
   assert.equal(atlasResourceSourcePath(spec(resource('hp', 'mana'), field('vitality', { meaning: 'hit-points' }))), null);
 });
 
+
+test('resolves dotted object paths with Atlas case and separator normalization', () => {
+  const maxStress = spec(resource('stress', 'resources.Max Stress', 'fills'), field('resources'));
+  const values = readAtlasResourceSourceValue({ resources: { max_stress: 7 } }, maxStress);
+  assert.deepEqual(values, {
+    status: 'value', value: { current: 0, max: 7 }, spec: maxStress,
+  });
+
+  const exactKey = spec(resource('stress', 'resources.max_stress', 'fills'), field('resources'));
+  assert.deepEqual(readAtlasResourceSourceValue({ resources: { max_stress: 5, 'Max Stress': 9 } }, exactKey), {
+    status: 'value', value: { current: 0, max: 5 }, spec: exactKey,
+  });
+  const exactPath = spec(resource('stress', 'resources.Max Stress', 'fills'), field('resources'));
+  assert.deepEqual(readAtlasResourceSourceValue({ resources: { max_stress: 5, 'Max Stress': 9 } }, exactPath), {
+    status: 'value', value: { current: 0, max: 9 }, spec: exactPath,
+  });
+});
+
 test('distinguishes absent, invalid, explicitly empty, and valid source values', () => {
   const hp = spec(resource('hp', 'hp'), field('hp'));
   assert.equal(readAtlasResourceSourceValue({}, hp).status, 'missing');
@@ -57,6 +75,18 @@ test('updates maxima while preserving current values, clamping, and manually ove
     resources: { hp: { current: 5, max: 20 } }, overriddenMax: ['hp'],
   }, sources);
   assert.deepEqual(overridden.resources.hp, { current: 5, max: 20 });
+});
+
+
+test('falls back to the Resource starting current when the stored current is not finite', () => {
+  const hp = spec(resource('hp', 'hp'), field('hp'));
+  const source = atlasResourceSourceValues({ hp: 9 }, [hp]);
+  for (const invalidCurrent of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const result = syncAtlasResourcesForToken({
+      resources: { hp: { current: invalidCurrent, max: 20 } },
+    }, source);
+    assert.deepEqual(result.resources.hp, { current: 9, max: 9 });
+  }
 });
 
 test('initializes new draining Resources full and filling Resources empty', () => {
@@ -89,6 +119,33 @@ test('refielded Resources restart only when still at their previous starting val
     resources: { hp: { current: 3, max: 10 }, stress: { current: 2, max: 4 } },
   }, sources, { refieldedKeys: new Set(['hp', 'stress']) });
   assert.deepEqual(wounded.resources, { hp: { current: 3, max: 6 }, stress: { current: 2, max: 8 } });
+});
+
+
+test('uses calculated Number/Rating values for Resource maxima and resolves formula dependencies', () => {
+  const base = field('base', { formula: '2 + 3' });
+  const stamina = field('stamina', { formula: '{base} * 2 + {level}' });
+  const level = field('level');
+  const resourceSpec = spec(resource('stamina', 'stamina'), stamina);
+  const values = atlasResourceSourceValues(
+    { base: 1, stamina: 99, level: 4 },
+    [resourceSpec],
+    { templateFields: [base, stamina, level] },
+  );
+  assert.deepEqual(values.get('stamina'), {
+    status: 'value', value: { current: 14, max: 14 }, spec: resourceSpec,
+  });
+});
+
+test('does not fall back to stale stored values when a configured Resource formula is invalid', () => {
+  const hp = spec(resource('hp', 'hp'), field('hp', { formula: '{missing_field} + 2' }));
+  const sources = atlasResourceSourceValues({ hp: 30 }, [hp], { templateFields: [hp.field] });
+  assert.equal(sources.get('hp')?.status, 'invalid');
+  const result = syncAtlasResourcesForToken(
+    { resources: { hp: { current: 12, max: 20 } } },
+    sources,
+  );
+  assert.deepEqual(result.resources, { hp: { current: 12, max: 20 } });
 });
 
 test('preserves static zero Resources as held values', () => {

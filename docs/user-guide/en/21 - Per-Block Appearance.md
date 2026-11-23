@@ -22,6 +22,12 @@ Per-block appearance lets an individual block inherit the Template's global them
 
 Each block has its own appearance state. Changing one `Stat` does not automatically change another `Stat`, even if both show Fields of the same type.
 
+### Copy appearance between blocks
+
+In **Block appearance**, click **Copy appearance** on the source block. Select another block and click **Paste appearance**. Paste becomes available after an appearance has been copied. The in-session appearance clipboard works across blocks and Templates while the plugin remains active.
+
+Only the appearance mode (**Theme** or **Custom**) and the block's visual settings are copied. The destination block's content, linked Fields, formulas, dimensions, position, visibility, and other structural properties remain unchanged. These explicit inspector actions are used instead of `Ctrl+C`/`Ctrl+V` so normal text copying, input editing, and Obsidian shortcuts keep their expected behavior.
+
 ## Theme and Custom modes
 
 | Mode | Behavior |

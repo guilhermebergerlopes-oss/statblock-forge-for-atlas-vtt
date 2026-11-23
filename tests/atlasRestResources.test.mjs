@@ -5,8 +5,14 @@ import {
   rollbackAtlasRestResourceChanges,
 } from '../src/atlas/atlasRestResources.ts';
 
+const MAP_PATH = 'atlas-vtt/collections/heroes/scenes/test.atlasmap';
+
 function makeStore(tokens, partyValues = {}) {
   let state = {
+    mapPath: MAP_PATH,
+    mapLoaded: true,
+    isMapLoading: false,
+    isPlayerView: false,
     objects: { tokens: structuredClone(tokens) },
     partyValues: structuredClone(partyValues),
     updateTokens(entries) {
@@ -35,16 +41,37 @@ function tokenContext({ aMax = 20, bMax = 30, bManual = true } = {}) {
     key: 'hp', name: 'HP', field: 'hp', direction: 'drains',
     current: 4, max: aMax, holder: 'token',
     tokenEntries: [
-      { store, tokenId: 'a', value: { current: 4, max: aMax }, rawValue: { current: 4, max: aMax }, overriddenMax: undefined },
-      { store, tokenId: 'b', value: { current: 10, max: bMax }, rawValue: { current: 10, max: bMax }, overriddenMax: bManual ? ['hp'] : undefined },
+      { store, mapPath: MAP_PATH, tokenId: 'a', value: { current: 4, max: aMax }, rawValue: { current: 4, max: aMax }, overriddenMax: undefined },
+      { store, mapPath: MAP_PATH, tokenId: 'b', value: { current: 10, max: bMax }, rawValue: { current: 10, max: bMax }, overriddenMax: bManual ? ['hp'] : undefined },
     ],
   };
   const context = {
     characterAssetId: 'pc-1', characterName: 'Ayla', collectionId: 'heroes',
-    resources: [resource], stores: [{ store, tokenIds: ['a', 'b'] }],
+    resources: [resource], stores: [{ store, tokenIds: ['a', 'b'], mapPath: MAP_PATH }],
   };
   return { store, context };
 }
+
+test('a Rest context cannot write to a different scene that replaced its source map', () => {
+  const { store, context } = tokenContext();
+  store.getState().mapPath = 'atlas-vtt/collections/heroes/scenes/replaced.atlasmap';
+
+  assert.throws(() => persistAtlasRestResourceChangesWithReceipt(context, [
+    { resourceKey: 'hp', from: 4, to: 8, max: 20, direction: 'down' },
+  ]), /vista do Atlas mudou para o modo de jogador, carregamento ou outro mapa/);
+  assert.deepEqual(store.getState().objects.tokens.a.resources.hp, { current: 4, max: 20 });
+});
+
+test('a Rest context captured in the GM view cannot write after the store switches to player view', () => {
+  const { store, context } = tokenContext();
+  store.getState().isPlayerView = true;
+
+  assert.throws(() => persistAtlasRestResourceChangesWithReceipt(context, [
+    { resourceKey: 'hp', from: 4, to: 8, max: 20, direction: 'down' },
+  ]), /vista do Atlas mudou para o modo de jogador/);
+  assert.deepEqual(store.getState().objects.tokens.a.resources.hp, { current: 4, max: 20 });
+  assert.deepEqual(store.getState().objects.tokens.b.resources.hp, { current: 10, max: 30 });
+});
 
 test('partial rest updates current values while retaining every form maximum', () => {
   const { store, context } = tokenContext();
@@ -102,11 +129,11 @@ test('a filling Resource fully recovers to zero without changing form-specific m
     resources: [{
       key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', current: 5, max: 6, holder: 'token',
       tokenEntries: [
-        { store, tokenId: 'a', value: { current: 5, max: 6 }, rawValue: { current: 5, max: 6 }, overriddenMax: undefined },
-        { store, tokenId: 'b', value: { current: 4, max: 9 }, rawValue: { current: 4, max: 9 }, overriddenMax: ['stress'] },
+        { store, mapPath: MAP_PATH, tokenId: 'a', value: { current: 5, max: 6 }, rawValue: { current: 5, max: 6 }, overriddenMax: undefined },
+        { store, mapPath: MAP_PATH, tokenId: 'b', value: { current: 4, max: 9 }, rawValue: { current: 4, max: 9 }, overriddenMax: ['stress'] },
       ],
     }],
-    stores: [{ store, tokenIds: ['a', 'b'] }],
+    stores: [{ store, tokenIds: ['a', 'b'], mapPath: MAP_PATH }],
   };
 
   persistAtlasRestResourceChangesWithReceipt(context, [
@@ -131,7 +158,7 @@ test('a stale token value aborts before any form is changed', () => {
 
 test('partial multi-map commit failure rolls back maps already written and the failing map if it mutated first', () => {
   function failingStore(token, failAfterWrite = false) {
-    let state = { objects: { tokens: structuredClone(token) } };
+    let state = { mapLoaded: true, isMapLoading: false, isPlayerView: false, objects: { tokens: structuredClone(token) } };
     let shouldFail = failAfterWrite;
     state.updateTokens = (entries) => {
       const next = { ...state.objects.tokens };
@@ -171,7 +198,7 @@ test('partial multi-map commit failure rolls back maps already written and the f
 test('preflight rejects a map without updateTokens before mutating any other map', () => {
   const { store: first } = tokenContext();
   const second = {
-    getState: () => ({ objects: { tokens: { c: { id: 'c', resources: { hp: { current: 6, max: 20 } } } } } }),
+    getState: () => ({ mapLoaded: true, isMapLoading: false, isPlayerView: false, objects: { tokens: { c: { id: 'c', resources: { hp: { current: 6, max: 20 } } } } } }),
   };
   const originalFirst = structuredClone(first.getState().objects.tokens);
   const context = {
@@ -190,6 +217,27 @@ test('preflight rejects a map without updateTokens before mutating any other map
     { resourceKey: 'hp', from: 4, to: 8, max: 20, direction: 'down' },
   ]), /não oferece updateTokens/);
   assert.deepEqual(first.getState().objects.tokens, originalFirst);
+});
+
+test('PartySync Rest refuses to write if the GM store changes to the player view after context capture', () => {
+  const partyKey = 'rest-party-stress';
+  const store = makeStore({}, { [partyKey]: { current: 6, max: 8 } });
+  const before = structuredClone(store.getState().partyValues);
+  const context = {
+    characterAssetId: 'pc-1', characterName: 'Ayla', collectionId: 'heroes',
+    resources: [{
+      key: 'stress', name: 'Stress', field: 'stress', direction: 'fills',
+      current: 6, max: 8, holder: 'party', partyKey,
+      partyEntries: [{ store, key: partyKey, current: 6, max: 8, rawValue: before[partyKey] }],
+    }],
+    stores: [],
+  };
+  store.getState().isPlayerView = true;
+
+  assert.throws(() => persistAtlasRestResourceChangesWithReceipt(context, [
+    { resourceKey: 'stress', from: 6, to: 3, max: 8, direction: 'up' },
+  ]), /vista do Atlas mudou para o modo de jogador/);
+  assert.deepEqual(store.getState().partyValues, before);
 });
 
 test('partial PartySync write failure restores every party store already changed', () => {
@@ -380,8 +428,8 @@ test('a stale later Resource aborts a multi-Resource commit before the first Res
   context.resources.push({
     key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', current: 6, max: 8, holder: 'token',
     tokenEntries: [
-      { store, tokenId: 'a', value: stressBefore, rawValue: stressBefore, overriddenMax: undefined },
-      { store, tokenId: 'b', value: { current: 3, max: 9 }, rawValue: { current: 3, max: 9 }, overriddenMax: ['hp'] },
+      { store, mapPath: MAP_PATH, tokenId: 'a', value: stressBefore, rawValue: stressBefore, overriddenMax: undefined },
+      { store, mapPath: MAP_PATH, tokenId: 'b', value: { current: 3, max: 9 }, rawValue: { current: 3, max: 9 }, overriddenMax: ['hp'] },
     ],
   });
   store.getState().objects.tokens.b.resources.stress = { current: 5, max: 9 };

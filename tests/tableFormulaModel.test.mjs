@@ -136,7 +136,7 @@ test('Number formulas can address a specific cell in any Table by storage key, r
   const evaluateWithTables = (formula, values, slotValue) =>
     evaluatePreviewFormula(formula, values, slotValue, fields, tableReferences);
 
-  assert.equal(tableReferences.table_1.includes('value'), true);
+  assert.equal(tableReferences.table_1.columns.includes('value'), true);
   assert.equal(evaluateWithTables('{table_1.row1.value}', sample, undefined), 12);
   assert.equal(evaluateWithTables('{table_1.row2.value}', sample, undefined), 14);
   assert.equal(evaluateWithTables('{table_1.row3.mod}', sample, undefined), -1);
@@ -185,6 +185,109 @@ test('Table cell references use the Number/Rating value shown after its Field fo
   assert.equal(evaluate('{table_1.row2.value}', sample, undefined), 16);
   assert.equal(sample.value, 12, 'calculation does not mutate the first-row input');
   assert.equal(sample.table_1.extraRows[0].values.value, 14, 'calculation does not mutate the extra-row input');
+});
+
+test('Table cell references use the displayed Table Row Formula instead of the stored input', () => {
+  const tableField = { key: 'table_1', label: 'Abilities', type: 'scores', forgeInternal: 'table-storage' };
+  const quantity = { key: 'quantity', label: 'Quantity', type: 'number' };
+  const unitPrice = { key: 'unitPrice', label: 'Unit Price', type: 'number' };
+  const discount = { key: 'discount', label: 'Discount', type: 'number' };
+  const subtotal = { key: 'subtotal', label: 'Subtotal', type: 'number' };
+  // The global Field formula is intentionally different: the Table-level
+  // Row Formula is what the Table visibly renders for this slot.
+  const total = { key: 'total', label: 'Total', type: 'number', formula: '{quantity} * {unitPrice} + 100' };
+  const external = { key: 'external', label: 'External', type: 'number', formula: '{table_1.row2.total} * 2' };
+  const allFields = [tableField, quantity, unitPrice, discount, subtotal, total, external];
+  const block = {
+    id: 'table-block-1',
+    type: 'scores',
+    field: 'table_1',
+    fields: ['quantity', 'unitPrice', 'discount', 'subtotal', 'total'],
+    rowFormulas: {
+      subtotal: '{quantity} * {unitPrice}',
+      total: '{subtotal} - {discount} + rowNumber',
+    },
+  };
+  const tableReferences = tableCellReferenceIndex([block]);
+  const sample = {
+    quantity: 2,
+    unitPrice: 10,
+    discount: 1,
+    subtotal: 999,
+    total: 777,
+    external: null,
+    table_1: {
+      format: 'statblock-forge-table-rows-v1',
+      extraRows: [{
+        label: 'DEX',
+        values: { quantity: 3, unitPrice: 5, discount: 2, subtotal: 888, total: 666 },
+      }],
+    },
+  };
+  const evaluate = (formula, values, slotValue, selfFieldKey) =>
+    evaluatePreviewFormula(formula, values, slotValue, allFields, tableReferences, sample, selfFieldKey);
+
+  // Row 1 displays subtotal 20 and total 20; row 2 displays subtotal 15 and
+  // total 15 (the rowNumber addition is 2, less discount 2).
+  assert.equal(evaluate('{table_1.row1.subtotal}', sample, undefined), 20);
+  assert.equal(evaluate('{table_1.row1.total}', sample, undefined), 20);
+  assert.equal(evaluate('{table_1.row2.subtotal}', sample, undefined), 15);
+  assert.equal(evaluate('{table_1.row2.total}', sample, undefined), 15);
+  assert.equal(calculateNumericFieldValue(external, sample, evaluate), 30,
+    'a Number Field formula referencing a Table cell receives the visible row-formula result');
+
+  assert.equal(sample.subtotal, 999, 'the first-row storage value is not overwritten');
+  assert.equal(sample.total, 777, 'the first-row storage value is not overwritten');
+  assert.equal(sample.table_1.extraRows[0].values.subtotal, 888, 'the extra-row storage value is not overwritten');
+  assert.equal(sample.table_1.extraRows[0].values.total, 666, 'the extra-row storage value is not overwritten');
+});
+
+test('cyclic absolute Table cell references fail closed without returning stored inputs', () => {
+  const storage = { key: 'table_1', label: 'Table 1', type: 'scores', forgeInternal: 'table-storage' };
+  const first = { key: 'first', label: 'First', type: 'number' };
+  const second = { key: 'second', label: 'Second', type: 'number' };
+  const fields = [storage, first, second];
+  const references = tableCellReferenceIndex([{
+    id: 'table-1',
+    type: 'scores',
+    field: 'table_1',
+    fields: ['first', 'second'],
+    rowFormulas: {
+      first: '{table_1.row1.second} + 1',
+      second: '{table_1.row1.first} + 1',
+    },
+  }]);
+  const sample = { first: 40, second: 50, table_1: { format: 'statblock-forge-table-rows-v1' } };
+  const evaluate = (formula, values, slotValue, selfFieldKey) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, references, sample, selfFieldKey);
+
+  assert.equal(evaluate('{table_1.row1.first}', sample, undefined), null);
+  assert.equal(evaluate('{table_1.row1.second}', sample, undefined), null);
+  assert.equal(sample.first, 40);
+  assert.equal(sample.second, 50);
+});
+
+test('Table cell references use the child Field display formula when no Table Row Formula exists', () => {
+  const tableField = { key: 'table_1', label: 'Table 1', type: 'scores', forgeInternal: 'table-storage' };
+  const valueField = { key: 'value', label: 'Value', type: 'number', formula: '{mod} + value' };
+  const modField = { key: 'mod', label: 'Mod', type: 'number' };
+  const fields = [tableField, valueField, modField];
+  const references = tableCellReferenceIndex([
+    { id: 'table-1', type: 'scores', field: 'table_1', fields: ['value', 'mod'] },
+  ]);
+  const sample = {
+    value: 10,
+    mod: 2,
+    table_1: {
+      format: 'statblock-forge-table-rows-v1',
+      extraRows: [{ label: 'DEX', values: { value: 20, mod: 3 } }],
+    },
+  };
+  const evaluate = (formula, values, slotValue, selfFieldKey) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, references, sample, selfFieldKey);
+
+  assert.equal(evaluate('{table_1.row1.value}', sample, undefined), 12);
+  assert.equal(evaluate('{table_1.row2.value}', sample, undefined), 23);
 });
 
 test('Row Formula resolves dependencies between calculated columns regardless of order', () => {

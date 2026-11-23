@@ -4,9 +4,16 @@ import { getAtlasMapViewContexts } from './atlasRuntime.ts';
 import {
   atlasResourceReadsForgeField,
   atlasRoleTemplateIdsForCollection,
+  atlasSceneShowsLegacySecondaryResource,
+  effectiveAtlasCampaignResources,
   effectiveAtlasCollectionResources,
+  slottedAtlasCollectionResources,
   type AtlasCollectionResourceDefinition,
 } from './atlasResourceCatalog.ts';
+import { cachedAtlasSystemPresetRules } from './atlasSystemPresetRules.ts';
+import { loadAtlasPlayedCampaignSystem } from './atlasPlayedCampaignSystem.ts';
+import { atlasCollectionUsesLegacySecondaryResource } from './atlasLegacyResourceScenes.ts';
+import { atlasCanWritePartyResources, atlasCanWriteTokenResources } from './atlasResourceWriteAccess.ts';
 
 export { atlasResourceReadsForgeField, atlasResourceSharesForgeFieldKey, atlasRoleTemplateIdsForCollection } from './atlasResourceCatalog.ts';
 export type { AtlasCollectionResourceDefinition } from './atlasResourceCatalog.ts';
@@ -18,6 +25,7 @@ export interface AtlasRestResourceSnapshot extends AtlasCollectionResourceDefini
   partyKey?: string;
   partyEntries?: readonly {
     store: AtlasStoreLike;
+    mapPath?: string | null;
     key: string;
     current: number;
     max: number;
@@ -26,6 +34,7 @@ export interface AtlasRestResourceSnapshot extends AtlasCollectionResourceDefini
   }[];
   tokenEntries?: readonly {
     store: AtlasStoreLike;
+    mapPath?: string | null;
     tokenId: string;
     value: AtlasResourceValueLike | null;
     rawValue: unknown;
@@ -58,6 +67,11 @@ interface AtlasPlacedTokenLike {
 }
 
 interface AtlasTokenUpdateState {
+  mapPath?: string | null;
+  mapLoaded?: boolean;
+  isMapLoading?: boolean;
+  isPlayerView?: boolean;
+  tokenSettings?: unknown;
   objects?: { tokens?: Record<string, AtlasPlacedTokenLike> };
   updateTokens?: (entries: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }>) => void;
   partyValues?: Record<string, { current: number; max: number; maxByHand?: true }>;
@@ -71,11 +85,13 @@ interface AtlasStoreLike {
 interface AtlasResourceStoreTarget {
   store: AtlasStoreLike;
   tokenIds: string[];
+  mapPath?: string | null;
 }
 
 interface AtlasCollectionLike { id: string; name?: string; settings?: unknown }
 
 interface AtlasAssetServiceLike {
+  getCollectionForMap?(mapPath: string): string | null;
   loadedTokenAssets?(): AtlasTokenAssetLike[];
   loadedCollections?(): AtlasCollectionLike[];
   getCollectionSettings?(collectionId: string): unknown;
@@ -111,6 +127,7 @@ export interface AtlasRestResourceChange {
 export interface AtlasRestResourceRollbackReceipt {
   tokenEntries: Array<{
     store: AtlasStoreLike;
+    mapPath?: string | null;
     tokenId: string;
     resourceKey: string;
     before: unknown;
@@ -120,6 +137,7 @@ export interface AtlasRestResourceRollbackReceipt {
   }>;
   partyEntries: Array<{
     store: AtlasStoreLike;
+    mapPath?: string | null;
     key: string;
     before: unknown;
     after: { current: number; max: number; maxByHand?: true };
@@ -133,6 +151,17 @@ export interface AtlasRestResourceCommit {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function presetRulesForCollection(app: App, settings: unknown): Record<string, unknown> | null {
+  if (!isRecord(settings) || typeof settings.systemPresetId !== 'string') return null;
+  return cachedAtlasSystemPresetRules(app, settings.systemPresetId);
+}
+
+function resourcesInAtlasSocketOrder(
+  resources: readonly AtlasCollectionResourceDefinition[],
+): AtlasCollectionResourceDefinition[] {
+  return slottedAtlasCollectionResources(resources).map(({ definition }) => definition);
 }
 
 function validResourceValue(value: unknown): AtlasResourceValueLike | null {
@@ -211,6 +240,31 @@ function characterAssetsForNote(assets: readonly AtlasTokenAssetLike[], notePath
     .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.id.localeCompare(b.id));
 }
 
+function collectionShowsLegacySecondaryResource(
+  collectionId: string,
+  views: ReturnType<typeof serviceViews>,
+): boolean {
+  return views.some(({ store, service }) => {
+    const state = store.getState();
+    const mapPath = typeof state.mapPath === 'string' ? state.mapPath : '';
+    if (!mapPath || service.getCollectionForMap?.(mapPath) !== collectionId
+      || state.mapLoaded !== true || state.isMapLoading === true || state.isPlayerView === true) return false;
+    return atlasSceneShowsLegacySecondaryResource(state);
+  });
+}
+
+function collectionSettingsForAsset(
+  service: AtlasAssetServiceLike,
+  collectionId: string,
+  assets: readonly AtlasCollectionLike[],
+): unknown {
+  try {
+    const settings = service.getCollectionSettings?.(collectionId);
+    if (settings !== undefined && settings !== null) return settings;
+  } catch { /* Fall back to the loaded collection record. */ }
+  return assets.find((collection) => collection.id === collectionId)?.settings;
+}
+
 export interface AtlasTemplateResourceMatch {
   readonly collectionId: string;
   readonly collectionName: string;
@@ -232,17 +286,15 @@ export function atlasResourceMatchesForTemplate(app: App, template: ForgeTemplat
   const matches: AtlasTemplateResourceMatch[] = [];
 
   for (const collection of collections) {
-    let loadedSettings: unknown;
-    try {
-      loadedSettings = service.getCollectionSettings?.(collection.id) ?? collection.settings;
-    } catch {
-      loadedSettings = collection.settings;
-    }
+    const loadedSettings = collectionSettingsForAsset(service, collection.id, collections);
     const settings = isRecord(loadedSettings) ? loadedSettings : {};
-    // Atlas uses explicit roles first, then the recorded preset, then generic Creature/NPC roles.
-    if (!atlasRoleTemplateIdsForCollection(settings).includes(template.id)) continue;
+    const presetRules = presetRulesForCollection(app, settings);
+    // Atlas uses collection roles first, then its recorded preset's roles, then generic roles.
+    if (!atlasRoleTemplateIdsForCollection(settings, presetRules).includes(template.id)) continue;
 
-    const resources = effectiveAtlasCollectionResources(settings);
+    const resources = resourcesInAtlasSocketOrder(effectiveAtlasCollectionResources(
+      settings, null, collectionShowsLegacySecondaryResource(collection.id, views),
+    ));
     for (const resource of resources) {
       const field = template.fields.find((candidate) => atlasResourceReadsForgeField(resource, candidate));
       if (!field) continue;
@@ -265,13 +317,40 @@ export function atlasResourceFieldKeysForTemplate(app: App, template: ForgeTempl
     .map((match) => match.fieldKey))];
 }
 
+/** Resolves the Resource definitions actually in force for this statblock's character.
+ * A played campaign's SystemRules take precedence over the character's collection on every map. */
+export async function atlasRestResourceDefinitionsForNote(
+  app: App,
+  notePath: string,
+): Promise<AtlasCollectionResourceDefinition[]> {
+  const views = serviceViews(app);
+  const first = views[0];
+  if (!first) return [];
+  const assets = first.service.loadedTokenAssets?.() ?? [];
+  const character = characterAssetsForNote(assets, notePath)[0];
+  if (!character) return [];
+
+  const played = await loadAtlasPlayedCampaignSystem(app);
+  if (played) return resourcesInAtlasSocketOrder(effectiveAtlasCampaignResources(played.settings));
+
+  const collections = first.service.loadedCollections?.() ?? [];
+  const settings = collectionSettingsForAsset(first.service, character.collection, collections);
+  const usedInScenes = await atlasCollectionUsesLegacySecondaryResource(
+    app, character.collection, (path) => first.service.getCollectionForMap?.(path),
+  );
+  return resourcesInAtlasSocketOrder(effectiveAtlasCollectionResources(settings, null, usedInScenes));
+}
+
 /**
- * Finds the Atlas player character linked to a Forge statblock note, its collection Resources,
- * and every live token copy on open maps. Forms share the oldest linked asset as their canonical
- * character id for PartySync. The first resource value follows Atlas' visible-map-first token
- * lookup; writes later update every token copy of the same player character.
+ * Finds the Atlas player character linked to a Forge statblock note, its effective Resources,
+ * and every live token copy on open maps. Pass pre-resolved definitions for a played campaign;
+ * token/PartySync values are still read fresh from the stores at call time.
  */
-export function atlasRestResourceContextForNote(app: App, notePath: string): AtlasRestResourceContext | null {
+export function atlasRestResourceContextForNote(
+  app: App,
+  notePath: string,
+  resourceDefinitions?: readonly AtlasCollectionResourceDefinition[],
+): AtlasRestResourceContext | null {
   const views = serviceViews(app);
   const first = views[0];
   if (!first) return null;
@@ -280,16 +359,24 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
   const character = characterAssets[0];
   if (!character) return null;
   const characterIds = new Set(characterAssets.map((asset) => asset.id));
-  const settings = first.service.getCollectionSettings?.(character.collection);
-  const definitions = effectiveAtlasCollectionResources(settings);
+  const collections = first.service.loadedCollections?.() ?? [];
+  const settings = collectionSettingsForAsset(first.service, character.collection, collections);
+  const definitions = resourceDefinitions
+    ? resourcesInAtlasSocketOrder(resourceDefinitions)
+    : resourcesInAtlasSocketOrder(effectiveAtlasCollectionResources(
+      settings,
+      null,
+      collectionShowsLegacySecondaryResource(character.collection, views),
+    ));
   if (definitions.length === 0) return null;
 
   const stores: AtlasResourceStoreTarget[] = [];
   const tokenValues = new Map<string, AtlasResourceValueLike>();
-  const tokenEntries = new Map<string, { store: AtlasStoreLike; tokenId: string; value: AtlasResourceValueLike | null; rawValue: unknown; overriddenMax: unknown }[]>();
-  const partyValues = new Map<string, { store: AtlasStoreLike; key: string; value: AtlasResourceValueLike; maxByHand?: true; rawValue: unknown }[]>();
+  const tokenEntries = new Map<string, { store: AtlasStoreLike; mapPath: string | null; tokenId: string; value: AtlasResourceValueLike | null; rawValue: unknown; overriddenMax: unknown }[]>();
+  const partyValues = new Map<string, { store: AtlasStoreLike; mapPath: string | null; key: string; value: AtlasResourceValueLike; maxByHand?: true; rawValue: unknown }[]>();
   for (const { store } of views) {
     const state = store.getState();
+    const mapPath = typeof state.mapPath === 'string' ? state.mapPath : null;
     // Token holds follow Atlas openMapViews + characterHolds: only loaded, non-loading GM maps.
     // PartySync values below are still read from stores whose scenes are not loaded yet.
     const canReadTokens = state.mapLoaded === true && state.isMapLoading !== true && state.isPlayerView !== true;
@@ -305,7 +392,8 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
         const value = validResourceValue(rawValue);
         const entries = tokenEntries.get(definition.key) ?? [];
         entries.push({
-          store, tokenId, value, rawValue: cloneStoredValue(rawValue),
+          store, ...(mapPath !== null && { mapPath }), tokenId, value,
+          rawValue: cloneStoredValue(rawValue),
           overriddenMax: cloneStoredValue(token.overriddenMax),
         });
         tokenEntries.set(definition.key, entries);
@@ -314,7 +402,7 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
     }
     // Keep empty token groups too: an active PartySync can hold the character's value even
     // when no copy of that character is currently placed on a map.
-    stores.push({ store, tokenIds });
+    stores.push({ store, tokenIds, ...(mapPath !== null && { mapPath }) });
     for (const definition of definitions) {
       // Atlas PartySync keys every form by its canonical character id (the oldest linked asset),
       // not by each form's individual asset id.
@@ -323,7 +411,7 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
       // The canonical party key is intentionally identical across map stores. Deduplicate only
       // when both the store and key match; otherwise one open map would be silently skipped.
       if (entry && !entries.some((candidate) => candidate.store === store && candidate.key === entry.key)) {
-        entries.push({ store, ...entry });
+        entries.push({ store, ...(mapPath !== null && { mapPath }), ...entry });
       }
       if (entries.length) partyValues.set(definition.key, entries);
     }
@@ -343,8 +431,8 @@ export function atlasRestResourceContextForNote(app: App, notePath: string): Atl
     if (partyValue) return {
       ...definition, current: partyValue.value.current, max: partyValue.value.max, holder: 'party',
       partyKey: partyValue.key,
-      partyEntries: partyEntries.map(({ store, key, value, maxByHand, rawValue }) => ({
-        store, key, current: value.current, max: value.max,
+      partyEntries: partyEntries.map(({ store, mapPath, key, value, maxByHand, rawValue }) => ({
+        store, ...(mapPath !== null && { mapPath }), key, current: value.current, max: value.max,
         ...(maxByHand && { maxByHand: true as const }), rawValue: cloneStoredValue(rawValue),
       })),
       ...(partyValue.maxByHand && { maxByHand: true }),
@@ -389,7 +477,11 @@ export function persistAtlasRestResourceChangesWithReceipt(
         throw new Error(`O Resource Atlas "${change.resourceKey}" mudou desde o cálculo do descanso. Reabra o descanso e tente novamente.`);
       }
       for (const entry of entries) {
-        const token = entry.store.getState().objects?.tokens?.[entry.tokenId];
+        const entryState = entry.store.getState();
+        if (!atlasCanWriteTokenResources(entryState, entry.mapPath)) {
+          throw new Error(`A vista do Atlas mudou para o modo de jogador, carregamento ou outro mapa. Reabra o descanso antes de gravar \"${change.resourceKey}\".`);
+        }
+        const token = entryState.objects?.tokens?.[entry.tokenId];
         if (!token
           || !sameStoredValue(token.resources?.[change.resourceKey], entry.rawValue)
           || !sameStoredValue(token.overriddenMax, entry.overriddenMax)) {
@@ -407,7 +499,11 @@ export function persistAtlasRestResourceChangesWithReceipt(
         throw new Error(`O Resource Atlas "${change.resourceKey}" possui valores de campanha divergentes entre mapas e precisa ser sincronizado. Reabra o descanso e tente novamente.`);
       }
       for (const entry of entries) {
-        const raw = entry.store.getState().partyValues?.[entry.key];
+        const entryState = entry.store.getState();
+        if (!atlasCanWritePartyResources(entryState, entry.mapPath)) {
+          throw new Error(`A vista do Atlas mudou para o modo de jogador, carregamento ou outro mapa. Reabra o descanso antes de gravar \"${change.resourceKey}\".`);
+        }
+        const raw = entryState.partyValues?.[entry.key];
         if (!sameStoredValue(raw, entry.rawValue)) {
           throw new Error(`O Resource Atlas "${change.resourceKey}" mudou desde o cálculo do descanso. Reabra o descanso e tente novamente.`);
         }
@@ -420,11 +516,13 @@ export function persistAtlasRestResourceChangesWithReceipt(
   const tokenChanges = pending.filter((change) => definitions.get(change.resourceKey)?.holder === 'token');
   const partyChanges = pending.filter((change) => definitions.get(change.resourceKey)?.holder === 'party');
   const tokenPlans: Array<{
-    state: AtlasTokenUpdateState;
+    store: AtlasStoreLike;
+    mapPath?: string | null;
     updates: Array<{ id: string; changes: { resources: Record<string, AtlasResourceValueLike> } }>;
   }> = [];
   const partyPlans: Array<{
     store: AtlasStoreLike;
+    mapPath?: string | null;
     values: Record<string, { current: number; max: number; maxByHand?: true }>;
   }> = [];
 
@@ -432,6 +530,9 @@ export function persistAtlasRestResourceChangesWithReceipt(
     for (const target of context.stores) {
       if (target.tokenIds.length === 0) continue;
       const state = target.store.getState();
+      if (!atlasCanWriteTokenResources(state, target.mapPath)) {
+        throw new Error('A vista do Atlas não está mais em um mapa carregado do mestre. Reabra o descanso antes de gravar Resources.');
+      }
       if (typeof state.updateTokens !== 'function') {
         throw new Error('Um mapa do Atlas não oferece updateTokens para salvar os Resources. Nenhuma alteração foi aplicada.');
       }
@@ -456,7 +557,7 @@ export function persistAtlasRestResourceChangesWithReceipt(
           const after = { current, max: ownMax };
           nextResources[change.resourceKey] = after;
           receipt.tokenEntries.push({
-            store: target.store, tokenId, resourceKey: change.resourceKey,
+            store: target.store, mapPath: target.mapPath, tokenId, resourceKey: change.resourceKey,
             before: cloneStoredValue(before), after: { ...after },
             beforeOverriddenMax: cloneStoredValue(token.overriddenMax),
             afterOverriddenMax: cloneStoredValue(token.overriddenMax),
@@ -465,7 +566,7 @@ export function persistAtlasRestResourceChangesWithReceipt(
         nextByToken.set(tokenId, nextResources);
       }
       const updates = [...nextByToken].map(([id, resources]) => ({ id, changes: { resources } }));
-      if (updates.length > 0) tokenPlans.push({ state, updates });
+      if (updates.length > 0) tokenPlans.push({ store: target.store, mapPath: target.mapPath, updates });
     }
     if (receipt.tokenEntries.length === 0) {
       throw new Error('Nenhum token do Atlas foi encontrado para salvar os Resources desta coleção.');
@@ -474,6 +575,7 @@ export function persistAtlasRestResourceChangesWithReceipt(
 
   if (partyChanges.length > 0) {
     const byStore = new Map<AtlasStoreLike, Record<string, { current: number; max: number; maxByHand?: true }>>();
+    const partyMapPaths = new Map<AtlasStoreLike, string | null | undefined>();
     for (const change of partyChanges) {
       const definition = definitions.get(change.resourceKey)!;
       for (const entry of definition.partyEntries ?? []) {
@@ -481,6 +583,9 @@ export function persistAtlasRestResourceChangesWithReceipt(
           throw new Error('Um mapa do Atlas não oferece setState para salvar os Resources de campanha. Nenhuma alteração foi aplicada.');
         }
         const state = entry.store.getState();
+        if (!atlasCanWritePartyResources(state, entry.mapPath)) {
+          throw new Error('A vista do Atlas não está mais em uma sessão do mestre. Reabra o descanso antes de gravar Resources de campanha.');
+        }
         const values = byStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
         const after = {
           current: Math.max(0, Math.min(entry.max, change.to)),
@@ -489,15 +594,16 @@ export function persistAtlasRestResourceChangesWithReceipt(
         };
         const before = state.partyValues?.[entry.key];
         values[entry.key] = after;
-        receipt.partyEntries.push({ store: entry.store, key: entry.key, before: cloneStoredValue(before), after: { ...after } });
+        receipt.partyEntries.push({ store: entry.store, mapPath: entry.mapPath, key: entry.key, before: cloneStoredValue(before), after: { ...after } });
         byStore.set(entry.store, values);
+        if (!partyMapPaths.has(entry.store)) partyMapPaths.set(entry.store, entry.mapPath);
       }
     }
     for (const [store, values] of byStore) {
       if (typeof store.setState !== 'function') {
         throw new Error('Um mapa do Atlas não oferece setState para salvar os Resources de campanha. Nenhuma alteração foi aplicada.');
       }
-      partyPlans.push({ store, values });
+      partyPlans.push({ store, mapPath: partyMapPaths.get(store), values });
     }
     if (receipt.partyEntries.length === 0) {
       throw new Error('Nenhum valor de campanha do Atlas foi encontrado para salvar os Resources desta coleção.');
@@ -508,12 +614,20 @@ export function persistAtlasRestResourceChangesWithReceipt(
   try {
     // Atlas updateTokens groups all token copies in one map into one store write/history step.
     for (const plan of tokenPlans) {
-      plan.state.updateTokens?.(plan.updates);
+      const state = plan.store.getState();
+      if (!atlasCanWriteTokenResources(state, plan.mapPath) || typeof state.updateTokens !== 'function') {
+        throw new Error('O mapa Atlas mudou antes da gravação. Nenhum Resource desse mapa foi atualizado. Reabra o descanso.');
+      }
+      state.updateTokens(plan.updates);
       updated += plan.updates.length;
     }
     // PartySync owns campaign persistence; write each map store once with the complete value map.
     for (const plan of partyPlans) {
-      plan.store.setState?.({ partyValues: plan.values });
+      const state = plan.store.getState();
+      if (!atlasCanWritePartyResources(state, plan.mapPath) || typeof plan.store.setState !== 'function') {
+        throw new Error('A sessão do Atlas mudou antes da gravação de PartySync. Reabra o descanso.');
+      }
+      plan.store.setState({ partyValues: plan.values });
       updated += 1;
     }
   } catch (error) {
@@ -552,7 +666,11 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
   // already at `before` is untouched (or already restored); a value at neither snapshot
   // belongs to a later edit and prevents the rollback from overwriting it.
   for (const entry of receipt.tokenEntries) {
-    const token = entry.store.getState().objects?.tokens?.[entry.tokenId];
+    const state = entry.store.getState();
+    if (!atlasCanWriteTokenResources(state, entry.mapPath)) {
+      throw new Error('O mapa Atlas mudou para uma vista de jogador ou deixou de estar carregado; o rollback foi interrompido para preservar as permissões.');
+    }
+    const token = state.objects?.tokens?.[entry.tokenId];
     if (!token) {
       throw new Error(`O token Atlas "${entry.tokenId}" não está mais disponível; o rollback foi interrompido para preservar o estado atual.`);
     }
@@ -569,7 +687,11 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
     tokenEntriesToRestore.push(entry);
   }
   for (const entry of receipt.partyEntries) {
-    const raw = entry.store.getState().partyValues?.[entry.key];
+    const state = entry.store.getState();
+    if (!atlasCanWritePartyResources(state, entry.mapPath)) {
+      throw new Error('A sessão Atlas mudou para uma vista de jogador; o rollback de PartySync foi interrompido para preservar as permissões.');
+    }
+    const raw = state.partyValues?.[entry.key];
     if (sameStoredValue(raw, entry.before)) continue;
     if (!sameStoredValue(raw, entry.after)) {
       throw new Error('Um Resource de campanha do Atlas mudou após a gravação; o rollback foi interrompido para preservar a alteração mais recente.');
@@ -582,6 +704,10 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
   for (const entry of tokenEntriesToRestore) {
     try {
       const state = entry.store.getState();
+      if (!atlasCanWriteTokenResources(state, entry.mapPath)) {
+        rollbackFailures.push('O mapa Atlas deixou de ser uma vista carregada do mestre durante o rollback.');
+        continue;
+      }
       const token = state.objects?.tokens?.[entry.tokenId];
       if (!token) {
         rollbackFailures.push(`O token Atlas "${entry.tokenId}" deixou de existir durante o rollback.`);
@@ -606,6 +732,9 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
     let writeError: unknown = null;
     try {
       const state = store.getState();
+      const storeEntries = tokenEntriesToRestore.filter((entry) => entry.store === store);
+      const expectedMapPath = storeEntries[0]?.mapPath;
+      if (!atlasCanWriteTokenResources(state, expectedMapPath)) throw new Error('O mapa Atlas deixou de ser uma vista carregada do mestre');
       if (typeof state.updateTokens !== 'function') throw new Error('updateTokens não está disponível');
       const updates = [...byToken].map(([id, resources]) => ({ id, changes: { resources } }));
       state.updateTokens(updates);
@@ -633,13 +762,19 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
   }
 
   const partyValuesByStore = new Map<AtlasStoreLike, Record<string, { current: number; max: number; maxByHand?: true }>>();
+  const partyMapPaths = new Map<AtlasStoreLike, string | null | undefined>();
   for (const entry of partyEntriesToRestore) {
     try {
       const state = entry.store.getState();
+      if (!atlasCanWritePartyResources(state, entry.mapPath)) {
+        rollbackFailures.push('A sessão Atlas deixou de ser uma vista do mestre durante o rollback.');
+        continue;
+      }
       const values = partyValuesByStore.get(entry.store) ?? { ...(state.partyValues ?? {}) };
       if (entry.before === undefined) delete values[entry.key];
       else values[entry.key] = cloneStoredValue(entry.before) as { current: number; max: number; maxByHand?: true };
       partyValuesByStore.set(entry.store, values);
+      if (!partyMapPaths.has(entry.store)) partyMapPaths.set(entry.store, entry.mapPath);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       rollbackFailures.push(`Não foi possível preparar a restauração de um Resource de campanha do Atlas: ${detail}`);
@@ -649,6 +784,8 @@ export function rollbackAtlasRestResourceChanges(receipt: AtlasRestResourceRollb
   for (const [store, partyValues] of partyValuesByStore) {
     let writeError: unknown = null;
     try {
+      const state = store.getState();
+      if (!atlasCanWritePartyResources(state, partyMapPaths.get(store))) throw new Error('A sessão Atlas deixou de ser uma vista do mestre');
       if (typeof store.setState !== 'function') throw new Error('setState não está disponível');
       store.setState({ partyValues });
     } catch (error) {

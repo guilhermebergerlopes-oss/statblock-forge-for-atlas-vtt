@@ -1,5 +1,6 @@
 import { TFile, type App } from 'obsidian';
 import type { TemplateStorage } from './templateRepository.ts';
+import { reservesForgeTemplateId } from './atlasRoleMirrorMetadata.ts';
 
 /** A small Obsidian Vault adapter shared by template creation and editing. */
 export function createTemplateVaultStorage(app: App): TemplateStorage {
@@ -64,6 +65,9 @@ export function createTemplateVaultStorage(app: App): TemplateStorage {
           const parsed: unknown = JSON.parse(await vault.cachedRead(file));
           if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
             const document = parsed as Record<string, unknown>;
+            // A generated Atlas mirror intentionally shares its Forge source ID.
+            // It is an adapter file, not a second user-owned template identity.
+            if (!reservesForgeTemplateId(file.path, document)) return null;
             if (document.format === 'atlas-statblock-template' && typeof document.id === 'string' && document.id.trim()) {
               return { path: file.path, id: document.id.trim() };
             }

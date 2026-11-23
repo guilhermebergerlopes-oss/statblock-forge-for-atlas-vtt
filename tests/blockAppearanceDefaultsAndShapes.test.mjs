@@ -100,8 +100,8 @@ test('SCSS and Obsidian stylesheet contain matching block and Token geometry sel
   ]);
   for (const shape of SHAPES) {
     assert.ok(scss.includes(`'${shape}'`), `SCSS missing ${shape}`);
-    assert.ok(css.includes(`data-border-preset='${shape}'`), `compiled block CSS missing ${shape}`);
-    assert.ok(css.includes(`data-token-border-preset='${shape}'`), `compiled Token CSS missing ${shape}`);
+    assert.ok(css.includes(`data-border-preset='${shape}'`) || css.includes(`data-border-preset=${shape}`), `compiled block CSS missing ${shape}`);
+    assert.ok(css.includes(`data-token-border-preset='${shape}'`) || css.includes(`data-token-border-preset=${shape}`), `compiled Token CSS missing ${shape}`);
   }
   assert.match(scss, /'regular-hexagon':\s*polygon\(25% 6\.69872981%, 75% 6\.69872981%, 100% 50%/);
 });

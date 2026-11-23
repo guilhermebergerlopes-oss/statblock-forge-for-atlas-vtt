@@ -65,6 +65,7 @@ import { DEFAULT_STATBLOCK_IMAGE_FRAME, normalizeStatblockImageFrame, panStatblo
 import { rollableBonusFormula } from '../statblocks/statblockValueRolls.ts';
 import { tableCellRollFormulas } from '../statblocks/tableCellRollsModel.ts';
 import { resolveTableRowFormulaValues, tableCellReferenceIndex, tableColumnAggregateContext, tableColumnFormulaValue, tableFormulaMap } from '../statblocks/tableFormulaModel.ts';
+import { TABLE_DISPLAYED_FIELD_KEYS_CONTEXT } from '../statblocks/tableRowFormulaResolver.ts';
 import { appendForgeStatblockDiceText, setForgeStatblockDiceLink } from './statblockDiceLinkElement.ts';
 import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
@@ -2288,6 +2289,20 @@ function applyBlockAppearance(node: HTMLElement, block: ForgeBlock, layout: Forg
   if (appearance.textColor) node.dataset.customTextColor = 'true';
   if (appearance.labelColor) node.dataset.customLabelColor = 'true';
   if (appearance.valueColor) node.dataset.customValueColor = 'true';
+  const typographyFlags: Array<[keyof BlockAppearance, string]> = [
+    ['fontSize', 'customTextFontSize'], ['fontWeight', 'customTextFontWeight'],
+    ['fontStyle', 'customTextFontStyle'], ['textDecoration', 'customTextTextDecoration'],
+    ['letterSpacing', 'customTextLetterSpacing'], ['lineHeight', 'customTextLineHeight'],
+    ['labelFontSize', 'customLabelFontSize'], ['labelFontWeight', 'customLabelFontWeight'],
+    ['labelFontStyle', 'customLabelFontStyle'], ['labelTextDecoration', 'customLabelTextDecoration'],
+    ['labelLetterSpacing', 'customLabelLetterSpacing'], ['labelLineHeight', 'customLabelLineHeight'],
+    ['valueFontSize', 'customValueFontSize'], ['valueFontWeight', 'customValueFontWeight'],
+    ['valueFontStyle', 'customValueFontStyle'], ['valueTextDecoration', 'customValueTextDecoration'],
+    ['valueLetterSpacing', 'customValueLetterSpacing'], ['valueLineHeight', 'customValueLineHeight'],
+  ];
+  for (const [key, flag] of typographyFlags) {
+    if (appearance[key] !== undefined) node.dataset[flag] = 'true';
+  }
   const css = buildBlockAppearanceCss(appearance);
   // Row-count-editable blocks use a column flex layout for their internal
   // scroll viewport. There the vertical axis is the main axis, so use
@@ -2301,6 +2316,84 @@ function applyBlockAppearance(node: HTMLElement, block: ForgeBlock, layout: Forg
     const cssProperty = property.startsWith('--') ? property : property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
     node.setCssProps({ [cssProperty]: value });
   }
+}
+
+const FIELD_LABEL_TEXT_SELECTOR = [
+  '.atlas-sb-label',
+  '.statblock-forge__preview-stat-label', '.statblock-forge__preview-field-label',
+  '.statblock-forge__preview-entry-part-label', '.statblock-forge__preview-block-heading',
+  '.statblock-forge__preview-section-heading', '.statblock-forge__preview-heading',
+  '.statblock-forge__preview-entry-name', '.statblock-forge__preview-line-label',
+  '.statblock-forge__preview-pair-key', '.statblock-forge__preview-counter-name',
+  '.statblock-forge__preview-score-table th', '.statblock-forge__preview-score-lines-table th',
+  '.statblock-forge__preview-score-derived-heading', '.statblock-forge__preview-score-derived-label',
+  '.statblock-forge__preview-spell-level', '.statblock-forge__preview-table-column-label',
+  '.statblock-forge__preview-table-row-label-heading',
+].join(',');
+
+const FIELD_VALUE_TEXT_SELECTOR = [
+  '.atlas-sb-value', '.statblock-forge__preview-name', '.statblock-forge__preview-title',
+  '.statblock-forge__preview-stat-value', '.statblock-forge__preview-field-value',
+  '.statblock-forge__preview-metric-value', '.statblock-forge__preview-text-content',
+  '.statblock-forge__preview-inline-text-value', '.statblock-forge__preview-tags-value',
+  '.statblock-forge__preview-numeric-field-value', '.statblock-forge__preview-table-cell',
+  '.statblock-forge__preview-table-formula-value', '.statblock-forge__preview-checkbox-option',
+  '.statblock-forge__preview-spell-name', '.statblock-forge__preview-spell-header',
+  '.statblock-forge__preview-description', '.statblock-forge__preview-entry-description',
+  '.statblock-forge__preview-entry-part-value', '.statblock-forge__preview-line-value',
+  '.statblock-forge__preview-pair-value', '.statblock-forge__preview-counter-value',
+  '.statblock-forge__preview-score-table td', '.statblock-forge__preview-score-lines-table td',
+  '.statblock-forge__preview-tag-list li', '.statblock-forge__preview-tag-item',
+  '.statblock-forge__preview-spell-list li',
+].join(',');
+
+function applyFieldTypographyToNode(root: HTMLElement, layout: ForgeLayoutDocument, fieldKey: string | undefined): void {
+  if (!fieldKey) return;
+  const fieldId = layout.fieldIds?.[fieldKey];
+  if (!fieldId) return;
+  const appearance = layout.fieldTypography?.[fieldId];
+  if (!appearance || Object.keys(appearance).length === 0) return;
+
+  const allProperties: Array<[keyof typeof appearance, string, (value: string | number) => string]> = [
+    ['fontSize', 'font-size', (value) => `${value}px`],
+    ['fontWeight', 'font-weight', String],
+    ['fontStyle', 'font-style', String],
+    ['textDecoration', 'text-decoration', String],
+    ['letterSpacing', 'letter-spacing', (value) => `${value}px`],
+    ['lineHeight', 'line-height', String],
+  ];
+  const apply = (
+    selector: string,
+    properties: Array<[keyof typeof appearance, string, (value: string | number) => string]>,
+  ): void => {
+    const targets = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    if (root.matches(selector)) targets.unshift(root);
+    for (const target of targets) {
+      for (const [key, cssProperty, format] of properties) {
+        const value = appearance[key];
+        if (typeof value === 'string' || typeof value === 'number') {
+          target.style.setProperty(cssProperty, format(value), 'important');
+        }
+      }
+    }
+  };
+  apply(`${FIELD_LABEL_TEXT_SELECTOR},${FIELD_VALUE_TEXT_SELECTOR}`, allProperties);
+  apply(FIELD_LABEL_TEXT_SELECTOR, [
+    ['labelFontSize', 'font-size', (value) => `${value}px`],
+    ['labelFontWeight', 'font-weight', String],
+    ['labelFontStyle', 'font-style', String],
+    ['labelTextDecoration', 'text-decoration', String],
+    ['labelLetterSpacing', 'letter-spacing', (value) => `${value}px`],
+    ['labelLineHeight', 'line-height', String],
+  ]);
+  apply(FIELD_VALUE_TEXT_SELECTOR, [
+    ['valueFontSize', 'font-size', (value) => `${value}px`],
+    ['valueFontWeight', 'font-weight', String],
+    ['valueFontStyle', 'font-style', String],
+    ['valueTextDecoration', 'text-decoration', String],
+    ['valueLetterSpacing', 'letter-spacing', (value) => `${value}px`],
+    ['valueLineHeight', 'line-height', String],
+  ]);
 }
 
 function applyGridPlacement(node: HTMLElement, placement: { x: number; y: number; span: number; rows: number } | undefined): void {
@@ -2338,6 +2431,7 @@ function atlasHeaderFrame(
   content: HTMLElement,
   rowSize: 'fit' | 'fill' = 'fit',
   look?: string,
+  layout?: ForgeLayoutDocument,
 ): HTMLElement {
   const frame = element('div', `atlas-sb-item atlas-sb-item--${rowSize}`);
   frame.dataset.type = fsType;
@@ -2346,6 +2440,7 @@ function atlasHeaderFrame(
   frame.dataset.blockId = `header-${part}`;
   if (look) frame.dataset.look = look;
   frame.append(content);
+  if (layout) applyFieldTypographyToNode(frame, layout, field?.key);
   return frame;
 }
 
@@ -2413,7 +2508,7 @@ function sampleHeader(
     nameHeading.dataset.level = '1';
     if (isInlineTextField(name) && numericRuntime?.canEdit) nameHeading.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, name, sample, numericRuntime));
     else nameHeading.textContent = titleText;
-    heading.append(atlasHeaderFrame('name', 'title', 'heading', name, nameHeading, 'fill'));
+    heading.append(atlasHeaderFrame('name', 'title', 'heading', name, nameHeading, 'fill', undefined, layout));
   }
 
   const level = headerFieldForPart(template.fields, 'level');
@@ -2444,14 +2539,14 @@ function sampleHeader(
       else if (isInlineTextField(level) && numericRuntime?.canEdit) value.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, level, sample, numericRuntime));
       else value.textContent = withUnit(levelRaw, level);
       labelled.append(value);
-      subtitle.append(atlasHeaderFrame('level', 'stat', 'property', level, labelled, 'fit', 'run-in'));
+      subtitle.append(atlasHeaderFrame('level', 'stat', 'property', level, labelled, 'fit', 'run-in', layout));
     }
     if (hasLevel && hasType) subtitle.append(element('span', 'atlas-sb-header__dot', '·'));
     if (hasType && type) {
       const typeValue = element('span', 'atlas-sb-header__type');
       if (isInlineTextField(type) && numericRuntime?.canEdit) typeValue.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, type, sample, numericRuntime));
       else typeValue.textContent = withUnit(typeRaw, type);
-      subtitle.append(atlasHeaderFrame('type', 'stat', 'property', type, typeValue));
+      subtitle.append(atlasHeaderFrame('type', 'stat', 'property', type, typeValue, 'fit', undefined, layout));
     }
     heading.append(subtitle);
   }
@@ -2478,7 +2573,7 @@ function sampleHeader(
     else if (isInlineTextField(hp) && numericRuntime?.canEdit) value.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, hp, sample, numericRuntime));
     else value.textContent = withUnit(hpRaw, hp);
     labelled.append(value);
-    textColumn.append(atlasHeaderFrame('hp', 'stat', 'property', hp, labelled, 'fit', 'run-in'));
+    textColumn.append(atlasHeaderFrame('hp', 'stat', 'property', hp, labelled, 'fit', 'run-in', layout));
   }
 
   const description = headerFieldForPart(template.fields, 'description');
@@ -2495,7 +2590,7 @@ function sampleHeader(
     } else {
       applyTextWithBasicMarkdown(descriptionNode, descriptionValue);
     }
-    textColumn.append(atlasHeaderFrame('description', 'text', 'text', description, descriptionNode, 'fill'));
+    textColumn.append(atlasHeaderFrame('description', 'text', 'text', description, descriptionNode, 'fill', undefined, layout));
   }
   if (textColumn.childElementCount > 0) headerNode.append(textColumn);
 
@@ -2520,7 +2615,7 @@ function sampleHeader(
     // Atlas places token art at the start of the statblock body and floats it
     // right, allowing the name and introductory text to use the remaining
     // line width instead of forcing the whole header into two fixed columns.
-    const tokenHeader = atlasHeaderFrame('token', 'image', 'image', imageField, art);
+    const tokenHeader = atlasHeaderFrame('token', 'image', 'image', imageField, art, 'fit', undefined, layout);
     tokenHeader.classList.add('statblock-forge__token-header-frame');
     applyTokenFrameAppearance(tokenHeader, layout);
     headerNode.prepend(tokenHeader);
@@ -2820,6 +2915,7 @@ function renderMetric(
           numericRuntime.subscribe(field.key, syncRollableMetric);
           numericRuntime.subscribeAll(syncRollableMetric);
         }
+        applyFieldTypographyToNode(cell, layout, field?.key);
         row.append(cell);
       });
       numbers.append(row);
@@ -2848,15 +2944,18 @@ function resolveTableFormulaRowValues(
   // Start from the complete statblock sample. Table-local cells are already
   // overlaid by the caller, while non-Table Fields keep their current Values.
   const baseValues: Record<string, unknown> = { ...rowSample };
-  for (const field of fields) {
+  const displayedFieldKeys: string[] = [];
+  for (const field of childFields) {
     if ((field.type === 'number' || field.type === 'rating') && hasNumericFieldFormulaSettings(field)) {
       const raw = rowSample[field.key];
       const calculated = runtime?.value(field, rowSample)
         ?? (runtime?.evaluateFormula(String(field.formula ?? ''), rowSample, raw)
         ?? evaluatePreviewFormula(String(field.formula ?? ''), rowSample, raw, fields));
       baseValues[field.key] = calculated;
+      if (calculated !== null && calculated !== undefined) displayedFieldKeys.push(field.key);
     }
   }
+  if (displayedFieldKeys.length > 0) baseValues[TABLE_DISPLAYED_FIELD_KEYS_CONTEXT] = displayedFieldKeys;
   return resolveTableRowFormulaValues(
     childFields,
     baseValues,
@@ -3516,6 +3615,7 @@ function renderTableFields(
         th.dataset.tableColumnLabel = field.key;
         th.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
         th.scope = 'col';
+        applyFieldTypographyToNode(th, layout, field.key);
         header.append(th);
       });
       if (editableRows) {
@@ -3577,6 +3677,7 @@ function renderTableFields(
           renderTableCalculatedValue(
             cell, field, rowValues[rowIndex]?.[field.key], block.display === 'signed', block.rollable === true,
           );
+          applyFieldTypographyToNode(cell, layout, field.key);
           row.append(cell);
           return;
         }
@@ -3597,6 +3698,7 @@ function renderTableFields(
           resolveImage, runtime, block.display === 'signed', block.rollable === true, onValueEdit,
           isCounterField ? rowIndex : undefined, language,
         );
+        applyFieldTypographyToNode(cell, layout, field.key);
         row.append(cell);
       });
       if (editableRows) {
@@ -3643,6 +3745,7 @@ function renderTableFields(
           );
           renderTableCalculatedValue(cell, field, value, block.display === 'signed', block.rollable === true);
         }
+        applyFieldTypographyToNode(cell, layout, field.key);
         summary.append(cell);
       });
       if (editableRows) summary.append(element('td', 'statblock-forge__preview-table-row-actions-cell'));
@@ -5680,6 +5783,9 @@ function renderTrack(block: ForgeBlock, field: ForgeField | undefined, sample: J
       maximumNumber.setAttribute('aria-label', numericRuntime.language === 'pt-BR'
         ? `Máximo de ${accessibleLabel}`
         : `${accessibleLabel} maximum`);
+      // A Track can display a second Field as its maximum. Its typography is
+      // independent from the tracked Field and must follow that source Field.
+      applyFieldTypographyToNode(maximumNumber, layout, maximumField.key);
       trailingMaximum.append(maximumNumber);
     } else {
       trailingMaximum.append(document.createTextNode(String(max)));
@@ -6688,24 +6794,27 @@ function renderLeafBlock(
         const raw = sample[fieldKey];
         const useFormula = field?.type === 'number' || field?.type === 'rating';
         const label = isBlockLabelHidden(block) ? '' : fieldLabel(field, fieldKey);
-        if (label) line.append(markInlineFieldNameForEdit(
+        const fieldGroup = element('span', 'statblock-forge__preview-line-field');
+        if (label) fieldGroup.append(markInlineFieldNameForEdit(
           element('strong', 'statblock-forge__preview-line-label', `${label} `),
           field, numericRuntime, Boolean(field && (useFormula || isInlineTextField(field))),
         ));
         if (useFormula && field) {
-          line.append(renderNumericFieldValue(field, sample, numericRuntime, false, 'statblock-forge__preview-line-value'));
+          fieldGroup.append(renderNumericFieldValue(field, sample, numericRuntime, false, 'statblock-forge__preview-line-value'));
         } else if (field?.type === 'dice' && hasDiceFieldFormula(field)) {
-          line.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, field, sample, numericRuntime, 'statblock-forge__preview-line-value'));
+          fieldGroup.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, field, sample, numericRuntime, 'statblock-forge__preview-line-value'));
         } else if (isInlineTextField(field) && numericRuntime?.canEdit) {
-          line.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, field, sample, numericRuntime, 'statblock-forge__preview-line-value'));
+          fieldGroup.append(createInlineTextFieldValue(app, markdownComponent, sourcePath, field, sample, numericRuntime, 'statblock-forge__preview-line-value'));
         } else if (field?.type === 'markdown' && raw !== undefined && raw !== null && raw !== '') {
           const markdown = element('div', 'statblock-forge__preview-line-value atlas-sb-prose');
           renderAtlasMarkdown(app, markdownComponent, sourcePath, markdown, readablePreviewValue(raw));
-          line.append(markdown);
+          fieldGroup.append(markdown);
         } else {
           const value = readablePreviewValue(raw);
-          line.append(element('span', 'statblock-forge__preview-line-value', value || '—'));
+          fieldGroup.append(element('span', 'statblock-forge__preview-line-value', value || '—'));
         }
+        applyFieldTypographyToNode(fieldGroup, layout, field?.key);
+        line.append(fieldGroup);
       });
       return line;
     }
@@ -6935,6 +7044,7 @@ function renderBlockNode(
       options.interactiveCounters, insideTab, options.language ?? 'en', options.onAbilityCounterMaxChange, options.numericFieldRuntime, options.onFieldValueChange, options.onImageFieldAction, options.onImageBlockSelect, options.imageFrames, options.onImageFrameChange, template.header, template.layout.blocks,
     );
     node.append(source);
+    applyFieldTypographyToNode(node, layout, boundField?.key);
     appendWhenEmptyFallback(node, source, block, sample, options);
   }
   return node;
