@@ -578,8 +578,8 @@ function createNumericFieldRuntime(
     },
     evaluateFormula,
     diceFormula(field, sample) {
-      return resolveDiceFieldFormula(field, fields, sample, (sourceField) =>
-        calculateNumericFieldValue(sourceField, sample, evaluateFormula));
+      return resolveDiceFieldFormula(field, fields, sample, undefined, (reference) =>
+        evaluateFormula(`{${reference}}`, sample, undefined));
     },
     async setBaseValue(fieldKey, value) {
       if (!onValueChange) throw new Error('A edição contextual não está habilitada nesta visualização.');
@@ -2292,13 +2292,13 @@ function applyBlockAppearance(node: HTMLElement, block: ForgeBlock, layout: Forg
   const typographyFlags: Array<[keyof BlockAppearance, string]> = [
     ['fontSize', 'customTextFontSize'], ['fontWeight', 'customTextFontWeight'],
     ['fontStyle', 'customTextFontStyle'], ['textDecoration', 'customTextTextDecoration'],
-    ['letterSpacing', 'customTextLetterSpacing'], ['lineHeight', 'customTextLineHeight'],
+    ['letterSpacing', 'customTextLetterSpacing'],
     ['labelFontSize', 'customLabelFontSize'], ['labelFontWeight', 'customLabelFontWeight'],
     ['labelFontStyle', 'customLabelFontStyle'], ['labelTextDecoration', 'customLabelTextDecoration'],
-    ['labelLetterSpacing', 'customLabelLetterSpacing'], ['labelLineHeight', 'customLabelLineHeight'],
+    ['labelLetterSpacing', 'customLabelLetterSpacing'],
     ['valueFontSize', 'customValueFontSize'], ['valueFontWeight', 'customValueFontWeight'],
     ['valueFontStyle', 'customValueFontStyle'], ['valueTextDecoration', 'customValueTextDecoration'],
-    ['valueLetterSpacing', 'customValueLetterSpacing'], ['valueLineHeight', 'customValueLineHeight'],
+    ['valueLetterSpacing', 'customValueLetterSpacing'],
   ];
   for (const [key, flag] of typographyFlags) {
     if (appearance[key] !== undefined) node.dataset[flag] = 'true';
@@ -2360,7 +2360,6 @@ function applyFieldTypographyToNode(root: HTMLElement, layout: ForgeLayoutDocume
     ['fontStyle', 'font-style', String],
     ['textDecoration', 'text-decoration', String],
     ['letterSpacing', 'letter-spacing', (value) => `${value}px`],
-    ['lineHeight', 'line-height', String],
   ];
   const apply = (
     selector: string,
@@ -2384,7 +2383,6 @@ function applyFieldTypographyToNode(root: HTMLElement, layout: ForgeLayoutDocume
     ['labelFontStyle', 'font-style', String],
     ['labelTextDecoration', 'text-decoration', String],
     ['labelLetterSpacing', 'letter-spacing', (value) => `${value}px`],
-    ['labelLineHeight', 'line-height', String],
   ]);
   apply(FIELD_VALUE_TEXT_SELECTOR, [
     ['valueFontSize', 'font-size', (value) => `${value}px`],
@@ -2392,7 +2390,6 @@ function applyFieldTypographyToNode(root: HTMLElement, layout: ForgeLayoutDocume
     ['valueFontStyle', 'font-style', String],
     ['valueTextDecoration', 'text-decoration', String],
     ['valueLetterSpacing', 'letter-spacing', (value) => `${value}px`],
-    ['valueLineHeight', 'line-height', String],
   ]);
 }
 

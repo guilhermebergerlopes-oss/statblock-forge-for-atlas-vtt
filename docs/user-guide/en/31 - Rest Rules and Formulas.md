@@ -70,6 +70,8 @@ When Counter uses are restored to maximum, each selected row without a `regain` 
 
 `regain` is a dice formula that must contain at least one die. It accepts `@field_key` and `{field_key}` references, resolved against the statblock Values during Rest. `regain` is evaluated per row, unlike **Restore an amount** targeting a Counter Field.
 
+Counter properties can be used in Rest formulas and `regain` expressions. For example, `{spell_slots.0.remaining}d4` uses the first row’s remaining uses as the dice count, while `{spell_slots.remaining}` reads the aggregate remaining uses and `@spell_slots.total.used` reads all spent uses. Row paths include `max`, `used`/`spent`, `remaining`/`current`/`available`, `remainingPercent`/`percent`/`availablePercent`/`currentPercent`, `usedPercent`/`spentPercent`, and `isFull`/`isEmpty`. Aggregate values are available through `.total` or root aliases such as `{spell_slots.remaining}`; aggregate paths include `.total.remaining`/`.total.current`/`.total.available` and `.total.used`/`.total.spent`; aggregate percentages are weighted by row maximums. `count` returns the number of visible rows. Boolean states resolve as `1` or `0`. Percentage references can be fractional, but Rest dice formulas require whole-number values, so use a Number/Rating formula to round or floor a percentage before using it as a dice count. See [[28 - Counters]] for row ordering, hidden rows, aliases, and examples. Rest formulas retain the Rest dice parser's own grammar.
+
 ### Restore an amount on Counters
 
 For an `amount` rule whose target is a Counter Field, the formula is calculated/rolled **once for the Counter Field**. The same recovered amount is then applied to the selected rows. It does not roll independently for each row.

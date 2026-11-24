@@ -6,9 +6,9 @@ const STYLES = new Set(['normal', 'italic']);
 const DECORATIONS = new Set(['none', 'underline', 'line-through']);
 
 const NUMERIC_RANGES: Array<[keyof FieldTypographyAppearance, number, number]> = [
-  ['fontSize', 8, 48], ['letterSpacing', -1, 8], ['lineHeight', 0.8, 3],
-  ['labelFontSize', 8, 48], ['labelLetterSpacing', -1, 8], ['labelLineHeight', 0.8, 3],
-  ['valueFontSize', 8, 48], ['valueLetterSpacing', -1, 8], ['valueLineHeight', 0.8, 3],
+  ['fontSize', 8, 48], ['letterSpacing', -1, 8],
+  ['labelFontSize', 8, 48], ['labelLetterSpacing', -1, 8],
+  ['valueFontSize', 8, 48], ['valueLetterSpacing', -1, 8],
 ];
 const CHOICE_VALUES: Array<[keyof FieldTypographyAppearance, ReadonlySet<string>]> = [
   ['fontWeight', WEIGHTS], ['labelFontWeight', WEIGHTS], ['valueFontWeight', WEIGHTS],

@@ -71,24 +71,18 @@ export interface BlockAppearance {
   fontStyle?: 'normal' | 'italic';
   textDecoration?: 'none' | 'underline' | 'line-through';
   letterSpacing?: number;
-  /** Unitless line-height multiplier shared by all text roles inside this block. */
-  lineHeight?: number;
   /** Typography overrides for field labels and headings. */
   labelFontSize?: number;
   labelFontWeight?: '400' | '500' | '600' | '700';
   labelFontStyle?: 'normal' | 'italic';
   labelTextDecoration?: 'none' | 'underline' | 'line-through';
   labelLetterSpacing?: number;
-  /** Unitless line-height multiplier for field labels and headings. */
-  labelLineHeight?: number;
   /** Typography overrides for field values and descriptions. */
   valueFontSize?: number;
   valueFontWeight?: '400' | '500' | '600' | '700';
   valueFontStyle?: 'normal' | 'italic';
   valueTextDecoration?: 'none' | 'underline' | 'line-through';
   valueLetterSpacing?: number;
-  /** Unitless line-height multiplier for field values and descriptions. */
-  valueLineHeight?: number;
   padding?: number;
   textAlign?: 'start' | 'center' | 'end';
   verticalAlign?: 'start' | 'center' | 'end';
@@ -104,9 +98,9 @@ export interface BlockAppearance {
 
 /** Typography overrides for one native Field, independent of its block placement. */
 export type FieldTypographyAppearance = Pick<BlockAppearance,
-  | 'fontSize' | 'fontWeight' | 'fontStyle' | 'textDecoration' | 'letterSpacing' | 'lineHeight'
-  | 'labelFontSize' | 'labelFontWeight' | 'labelFontStyle' | 'labelTextDecoration' | 'labelLetterSpacing' | 'labelLineHeight'
-  | 'valueFontSize' | 'valueFontWeight' | 'valueFontStyle' | 'valueTextDecoration' | 'valueLetterSpacing' | 'valueLineHeight'
+  | 'fontSize' | 'fontWeight' | 'fontStyle' | 'textDecoration' | 'letterSpacing'
+  | 'labelFontSize' | 'labelFontWeight' | 'labelFontStyle' | 'labelTextDecoration' | 'labelLetterSpacing'
+  | 'valueFontSize' | 'valueFontWeight' | 'valueFontStyle' | 'valueTextDecoration' | 'valueLetterSpacing'
 >;
 
 export interface ForgeBlockLayout {

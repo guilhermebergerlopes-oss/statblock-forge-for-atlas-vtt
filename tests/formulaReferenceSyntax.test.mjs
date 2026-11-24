@@ -272,3 +272,121 @@ test('Selection formula option keys disambiguate different labels with the same 
   assert.equal(evaluatePreviewFormula('@movement.night_vision', { movement: 'Night Vision' }, undefined, fields), 0);
   assert.equal(evaluatePreviewFormula('@movement.night_vision_2', { movement: 'Night Vision' }, undefined, fields), 1);
 });
+
+
+test('Number/Rating formulas resolve complete Counter rows, aliases, totals, and preset defaults', async () => {
+  const fields = [
+    { key: 'spell_slots', label: 'Spell Slots', type: 'counters', counterRows: [
+      { name: 'First Circle', max: 4 },
+      { name: 'Second Circle', max: 3 },
+      { name: 'Hidden row', max: 0 },
+    ] },
+    { key: 'remaining_first', label: 'Remaining first', type: 'number', formula: '{spell_slots.0.remaining}' },
+    { key: 'remaining_total', label: 'Remaining total', type: 'number', formula: '@spell_slots.total.available' },
+  ];
+  const sample = {
+    spell_slots: [
+      { max: 4, used: 2 },
+      { max: 3, used: 1 },
+      { max: 0, used: 0 },
+    ],
+    remaining_first: 999,
+    remaining_total: 999,
+  };
+  const evaluate = (formula, values, slotValue, selfFieldKey) =>
+    evaluatePreviewFormula(formula, values, slotValue, fields, {}, values, selfFieldKey);
+
+  assert.equal(evaluate('{spell_slots.0.max}', sample, undefined), 4);
+  assert.equal(evaluate('@spell_slots.0.used', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.0.spent}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.0.remaining}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.0.current}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.0.available}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.total.max}', sample, undefined), 7);
+  assert.equal(evaluate('{spell_slots.total.used}', sample, undefined), 3);
+  assert.equal(evaluate('{spell_slots.total.spent}', sample, undefined), 3);
+  assert.equal(evaluate('{spell_slots.total.remaining}', sample, undefined), 4);
+  assert.equal(evaluate('{spell_slots.total.current}', sample, undefined), 4);
+  assert.equal(evaluate('{spell_slots.total.available}', sample, undefined), 4);
+  assert.equal(evaluate('{spell_slots.count}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.total.count}', sample, undefined), 2);
+  assert.equal(evaluate('{spell_slots.max}', sample, undefined), 7,
+    'root aggregate aliases provide a shorter form when no individual row is needed');
+  assert.equal(evaluate('{spell_slots.remaining}', sample, undefined), 4);
+  assert.equal(evaluate('{spell_slots.spent}', sample, undefined), 3);
+  assert.equal(evaluate('{spell_slots.0.percent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.remaining_percent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.availablePercent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.currentPercent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.spentPercent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.used_percent}', sample, undefined), 50);
+  assert.equal(evaluate('{spell_slots.0.isFull}', sample, undefined), 0);
+  assert.equal(evaluate('{spell_slots.0.isEmpty}', sample, undefined), 0);
+  assert.equal(evaluate('{spell_slots.1.remainingPercent}', sample, undefined), (2 / 3) * 100);
+  assert.equal(evaluate('{spell_slots.total.remainingPercent}', sample, undefined), (4 / 7) * 100);
+  assert.equal(evaluate('{spell_slots.total.spentPercent}', sample, undefined), (3 / 7) * 100);
+  assert.equal(evaluate('{spell_slots.total.isFull}', sample, undefined), 0);
+  assert.equal(evaluate('{spell_slots.total.isEmpty}', sample, undefined), 0);
+  assert.equal(evaluate('{spell_slots.remaining_percent}', sample, undefined), (4 / 7) * 100);
+  assert.equal(evaluate('{spell_slots.remainingPercent}', sample, undefined), (4 / 7) * 100);
+  assert.equal(evaluate('{spell_slots.isFull}', sample, undefined), 0);
+  assert.equal(evaluate('{spell_slots.count}', sample, undefined), 2);
+  assert.equal(calculateNumericFieldValue(fields[1], sample, evaluate), 2);
+  assert.equal(calculateNumericFieldValue(fields[2], sample, evaluate), 4);
+  assert.deepEqual(sample.spell_slots, [
+    { max: 4, used: 2 }, { max: 3, used: 1 }, { max: 0, used: 0 },
+  ], 'resolving formulas must not mutate Counter state');
+
+  const defaultsOnly = {};
+  assert.equal(evaluatePreviewFormula('{spell_slots.0.remaining}', defaultsOnly, undefined, fields), 4,
+    'unmaterialized rows use Template presets and begin with zero spent uses');
+  assert.equal(evaluatePreviewFormula('{spell_slots.total.remaining}', defaultsOnly, undefined, fields), 7);
+  assert.equal(evaluatePreviewFormula('{spell_slots.0.isFull}', defaultsOnly, undefined, fields), 1);
+  assert.equal(evaluatePreviewFormula('{spell_slots.0.isEmpty}', defaultsOnly, undefined, fields), 0);
+
+  const exhausted = { spell_slots: [{ max: 4, used: 4 }, { max: 3, used: 3 }, { max: 0, used: 0 }] };
+  assert.equal(evaluate('{spell_slots.0.isEmpty}', exhausted, undefined), 1);
+  assert.equal(evaluate('{spell_slots.total.isEmpty}', exhausted, undefined), 1);
+  assert.equal(evaluate('{spell_slots.total.isFull}', exhausted, undefined), 0);
+  assert.equal(evaluate('{spell_slots.0.percent}', { spell_slots: [{ max: 0, used: 0 }] }, undefined), null,
+    'hidden zero-maximum rows do not have a percentage');
+});
+
+test('Dice Formula can build dynamic dice expressions from Counter remaining, spent, and totals', () => {
+  const fields = [
+    { key: 'uses', label: 'Uses', type: 'counters', counterRows: [
+      { name: 'Focus', max: 5 }, { name: 'Charges', max: 2 },
+    ] },
+    { key: 'cast', label: 'Cast', type: 'dice', diceFormula: '{uses.total.remaining}d{uses.0.max}kh{uses.0.available}' },
+  ];
+  const sample = { uses: [{ max: 5, used: 2 }, { max: 2, used: 1 }] };
+  const resolved = resolveDiceFieldFormula(fields[1], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '4d5kh3');
+});
+
+test('Rest formulas and Counter regain formulas can read effective Counter references', async () => {
+  const localTemplate = {
+    ...structuredClone(template),
+    fields: [
+      { key: 'spell_slots', label: 'Spell Slots', type: 'counters', counterRows: [
+        { name: 'First Circle', max: 4 }, { name: 'Second Circle', max: 3 },
+      ] },
+    ],
+    sample: { spell_slots: [{ max: 4, used: 2 }, { max: 3, used: 1 }] },
+  };
+  const filled = fillRestFormula('{spell_slots.0.remaining}d4+@spell_slots.total.used', localTemplate, localTemplate.sample);
+  assert.equal(filled.ok, true);
+  assert.equal(filled.formula, '2d4+(3)');
+  assert.deepEqual(evaluateRestFormula('@spell_slots.total.remaining', localTemplate, localTemplate.sample, 'Counter reference'), { value: 4 });
+
+  const { isCounterRegainFormula } = await import('../src/statblocks/counterRegainModel.ts');
+  assert.equal(isCounterRegainFormula('{spell_slots.0.remaining}d4'), true);
+  let rolled = '';
+  const result = evaluateRestFormula('{spell_slots.0.remaining}d4', localTemplate, localTemplate.sample, 'Counter regain', (formula) => {
+    rolled = formula;
+    return 2;
+  });
+  assert.deepEqual(result, { value: 2 });
+  assert.equal(rolled, '2d4');
+});

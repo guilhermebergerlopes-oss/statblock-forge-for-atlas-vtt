@@ -5,8 +5,7 @@
  * Atlas template JSON shape and preserves unknown properties while keeping
  * field references coherent.
  */
-import { diceFieldFormulaUsesField, renameDiceFieldFormulaReference } from '../statblocks/diceFieldFormulaModel.ts';
-import { isFormulaCapableNumericField } from './numericFieldModel.ts';
+import { diceFieldFormulaReferences, diceFieldFormulaUsesField, renameDiceFieldFormulaReference } from '../statblocks/diceFieldFormulaModel.ts';
 import { tableFormulaReferencesField } from '../statblocks/tableFormulaModel.ts';
 import {
   DEFAULT_SCORE_COLUMNS,
@@ -653,17 +652,9 @@ export function changeTemplateFieldType(template: ForgeTemplate, key: string, ne
   if (!allowed.includes(nextType)) throw new Error(`Tipo de campo não suportado: ${nextType}`);
   const previousType = field.type;
   if (previousType === nextType) return;
-  if (previousType === 'number' || previousType === 'rating') {
-    if (nextType !== 'number' && nextType !== 'rating') {
-      const diceFormulaDependents = findFieldReferences(template, key)
-        .filter((reference) => reference.property === 'diceFormula');
-      if (diceFormulaDependents.length > 0) {
-        const dependents = diceFormulaDependents.slice(0, 4)
-          .map((reference) => reference.blockId).join(', ');
-        throw new Error(`Este Field é usado por Dice Formulas (${dependents}). Redirecione essas fórmulas antes de alterar seu tipo para ${nextType}.`);
-      }
-    }
-  }
+  // Dice Formula now uses the same numeric-compatible reference resolver as
+  // Number/Rating formulas, so a source Field may legitimately change type
+  // while remaining useful through a boolean or nested numeric property.
   field.type = nextType;
   if (previousType === 'dice' && nextType !== 'dice') delete field.diceFormula;
   if (nextType === 'entries' && !isRecord(field.entry)) field.entry = { nameKey: 'name', textKey: 'desc', extras: [] };
@@ -767,15 +758,22 @@ export function validateTemplateFields(template: ForgeTemplate): FieldValidation
       issues.push({ code: 'missing-reference', fieldKey: field.key, message: `O campo "${field.key}" referencia o campo inexistente "${field.tracks.max}" em tracks.max.` });
     }
     if (field.type === 'dice' && typeof field.diceFormula === 'string') {
-      const references = [...field.diceFormula.matchAll(/\{([A-Za-z][A-Za-z0-9_-]{0,39})\}/g)];
-      for (const match of references) {
-        const referencedKey = match[1] ?? '';
-        const referencedField = template.fields.find((candidate) => candidate.key === referencedKey);
-        if (!referencedField || !isFormulaCapableNumericField(referencedField) || referencedField.key === field.key) {
+      const references = diceFieldFormulaReferences(field.diceFormula, template.fields);
+      for (const referencePath of references) {
+        const [rootKey, rowSegment, columnKey] = referencePath.split('.');
+        const referencedField = template.fields.find((candidate) => candidate.key === rootKey
+          || formerKeys(candidate).includes(rootKey ?? ''));
+        const tableColumn = rowSegment && /^row[1-9][0-9]*$/i.test(rowSegment)
+          ? template.fields.find((candidate) => candidate.key === columnKey)
+          : undefined;
+        const validTableCell = Boolean(referencedField && referencedField.type === 'scores'
+          && tableColumn && tableColumn.key !== field.key);
+        const validRoot = Boolean(referencedField && referencedField.key !== field.key);
+        if ((!validRoot && !validTableCell) || referencedField?.key === field.key || tableColumn?.key === field.key) {
           issues.push({
             code: 'missing-reference',
             fieldKey: field.key,
-            message: `O Dice Field "${field.key}" referencia "${referencedKey}", mas fórmulas de dados exigem um Field Number ou Rating existente e diferente do próprio campo.`,
+            message: `O Dice Field "${field.key}" referencia "${referencePath}", mas a referência precisa apontar para outro Field existente e produzir um número ou booleano válido.`,
           });
         }
       }

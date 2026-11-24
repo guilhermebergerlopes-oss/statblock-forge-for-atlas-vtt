@@ -61,6 +61,48 @@ Exemplo conceitual de uma linha:
 
 Essa linha tem `2 / 3` usos restantes. O `reset` pode ser acrescentado na ficha quando a linha é atribuída a um botão Rest; não é herdado do preset do Template.
 
+## Referenciar Counters em fórmulas
+
+Fields Counter podem ser consultados por fórmulas Number/Rating, Dice Formula, fórmulas de Table/Metric que usam o resolvedor numérico compartilhado e fórmulas de Rest (incluindo `regain` de uma linha). Use a key do Counter seguida pelo índice da linha, começando em zero, e uma propriedade numérica:
+
+| Referência | Valor |
+|---|---|
+| `{spell_slots.0.max}` | Máximo de usos da primeira linha configurada. |
+| `{spell_slots.0.used}` ou `{spell_slots.0.spent}` | Usos já gastos nessa linha. |
+| `{spell_slots.0.remaining}` | Usos ainda disponíveis: `max - used`. |
+| `{spell_slots.0.current}` ou `{spell_slots.0.available}` | Aliases de `remaining`. |
+| `{spell_slots.total.max}` | Soma dos máximos de todas as linhas visíveis. |
+| `{spell_slots.total.used}` ou `{spell_slots.total.spent}` | Soma dos usos gastos em todas as linhas visíveis. |
+| `{spell_slots.total.remaining}`, `{spell_slots.total.current}` ou `{spell_slots.total.available}` | Soma dos usos restantes em todas as linhas visíveis. |
+| `{spell_slots.count}` ou `{spell_slots.total.count}` | Quantidade de linhas visíveis (`max > 0`). |
+| `{spell_slots.0.percent}` / `{spell_slots.0.remainingPercent}` | Percentual de usos restantes na primeira linha (`remaining / max * 100`). |
+| `{spell_slots.0.availablePercent}` / `{spell_slots.0.currentPercent}` | Aliases de `remainingPercent`. |
+| `{spell_slots.0.usedPercent}` / `{spell_slots.0.spentPercent}` | Percentual de usos gastos na primeira linha (`used / max * 100`). |
+| `{spell_slots.0.isFull}` / `{spell_slots.0.isEmpty}` | Estado booleano da linha, retornado como `1` ou `0`. |
+| `{spell_slots.total.remainingPercent}` / `{spell_slots.total.percent}` | Percentual restante do conjunto de linhas visíveis, calculado sobre as somas (ponderado pelo máximo de cada linha). |
+| `{spell_slots.total.usedPercent}` / `{spell_slots.total.spentPercent}` | Percentual gasto do conjunto de linhas visíveis. |
+| `{spell_slots.total.isFull}` / `{spell_slots.total.isEmpty}` | Indica se o conjunto visível está cheio ou vazio, retornando `1` ou `0`. |
+| `{spell_slots.max}`, `{spell_slots.used}`, `{spell_slots.remaining}`, `{spell_slots.count}` | Atalhos para os caminhos agregados correspondentes sob `.total`. |
+
+O índice começa em `0` e segue a ordem combinada dos presets do Template e das linhas da ficha. Uma linha com `max = 0` fica oculta, mas mantém sua posição nas referências por índice; linhas ocultas não entram em `total` nem em `count`. O resolvedor usa as linhas efetivas exibidas no statblock: se uma linha de preset ainda não foi gravada no Value da ficha, seu máximo configurado continua disponível para fórmulas e seu `used` começa em `0`.
+
+Exemplos:
+
+```text
+{spell_slots.0.remaining} + {spell_slots.1.remaining}
+floor({spell_slots.total.remaining} / 2)
+{spell_slots.count} >= 2 ? {spell_slots.0.max} : 0
+{spell_slots.0.isEmpty} ? 0 : 1d{spell_slots.0.max}
+{spell_slots.total.remainingPercent} >= 50 ? 2 : 1
+{spell_slots.remaining} + {spell_slots.used}
+```
+
+Referências percentuais retornam um decimal de `0` a `100` e não são arredondadas. `percent` é alias de `remainingPercent`. `isFull` é verdadeiro (`1`) quando a linha/conjunto visível tem máximo positivo e nenhum uso gasto; `isEmpty` é verdadeiro (`1`) quando tem máximo positivo e nenhum uso restante. Uma linha oculta com `max = 0` não possui percentual nem estado cheio/vazio. Os nomes das propriedades não diferenciam maiúsculas de minúsculas; `remaining_percent` e `remaining-percent` também são aceitos.
+
+Todas as propriedades agregadas podem omitir `.total`: `{spell_slots.remaining}` equivale a `{spell_slots.total.remaining}`, e `{spell_slots.remainingPercent}` ou `{spell_slots.isFull}` consultam os valores derivados agregados correspondentes. Use a forma `.0`, `.1` etc. para consultar uma linha específica. Percentuais agregados são calculados pela soma de usos restantes/máximos ou gastos/máximos, não pela média dos percentuais das linhas.
+
+Somente propriedades numéricas do Counter podem ser usadas como entradas de fórmula. Os textos `name`, `reset` e `regain` da linha não são referências numéricas. Se uma linha/caminho não existir ou o estado salvo for inválido, a referência fica indisponível em vez de ser silenciosamente convertida em zero. Em Dice Formula e expressões de dados do Rest, os valores resolvidos também precisam respeitar os limites de inteiros do parser de dados; percentuais fracionários, portanto, não podem ser usados como quantidade de dados ou faces sem antes serem convertidos para inteiro por uma fórmula Number/Rating.
+
 ## Como os Counters são apresentados
 
 O bloco **Counters** organiza cada contador em uma célula. A quantidade de contadores por linha é uma propriedade do bloco, **Counters per row**:

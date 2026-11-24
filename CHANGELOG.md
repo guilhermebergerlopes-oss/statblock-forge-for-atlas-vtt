@@ -1,18 +1,9 @@
-## 0.5.6 — Configurable line spacing
+## 0.5.6 — Dice Formula shares Number/Rating reference resolution
 
-- Adds line-spacing controls to **Block appearance → Text** and **Template → Appearance → Field typography**. All text, labels, and values can use independent unitless line-height multipliers from 0.8× to 3×; disabled overrides continue to inherit the selected theme or enclosing block. Values persist in the Forge sidecar and are included when copying block appearance. Adds regression coverage for normalization, rendering, Field overrides, and save/reload.
-
-## 0.5.6 — Keep text customization open after confirmations and full rerenders
-
-- Fixes the missed full-render path: before rebuilding the Template Editor, `render()` now captures the live open/closed state of every keyed disclosure. The prior fix only captured during selection-only sidebar refreshes, so confirmation actions that called the full renderer could still collapse the Text customization panels.
-- Tracks each keyed disclosure's `toggle` event immediately, so its last explicit open/closed state remains current even when no rerender occurs before the next confirmation or action. Restores that state when the sidebar is rebuilt.
-- Preserves the Field typography panel and its **All text**, **Labels**, and **Values** subsections, as well as per-block Text typography subsections. The state remains transient editor UI state and is never written to the Template.
-- Adds regression tests for immediate toggle tracking, close/reopen state, full-render capture ordering, and sidebar restoration after a rebuild.
-
-## 0.5.6 — Copy and paste block appearance
-
-- Adds **Copy appearance** and **Paste appearance** actions to the Block appearance inspector. The in-session clipboard copies the block's Theme/Custom mode and all normalized visual overrides, including surface, border, text, typography, indicator, padding, and image-frame settings. It does not copy block content, Field links, formulas, dimensions, placement, visibility, or other structural metadata. The action is available across blocks and Templates during the active plugin session.
-- Uses explicit inspector actions instead of overriding `Ctrl+C`/`Ctrl+V`, preserving normal text selection, input editing, and Obsidian shortcuts. Adds regression tests for complete appearance transfer, detached clipboard snapshots, Theme mode, empty clipboard, and preservation of target structure.
+- Routes every Dice Formula reference through the same Number/Rating evaluator used by the live renderer. Dice Fields can now read Number/Rating values and calculated formulas, whole-Field and individual-option Checkboxes booleans, Selection options and `.number`, nested numeric properties in structured Values (including stored Counter rows), and displayed Table cells with Row Formula precedence. Bare keys, `@key`, and `{key}` are supported where the Number Formula grammar permits them; all substituted values must be safe integers for the dice parser.
+- Preserves Dice notation as the outer grammar: a Dice Formula still needs at least one valid dice term, and roll counts/faces/keep/drop values remain integers. Full Number Formula expressions can be calculated in referenced Number/Rating Fields before their result is substituted.
+- Fixes reference scanning and normalization for formulas with spaces around `d`, supports the exact checkbox-weighted pool expression `({cb_strength}*{strength} + {cb_skill1}*{skill1} + {cb_skill2}*{skill2})d{strength}kh{strength}`, and adds coverage for Checkboxes, Selection, Counters, Table cells, formula dependencies, and Field-key renames. Keeps package identity at **0.5.6**.
+- Expands Counter formula references across Number/Rating, Dice, Table/Metric, and Rest formulas. In addition to indexed row `max`, `used`/`spent`, and `remaining`/`current`/`available`, formulas can read row percentages (`remainingPercent`/`percent`/`availablePercent`, `usedPercent`/`spentPercent`) and row state (`isFull`/`isEmpty`, as `1` or `0`). The same derived properties are available on visible-row `.total` aggregates; aggregate percentages are weighted by each row maximum. Short root aliases such as `{spell_slots.remaining}` and `{spell_slots.max}` map to the corresponding total values. Property names are case-insensitive and accept underscore/hyphen variants. References use effective Template preset rows before statblock materialization, preserve hidden-row indexes, and exclude `max = 0` rows from aggregates and percentage/full/empty calculations. Updates the Portuguese and English formula, Dice, Counter, Rest, and index documentation.
 
 ## 0.5.6 — Statblock opening crash guard for Table references
 

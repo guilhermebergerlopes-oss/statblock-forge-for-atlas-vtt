@@ -60,6 +60,30 @@ The tokenizer recognizes bare identifiers beginning with a letter or `_`, follow
 
 A reference must exist and resolve to a usable number or boolean. A missing Field, empty Value, or non-numeric text makes the result unavailable; Forge does not silently convert invalid text to zero.
 
+### Counter Field references
+
+A Counter Field has a dedicated numeric reference path. The row index is zero-based and follows the merged Template preset/statblock order:
+
+| Reference | Meaning |
+|---|---|
+| `{spell_slots.0.max}` | Row maximum. |
+| `{spell_slots.0.used}` / `{spell_slots.0.spent}` | Spent uses. |
+| `{spell_slots.0.remaining}` / `{spell_slots.0.current}` / `{spell_slots.0.available}` | Remaining uses (`max - used`). |
+| `{spell_slots.total.max}` | Sum of visible row maximums. |
+| `{spell_slots.total.used}` / `{spell_slots.total.spent}` | Sum of visible spent uses. |
+| `{spell_slots.total.remaining}` / `{spell_slots.total.current}` / `{spell_slots.total.available}` | Sum of visible remaining uses. |
+| `{spell_slots.count}` / `{spell_slots.total.count}` | Number of visible rows. |
+| `{spell_slots.0.remainingPercent}` / `{spell_slots.0.currentPercent}` / `{spell_slots.0.percent}` | Remaining uses as a percentage of that row's maximum (`0`–`100`). |
+| `{spell_slots.0.usedPercent}` / `{spell_slots.0.spentPercent}` | Spent uses as a percentage of that row's maximum. |
+| `{spell_slots.0.isFull}` / `{spell_slots.0.isEmpty}` | Row state as a boolean number (`1` or `0`). |
+| `{spell_slots.total.remainingPercent}` / `{spell_slots.total.usedPercent}` | Percentage of the aggregate pool remaining/spent, weighted by row maximums. |
+| `{spell_slots.total.isFull}` / `{spell_slots.total.isEmpty}` | Full/empty state of the visible aggregate pool as `1` or `0`. |
+| `{spell_slots.remaining}` / `{spell_slots.used}` / `{spell_slots.max}` | Short forms of the matching `.total` aggregate properties. |
+
+A row with `max = 0` keeps its index but is hidden and excluded from totals. Configured Template rows are resolved even before their state is materialized in the statblock Value; an unspent preset row starts with `used = 0`. The `name`, `reset`, and `regain` text properties are not numeric formula references. These paths are also available to Dice Formula and Rest formulas; see [[27 - Dice Fields and Set Dice]] and [[28 - Counters]].
+
+Percentage properties return an unrounded decimal from `0` to `100`; `percent`, `availablePercent`, and `currentPercent` alias `remainingPercent`. `isFull` is `1` when a visible row/pool has a positive maximum and no uses spent; `isEmpty` is `1` when it has a positive maximum and no uses remaining. Hidden zero-maximum rows have no percentage or full/empty state. Property names are case-insensitive, and underscore/hyphen variants such as `remaining_percent` are accepted. Aggregate percentages use summed values (weighted by each row's maximum), not the average of individual row percentages.
+
 ### Fractional Ratings
 
 A Rating may store a representation such as `1/4`. In numeric formula context, Forge converts it to a decimal (`0.25`) without replacing the original representation stored on the sheet.

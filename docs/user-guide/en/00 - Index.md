@@ -16,7 +16,7 @@ forge-version: 0.5.0
 This manual explains how to create reusable Templates, arrange statblocks in the Canvas, configure Fields, build formulas, and use advanced features in **Statblock Forge for Atlas VTT**. The notes are designed for an Obsidian Vault and use Markdown, YAML frontmatter, wikilinks, and callouts.
 
 > [!info] Scope of this edition
-> This edition follows Forge codebase **0.5.0**. It includes Dice Field validation using the roll parser, full-expression recognition in text, Atlas-integrated roll history, and dynamic formulas in `dice` Fields based on Number/Rating Values. The package delivered by **Download documentation** contains 34 notes in the selected language: this index and 33 topic notes, grouped into four parts.
+> This edition follows Forge codebase **0.5.6**. It includes Dice Field validation using the roll parser, full-expression recognition in text, Atlas-integrated roll history, and dynamic formulas in `dice` Fields based on Number/Rating Values. The package delivered by **Download documentation** contains 35 notes in the selected language: this index and 34 topic notes, grouped into four parts.
 
 ## Recommended reading path
 
@@ -74,13 +74,15 @@ Forge has different formula families. They are not interchangeable:
 | Family | Where it is used | Syntax and example |
 |---|---|---|
 | **Number/Rating Formula** | Calculates the numeric Value of a Number/Rating Field. | [[25 - Formulas in Number and Rating]]; accepts bare keys, `@key`, and `{key}`. Example: `floor(@strength / 2)`. |
-| **Dice Formula** | Configured on a `dice` Field; builds a roll from statblock Values. | [[27 - Dice Fields and Set Dice]]; accepts `@fieldKey` and `{fieldKey}`; both forms can be mixed. Example: `@proficiency d{might}+{level}`. |
+| **Dice Formula** | Configured on a `dice` Field; builds a roll from statblock Values. | [[27 - Dice Fields and Set Dice]]; uses the Number/Rating reference resolver for Checkboxes, Selection, Counter rows, aggregates, percentages and full/empty states, calculated Fields, structured values, and Table cells, while keeping dice-roll syntax and integer limits. Example: `({cb_strength}*{strength})d{strength}kh{strength}`. |
 | **Rest formula** | Recovery, per-unit spending, and `regain` rules. | [[31 - Rest Rules and Formulas]]; accepts `@field_key` and `{field_key}`. Example: `@level d4` or `{level}d4`. |
 | **Scores column formula** | Calculates a derived cell in a Scores table. | [[05 - Fields]]; uses `value` for the current row cell and the column's documented syntax. |
+| **Table formulas** | Calculates each Table row and its column summary. | [[34 - Table Formulas]]; includes **Row Formula** and **Column Formula**, with displayed cell values and shared numeric references. |
 | **Metric formula** | Calculates the value of a Metric slot. | [[05 - Fields]] and [[25 - Formulas in Number and Rating]]; it is slot configuration, not the Field's own formula. |
 
 > [!warning] Do not mix formula syntaxes
 > `@key` and `{key}` are alternative Field-reference forms in Number/Rating formulas, Dice Formula, and Rest formulas. Number/Rating formulas also retain bare-key references. `value` belongs to the Number/Rating, Scores, or Metric formula context. Check the relevant note before copying an expression.
+> In **Table formulas**, bare `value` refers to the current cell/context input; `{value}` and `@value` explicitly reference a Field whose key is `value`. This distinction prevents confusing the current row value with a Field named `value`.
 
 ## Reading the examples
 
@@ -107,7 +109,7 @@ Forge has different formula families. They are not interchangeable:
 
 ## Scope, version, and language
 
-- Based on Statblock Forge **v0.5.0**.
+- Based on Statblock Forge **v0.5.6**.
 - Minimum Obsidian version declared in the manifest: **1.8.7**.
 - The plugin is marked desktop-only.
 - UI control names remain in English when that is the application's label; Brazilian Portuguese is also available in settings.

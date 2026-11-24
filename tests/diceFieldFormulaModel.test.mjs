@@ -8,6 +8,7 @@ import {
 } from '../src/statblocks/diceFieldFormulaModel.ts';
 import { calculateNumericFieldValue } from '../src/templates/numericFieldModel.ts';
 import { evaluatePreviewFormula } from '../src/render/previewValueModel.ts';
+import { tableCellReferenceIndex } from '../src/statblocks/tableFormulaModel.ts';
 import {
   changeTemplateFieldType,
   findFieldReferences,
@@ -106,7 +107,7 @@ test('Dice Field formula syntax accepts placeholders in dice counts, sides, and 
   assert.equal(isDiceFieldFormulaSyntaxValid(''), false);
 });
 
-test('unresolved, non-numeric, fractional, self, and non-Number/Rating references do not produce roll links', () => {
+test('unresolved, non-numeric, fractional, and self references do not produce roll links', () => {
   const { fields, resolve } = fixture();
   assert.equal(resolve(fields[3], { proficiency: 2, might: 8 }), '');
   assert.equal(resolve(fields[3], { proficiency: 2, might: 8, level: 'not a number' }), '');
@@ -141,7 +142,7 @@ test('renaming a Number/Rating Field updates Dice Formula references and depende
   assert.equal(findFieldReferences(template, 'training').some((ref) => ref.property === 'diceFormula'), true);
 });
 
-test('template validation requires Dice Formula references to resolve to another Number/Rating Field', () => {
+test('template validation accepts Number Formula-compatible Field references but rejects missing and self references', () => {
   const { fields } = fixture();
   const template = {
     format: 'atlas-statblock-template', version: 1, id: 'test', fields,
@@ -150,7 +151,11 @@ test('template validation requires Dice Formula references to resolve to another
   assert.equal(validateTemplateFields(template).some((issue) => issue.fieldKey === 'attack' && issue.code === 'missing-reference'), false);
   fields[3].diceFormula = '{weapon}d{might}';
   fields.push({ key: 'weapon', label: 'Weapon', type: 'text' });
+  assert.equal(validateTemplateFields(template).some((issue) => issue.fieldKey === 'attack' && issue.code === 'missing-reference'), false, 'numeric-compatible values from non-Number Fields are valid references');
+  fields[3].diceFormula = '{missing}d{might}';
   assert.equal(validateTemplateFields(template).some((issue) => issue.fieldKey === 'attack' && issue.code === 'missing-reference'), true);
+  fields[3].diceFormula = '{attack}d{might}';
+  assert.equal(validateTemplateFields(template).some((issue) => issue.fieldKey === 'attack' && issue.code === 'missing-reference'), true, 'a Dice Field cannot reference itself');
 });
 
 test('the renderer recalculates a formula-backed Dice Field when any source Value changes', async () => {
@@ -172,7 +177,9 @@ test('Dice Field formula editor exposes the placeholder syntax and validates it 
   const editor = await readFile(new URL('../src/views/templateFieldEditor.ts', import.meta.url), 'utf8');
   assert.match(editor, /else if \(field\.type === 'dice'\)/);
   assert.match(editor, /\{proficiency\}d\{might\}\+\{level\}/);
-  assert.match(editor, /isDiceFieldFormulaSyntaxValid\(formula\.value\)/);
+  assert.match(editor, /isDiceFieldFormulaSyntaxValid\(formula\.value, context\.template\.fields\)/);
+  assert.match(editor, /Checkboxes, Selection, calculated Fields, structured values, and Table cells/);
+  assert.match(editor, /outer expression must remain valid dice notation/);
   assert.match(editor, /setDiceFieldFormula\(field, formula\.value\)/);
 });
 
@@ -191,16 +198,16 @@ test('formula-backed Dice Fields also render as live roll links in Metric blocks
 });
 
 
-test('a Number/Rating source cannot be changed to a non-numeric type while Dice Formulas depend on it', () => {
+test('a Dice Formula source can change type because runtime uses Number Formula-compatible values', () => {
   const { fields } = fixture();
   const template = {
     format: 'atlas-statblock-template', version: 1, id: 'test', fields,
     layout: { maxColumns: 12, blocks: [] }, sample: { proficiency: 2, might: 8, level: 3 },
   };
-  assert.throws(() => changeTemplateFieldType(template, 'proficiency', 'text'), /usado por Dice Formulas/);
-  assert.equal(fields[0].type, 'number', 'the failed change must not mutate the source Field');
+  changeTemplateFieldType(template, 'proficiency', 'text');
+  assert.equal(fields[0].type, 'text', 'numeric-compatible text and structured values can remain valid formula sources');
   changeTemplateFieldType(template, 'proficiency', 'rating');
-  assert.equal(fields[0].type, 'rating', 'Number and Rating remain interchangeable formula sources');
+  assert.equal(fields[0].type, 'rating', 'the source Field can later change back without rewriting the Dice Formula');
 });
 
 
@@ -219,4 +226,125 @@ test('Dice Field formulas accept written advantage and preserve it after resolvi
   assert.equal(resolve(fields[3]), '2d8+3 adv');
   fields[3].diceFormula = '{proficiency}d{might}+{level} dis';
   assert.equal(resolve(fields[3]), '2d8+3 dis');
+});
+
+
+test('Dice Formula accepts Checkboxes boolean options and Selection options like Number Formula', () => {
+  const fields = [
+    { key: 'traits', label: 'Traits', type: 'checkboxes', options: [{ key: 'flying', label: 'Flying' }, { key: 'strong', label: 'Strong' }] },
+    { key: 'stance', label: 'Stance', type: 'choice', options: ['Aggressive', 'Defensive'] },
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({traits.strong}*{strength}+{stance.aggressive})d{strength}kh{strength}' },
+  ];
+  const sample = { traits: { flying: false, strong: true }, stance: 'Aggressive', strength: 4 };
+  const resolved = resolveDiceFieldFormula(fields[3], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '5d4kh4');
+  sample.traits.strong = false;
+  sample.stance = 'Defensive';
+  assert.equal(resolveDiceFieldFormula(fields[3], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields)), '', 'keeping four results from zero rolled dice is invalid');
+});
+
+test('Dice Formula supports checkbox-weighted dice pools with the requested dynamic die size and keep-highest count', () => {
+  const fields = [
+    { key: 'cb_strength', label: 'Use Strength', type: 'checkboxes', options: [{ key: 'enabled', label: 'Enabled' }] },
+    { key: 'cb_skill1', label: 'Use Skill 1', type: 'checkboxes', options: [{ key: 'enabled', label: 'Enabled' }] },
+    { key: 'cb_skill2', label: 'Use Skill 2', type: 'checkboxes', options: [{ key: 'enabled', label: 'Enabled' }] },
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'skill1', label: 'Skill 1', type: 'number' },
+    { key: 'skill2', label: 'Skill 2', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({cb_strength}*{strength} + {cb_skill1}*{skill1} + {cb_skill2}*{skill2}) d {strength}kh{strength}' },
+  ];
+  const sample = {
+    cb_strength: { enabled: true },
+    cb_skill1: { enabled: true },
+    cb_skill2: { enabled: false },
+    strength: 3,
+    skill1: 2,
+    skill2: 4,
+  };
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[6].diceFormula, fields), true);
+  const resolve = () => resolveDiceFieldFormula(fields[6], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolve(), '5d3kh3');
+  sample.cb_strength.enabled = false;
+  sample.cb_skill2.enabled = true;
+  assert.equal(resolve(), '6d3kh3', 'unselected Checkboxes contribute zero while checked options contribute one');
+});
+
+test('Dice Formula can consume the full Number Formula calculation of a referenced Field', () => {
+  const fields = [
+    { key: 'base', label: 'Base', type: 'number' },
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'pool', label: 'Pool', type: 'number', formula: 'strength >= 3 && true ? floor(base / 2) : ceil(base / 3)' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '{pool}d6kh{pool}' },
+  ];
+  const sample = { base: 9, strength: 4, pool: 0 };
+  const resolved = resolveDiceFieldFormula(fields[3], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '4d6kh4');
+});
+
+test('Dice Formula accepts computed Number/Rating dependencies and numeric properties in structured Fields', () => {
+  const fields = [
+    { key: 'base', label: 'Base', type: 'number' },
+    { key: 'strength', label: 'Strength', type: 'number', formula: 'floor(base / 2) + 1' },
+    { key: 'slots', label: 'Slots', type: 'counters' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '({strength}+{slots.0.max})d6kh{slots.0.used}' },
+  ];
+  const sample = { base: 5, strength: 0, slots: [{ used: 2, max: 4 }] };
+  const resolved = resolveDiceFieldFormula(fields[3], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '7d6kh2');
+});
+
+test('Dice Formula accepts Table cell references and uses the same displayed cell value as Number Formula', () => {
+  const fields = [
+    { key: 'scores', label: 'Scores storage', type: 'scores', forgeInternal: 'table-storage' },
+    { key: 'power', label: 'Power', type: 'number', formula: 'value + 1' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '{scores.row2.power}d6kh{scores.row2.power}' },
+  ];
+  const layout = { maxColumns: 12, blocks: [{ id: 'scores-block', type: 'scores', field: 'scores', fields: ['power'] }] };
+  const tableReferences = tableCellReferenceIndex(layout.blocks);
+  const sample = {
+    scores: {
+      format: 'statblock-forge-table-rows-v1', firstRowLabel: '',
+      extraRows: [{ label: 'Second', values: { power: 3 } }],
+    },
+    power: 9,
+  };
+  const resolved = resolveDiceFieldFormula(fields[2], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields, tableReferences, sample));
+  assert.equal(resolved, '4d6kh4');
+});
+
+test('Dice Formula supports bare Field keys and @ references, preserving labels and dice modifiers', () => {
+  const fields = [
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '(strength)d@strength+1[fire]' },
+  ];
+  const sample = { strength: 4 };
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[1].diceFormula, fields), true);
+  const resolved = resolveDiceFieldFormula(fields[1], fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '4d4+1[fire]');
+});
+
+test('Dice Formula dependency tracking and renaming include dotted references and Table columns', () => {
+  const fields = [
+    { key: 'traits', label: 'Traits', type: 'checkboxes' },
+    { key: 'scores', label: 'Scores', type: 'scores', forgeInternal: 'table-storage' },
+    { key: 'power', label: 'Power', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '{traits.flying}d{scores.row2.power}kh{power}' },
+  ];
+  const template = { format: 'atlas-statblock-template', version: 1, id: 'test', fields,
+    layout: { maxColumns: 12, blocks: [] }, sample: {} };
+  assert.equal(findFieldReferences(template, 'traits').some((ref) => ref.property === 'diceFormula'), true);
+  assert.equal(findFieldReferences(template, 'power').some((ref) => ref.property === 'diceFormula'), true);
+  renameTemplateFieldKey(template, 'traits', 'features');
+  renameTemplateFieldKey(template, 'power', 'might');
+  assert.equal(fields[3].diceFormula, '{features.flying}d{scores.row2.might}kh{might}');
+  assert.equal(findFieldReferences(template, 'features').some((ref) => ref.property === 'diceFormula'), true);
+  assert.equal(findFieldReferences(template, 'might').some((ref) => ref.property === 'diceFormula'), true);
 });

@@ -16,7 +16,7 @@ A **Dice** Field represents an expression to roll, such as `2d6+3`, `1d20+5`, or
 There are two distinct ways to configure a Dice Field:
 
 1. **Literal formula:** the roll text is the Field's own Value on each statblock.
-2. **Dice Formula:** the expression is defined in the Template and uses Number/Rating Values from the sheet to build the resolved formula.
+2. **Dice Formula:** the expression is defined in the Template and uses the same numeric-compatible Field references as Number/Rating formulas to build the resolved roll.
 
 The **Set Dice** action selects the dice set/rules associated with compatible Template roll contexts. It does not replace the Field expression.
 
@@ -37,11 +37,11 @@ The content must be an expression accepted by the parser and contain at least on
 
 ### `@field` references in dice text
 
-The editor's syntax validator recognizes explicit Field references in dice expressions as numeric placeholders while checking notation. For a Template-controlled roll, use **Dice Formula**, which validates Number/Rating Field dependencies and accepts both `@fieldKey` and `{fieldKey}`.
+The editor's syntax validator recognizes explicit Field references in dice expressions as numeric placeholders while checking notation. For a Template-controlled roll, use **Dice Formula**, which accepts `@fieldKey`, `{fieldKey}`, and bare Field keys, with the same numeric-compatible reference lookup as Number/Rating formulas.
 
 ## 2. Dynamic Dice Formula with `@field` or `{fieldKey}`
 
-**Dice Formula** is configured in the Dice Field's Template properties. It turns statblock Values into a resolved dice expression. Use `@key` or `{key}` around the exact key of the source Field. Both forms can appear in one expression; use braces for keys containing hyphens:
+**Dice Formula** is configured in the Dice Field's Template properties. It turns statblock Values into a resolved dice expression. References use the same resolver as Number/Rating formulas: use a bare Field key, `@key`, or `{key}`. Dotted paths can read Checkboxes and Selection options, numeric properties inside structured Values, and Table cells. Braces are safest for keys containing hyphens:
 
 ```text
 @proficiency d{might}+{level}
@@ -69,36 +69,66 @@ The configured formula stays in the Template. The numbers `2`, `8`, and `3` belo
 1. Create or select a **Dice** Field.
 2. Open that Field's properties.
 3. Enter the expression in **Dice Formula** using `@fieldKey` or `{fieldKey}`.
-4. Confirm that each placeholder points to another **Number** or **Rating** Field in the same Template.
+4. Confirm that every reference points to another Field in the same Template and resolves to a numeric-compatible value.
 5. Fill Samples with valid integers to preview the resolved expression.
 6. Save the Template and test it on a real statblock.
 
 The configured formula accepts up to **500 characters**. The final expanded expression must still obey the dice parser's limits.
 
-### Which Fields can be referenced
+### Which Values can be referenced
 
-Only **Number** and **Rating** Fields can be referenced by `@fieldKey` or `{fieldKey}`. A Dice Field cannot reference itself.
+Dice Formula uses the same reference resolver as Number/Rating formulas. It can read:
 
-Every substituted Value must be a **safe integer**. This matters because the number before `d` means the number of dice, and the number after `d` means the die's faces.
+- Number and Rating Values, including the displayed result of a Field's own Formula;
+- Checkboxes options and Selection options as booleans (`true` becomes `1`, `false` becomes `0`);
+- Selection options configured with **Each with a number**, through `.number`;
+- nested object properties and array positions when they contain a numeric/boolean Value;
+- displayed Table cells, including Table Row Formulas and child Number/Rating formulas;
+- any other Field Value that the Number Formula resolver can interpret as a number or boolean.
 
-| Source Value | Example | Resolution |
-|---|---|---|
-| Integer | `proficiency = 2` | Valid. |
-| Negative integer as a modifier | `modifier = -1` | Can participate as a constant/additive term when the resulting expression is valid. |
-| Fractional Rating | `challenge = 1/4` | Not substituted: fractions are not integers. |
-| Decimal | `might = 8.5` | Not substituted. |
-| Text | `might = "high"` | Not substituted. |
-| Missing Field | `{missing}` | Unresolved. |
-| Wrong type | `{weaponName}` where the Field is Text | Unresolved. |
+Examples:
 
-If any reference is missing, empty, fractional, or the wrong type, the formula does not produce a roll link. Forge shows an unavailable state (`—`) and does not silently replace a bad reference with zero.
+```text
+{traits.flying} * {strength}
+{stance.aggressive} * {proficiency}
+{slots.0.max}d6kh{slots.0.used}
+{scores.row2.power}d{strength}kh{strength}
+```
+
+For simple keys, bare references and `@key` are also supported. Use braces for keys containing hyphens and for dotted paths when you want the reference to be unambiguous.
+
+### Checkbox-weighted dice pools
+
+A Checkboxes Field can be referenced as a whole Field: it resolves to `1` when at least one configured option is checked and `0` when none is checked. You can multiply that boolean by a numeric Field to include or exclude its contribution from a dice pool:
+
+```text
+({cb_strength}*{strength} + {cb_skill1}*{skill1} + {cb_skill2}*{skill2})d{strength}kh{strength}
+```
+
+For example, with Strength `3`, Skill 1 `2`, Skill 2 `4`, and only `cb_strength` plus `cb_skill1` checked, the formula resolves to `5d3kh3`: roll five d3 and keep the highest three. You can also reference one option directly, such as `{traits.flying}`.
+
+Counter Fields provide row-level and aggregate references. For example, `{spell_slots.0.max}`, `{spell_slots.0.used}`, and `{spell_slots.0.remaining}` read the first row's maximum, spent uses, and remaining uses. `.spent` aliases `.used`; `.current` and `.available` alias `.remaining`. Indexes start at zero and follow the merged Template-preset/statblock row order. A preset row can be referenced before it is materialized in the statblock Value; its initial `used` is zero.
+
+The aggregate can be read through `.total` paths such as `{spell_slots.total.remaining}`, or with shorter root aliases such as `{spell_slots.remaining}`, `{spell_slots.used}`, and `{spell_slots.max}`. `{spell_slots.count}` returns the number of visible rows. Rows with `max = 0` keep their index but are hidden and excluded from aggregates.
+
+Counters also expose derived values: `.remainingPercent` (aliases `.percent`, `.availablePercent`, and `.currentPercent`), `.usedPercent` (alias `.spentPercent`), `.isFull`, and `.isEmpty`. Percentages are unrounded values from `0` to `100`; full/empty flags are boolean numbers (`1` or `0`). Aggregate percentages are weighted by the rows' maximums. Property names are case-insensitive, and underscore/hyphen spellings such as `.remaining_percent` are accepted. A hidden row with `max = 0` has no percentage or full/empty state.
+
+The same Counter paths work in Number/Rating, Dice Formula, Table/Metric, and Rest formulas. Only numeric properties are formula values; text properties such as `name`, `reset`, and `regain` are not. Dice Formula requires every resolved value used in the roll expression to be a safe integer, so fractional percentages cannot be inserted directly as dice counts/faces. Use a Number/Rating Field formula such as `floor({spell_slots.0.remainingPercent})` when an integer is required.
+
+If a referenced Number/Rating Field has its own Formula, the complete Number Formula is evaluated first — including arithmetic, comparisons, logical expressions, ternary conditions, and supported functions such as `floor`, `ceil`, `round`, `abs`, `min`, and `max. Dice Formula then substitutes that calculated result.
+
+The final substitution still has to be a **safe integer**. Dice counts, die faces, keep/drop amounts, and constants are whole-number values in the dice parser. A fractional Rating such as `1/4`, a decimal such as `8.5`, missing data, or non-numeric text does not produce a roll link. This is the dice-notation constraint; it does not change how Number/Rating formulas display fractional results.
+
+The Dice Formula itself remains a dice expression, not a general Number Formula. Use a referenced Number/Rating Field when you need to calculate a value with Number Formula functions or conditions; the resolved value must still be a safe integer for the dice parser.
+
+A Dice Field cannot reference itself. Missing references and unresolved/circular calculations produce an unavailable state (`—`); values are not silently replaced with zero.
 
 ### What happens when a Field changes
 
-- Changing a source Number/Rating Value updates the displayed Dice Formula on the sheet.
-- If the source Field has its own formula, its calculated numeric result is used for that substitution.
+- Changing any referenced Value — including a Checkboxes option, Selection option, structured property, or Table cell — updates the displayed Dice Formula on the sheet.
+- If a referenced Number/Rating Field has its own Formula, its calculated displayed result is used for that substitution.
 - Renaming a key through the editor updates recognized `@oldKey` and `{oldKey}` references.
-- A Number/Rating Field used by a Dice Formula cannot be deleted or converted to an incompatible type until the dependency is fixed.
+- A Field referenced by a Dice Formula cannot be deleted until the dependency is fixed. Changing its type is allowed, but the resulting Value must still resolve as a number or boolean.
 - The sheet user edits source Values, not the expression defined in the Template.
 
 ### Example: attribute and proficiency damage
@@ -245,7 +275,7 @@ Rolls made through Forge links store the formula, source, Dice Set, and advantag
 | Family | Reference syntax | Result |
 |---|---|---|
 | Number/Rating | `strength + proficiency`, `value * 2` | Deterministic number; no roll. |
-| Dice Formula | `@proficiency d{might}+{level}` or `{proficiency}d{might}+@level` | Substitutes integer Values and creates a roll. |
+| Dice Formula | `@proficiency d{might}+{level}` or `{traits.flying}d{might}+@level` | Substitutes numeric-compatible references and creates a roll. |
 | Rest Formula | `(@level)d4`, `1d8+2` | Recovery/spending rule with `@field` references and its own validator. |
 | Counter `regain` | `1d4`, `2d6+1` | Literal per-row dice formula used by **Restore to full**. |
 
@@ -256,8 +286,8 @@ Rolls made through Forge links store the formula, source, Dice Set, and advantag
 
 | Symptom | Check |
 |---|---|
-| Dice Formula displays `—` | Confirm all placeholders exist and point to Number/Rating Fields. |
-| Formula does not resolve even though the Fields exist | Check that all substituted Values are safe integers. |
+| Dice Formula displays `—` | Confirm all reference roots exist, the path/option is valid, and every resolved value is a safe integer. |
+| Formula does not resolve even though the Fields exist | Check the nested option/property path and confirm all substituted Values are safe integers. |
 | Parser rejects the expression | Check operators, parentheses, modifiers, and parser limits. |
 | `avg` is missing | The expression may contain modifiers, references, or operations without a reliable simple average. |
 | Custom Set is missing | Check the JSON in `atlas-vtt/dice-sets/`, especially `id`, `name`, `dice`, and `crit`. |

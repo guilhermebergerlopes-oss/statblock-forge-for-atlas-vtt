@@ -18,19 +18,16 @@ test('typography options normalize independently for general text, labels and va
     fontStyle: 'italic',
     textDecoration: 'underline',
     letterSpacing: 1.25,
-    lineHeight: 1.6,
     labelFontSize: 11,
     labelFontWeight: '600',
     labelFontStyle: 'normal',
     labelTextDecoration: 'line-through',
     labelLetterSpacing: -0.5,
-    labelLineHeight: 1.2,
     valueFontSize: 20,
     valueFontWeight: '500',
     valueFontStyle: 'italic',
     valueTextDecoration: 'none',
     valueLetterSpacing: 2,
-    valueLineHeight: 1.8,
   });
 
   assert.equal(appearance.fontSize, 16);
@@ -38,15 +35,12 @@ test('typography options normalize independently for general text, labels and va
   assert.equal(appearance.fontStyle, 'italic');
   assert.equal(appearance.textDecoration, 'underline');
   assert.equal(appearance.letterSpacing, 1.25);
-  assert.equal(appearance.lineHeight, 1.6);
   assert.equal(appearance.labelFontSize, 11);
   assert.equal(appearance.labelFontWeight, '600');
   assert.equal(appearance.labelTextDecoration, 'line-through');
-  assert.equal(appearance.labelLineHeight, 1.2);
   assert.equal(appearance.valueFontSize, 20);
   assert.equal(appearance.valueFontWeight, '500');
   assert.equal(appearance.valueTextDecoration, 'none');
-  assert.equal(appearance.valueLineHeight, 1.8);
 });
 
 test('typography values are clamped or discarded when malformed', () => {
@@ -57,9 +51,6 @@ test('typography values are clamped or discarded when malformed', () => {
     letterSpacing: -4,
     labelLetterSpacing: 20,
     valueLetterSpacing: 'wide',
-    lineHeight: 4.5,
-    labelLineHeight: 0.4,
-    valueLineHeight: Number.NaN,
     fontWeight: '900',
     labelFontStyle: 'oblique',
     valueTextDecoration: 'blink',
@@ -71,23 +62,17 @@ test('typography values are clamped or discarded when malformed', () => {
   assert.equal(appearance.letterSpacing, -1);
   assert.equal(appearance.labelLetterSpacing, 8);
   assert.equal(appearance.valueLetterSpacing, undefined);
-  assert.equal(appearance.lineHeight, 3);
-  assert.equal(appearance.labelLineHeight, 0.8);
-  assert.equal(appearance.valueLineHeight, undefined);
   assert.equal(appearance.fontWeight, undefined);
   assert.equal(appearance.labelFontStyle, undefined);
   assert.equal(appearance.valueTextDecoration, undefined);
 });
 
 test('custom appearance preserves typography while theme mode ignores it', () => {
-  const configured = { fontSize: 18, lineHeight: 1.7, labelFontWeight: '700', labelLineHeight: 1.1, valueFontStyle: 'italic', valueLineHeight: 2 };
+  const configured = { fontSize: 18, labelFontWeight: '700', valueFontStyle: 'italic' };
   const custom = resolveBlockAppearanceForMode(configured, 'custom');
   assert.equal(custom.fontSize, 18);
-  assert.equal(custom.lineHeight, 1.7);
   assert.equal(custom.labelFontWeight, '700');
-  assert.equal(custom.labelLineHeight, 1.1);
   assert.equal(custom.valueFontStyle, 'italic');
-  assert.equal(custom.valueLineHeight, 2);
   assert.deepEqual(resolveBlockAppearanceForMode(configured, 'theme'), {});
   assert.equal(resolveBlockAppearanceForMode({}, 'custom').fontSize, undefined);
 });
@@ -99,13 +84,10 @@ test('appearance CSS exposes independent typography variables only when configur
     fontStyle: 'italic',
     textDecoration: 'underline',
     letterSpacing: 0.5,
-    lineHeight: 1.55,
     labelFontSize: 12,
     labelFontWeight: '600',
-    labelLineHeight: 1.1,
     valueFontSize: 21,
     valueTextDecoration: 'line-through',
-    valueLineHeight: 1.9,
   });
 
   assert.equal(css['--forge-block-font-size'], '17px');
@@ -113,13 +95,10 @@ test('appearance CSS exposes independent typography variables only when configur
   assert.equal(css['--forge-block-font-style'], 'italic');
   assert.equal(css['--forge-block-text-decoration'], 'underline');
   assert.equal(css['--forge-block-letter-spacing'], '0.5px');
-  assert.equal(css['--forge-block-line-height'], '1.55');
   assert.equal(css['--forge-block-label-font-size'], '12px');
   assert.equal(css['--forge-block-label-font-weight'], '600');
-  assert.equal(css['--forge-block-label-line-height'], '1.1');
   assert.equal(css['--forge-block-value-font-size'], '21px');
   assert.equal(css['--forge-block-value-text-decoration'], 'line-through');
-  assert.equal(css['--forge-block-value-line-height'], '1.9');
   assert.equal(buildBlockAppearanceCss({})['--forge-block-font-size'], undefined);
 });
 
@@ -128,7 +107,7 @@ test('Block Appearance inspector exposes general, label and value typography con
   for (const scope of ["translateForgeText('All text'", "translateForgeText('Labels'", "translateForgeText('Values'"]) {
     assert.ok(inspector.includes(scope), `missing typography scope ${scope}`);
   }
-  for (const option of ['Font size (px)', 'Font weight', 'Font style', 'Text decoration', 'Letter spacing (px)', 'Line spacing (×)', 'Customize line spacing']) {
+  for (const option of ['Font size (px)', 'Font weight', 'Font style', 'Text decoration', 'Letter spacing (px)']) {
     assert.ok(inspector.includes(`'${option}'`), `missing control ${option}`);
   }
   assert.match(inspector, /delete record\[weightKey\]/);
@@ -142,9 +121,9 @@ test('renderer maps typography metadata to scoped data flags and stylesheet rule
     readFile(new URL('styles.css', root), 'utf8'),
   ]);
   for (const flag of [
-    'customTextFontSize', 'customTextFontWeight', 'customTextFontStyle', 'customTextTextDecoration', 'customTextLetterSpacing', 'customTextLineHeight',
-    'customLabelFontSize', 'customLabelFontWeight', 'customLabelFontStyle', 'customLabelTextDecoration', 'customLabelLetterSpacing', 'customLabelLineHeight',
-    'customValueFontSize', 'customValueFontWeight', 'customValueFontStyle', 'customValueTextDecoration', 'customValueLetterSpacing', 'customValueLineHeight',
+    'customTextFontSize', 'customTextFontWeight', 'customTextFontStyle', 'customTextTextDecoration', 'customTextLetterSpacing',
+    'customLabelFontSize', 'customLabelFontWeight', 'customLabelFontStyle', 'customLabelTextDecoration', 'customLabelLetterSpacing',
+    'customValueFontSize', 'customValueFontWeight', 'customValueFontStyle', 'customValueTextDecoration', 'customValueLetterSpacing',
   ]) {
     assert.ok(renderer.includes(`'${flag}'`), `renderer missing ${flag}`);
     const cssFlag = flag.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
@@ -155,9 +134,6 @@ test('renderer maps typography metadata to scoped data flags and stylesheet rule
   assert.match(stylesheet, /font-style: var\(--forge-block-font-style\) !important/);
   assert.match(stylesheet, /text-decoration: var\(--forge-block-label-text-decoration\) !important/);
   assert.match(stylesheet, /letter-spacing: var\(--forge-block-value-letter-spacing\) !important/);
-  assert.match(stylesheet, /line-height: var\(--forge-block-line-height\) !important/);
-  assert.match(stylesheet, /line-height: var\(--forge-block-label-line-height\) !important/);
-  assert.match(stylesheet, /line-height: var\(--forge-block-value-line-height\) !important/);
 });
 
 
@@ -172,14 +148,11 @@ test('typography settings survive Forge sidecar serialization and reload', () =>
     fontStyle: 'italic',
     textDecoration: 'underline',
     letterSpacing: 0.5,
-    lineHeight: 1.55,
     labelFontSize: 12,
     labelFontWeight: '600',
-    labelLineHeight: 1.2,
     valueFontSize: 22,
     valueFontStyle: 'normal',
     valueTextDecoration: 'line-through',
-    valueLineHeight: 1.8,
   };
 
   const serialized = serializeForgeTemplateFile(template, layout);
@@ -193,12 +166,9 @@ test('typography settings survive Forge sidecar serialization and reload', () =>
   assert.equal(appearance?.fontStyle, 'italic');
   assert.equal(appearance?.textDecoration, 'underline');
   assert.equal(appearance?.letterSpacing, 0.5);
-  assert.equal(appearance?.lineHeight, 1.55);
   assert.equal(appearance?.labelFontSize, 12);
   assert.equal(appearance?.labelFontWeight, '600');
-  assert.equal(appearance?.labelLineHeight, 1.2);
   assert.equal(appearance?.valueFontSize, 22);
   assert.equal(appearance?.valueFontStyle, 'normal');
   assert.equal(appearance?.valueTextDecoration, 'line-through');
-  assert.equal(appearance?.valueLineHeight, 1.8);
 });

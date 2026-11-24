@@ -31,7 +31,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 
 - Choose a built-in theme or create a reusable custom theme with an eight-color palette.
 - Adjust the outer frame, token-art frame, borders, shapes, and individual block appearance.
-- Customize typography per block and per Field, independently for all text, labels, and values (font size, weight, italic style, text decoration, letter spacing, and line spacing). Field overrides follow the Field across blocks and take priority over block typography.
+- Customize typography per block and per Field, independently for all text, labels, and values (font size, weight, italic style, text decoration, and letter spacing). Field overrides follow the Field across blocks and take priority over block typography.
 - Import and export reusable themes and frames with `.forgestyle` packages.
 - Frame and reposition images directly in the statblock.
 
@@ -39,7 +39,7 @@ Forge can be used on its own and integrates directly with the original Atlas VTT
 
 - Calculate Number and Rating values with formulas that reference other Fields.
 - Calculate Table cells per row and show per-column summaries with Table-specific formulas.
-- Build dynamic Dice Field formulas from the current statblock's values.
+- Build dynamic Dice Field formulas with the same Number/Rating reference resolver: Number/Rating calculations, Checkboxes and Selection booleans, Counter row values (`max`, `used`/`spent`, `remaining`/`current`/`available`), percentages, full/empty states, root and `.total` aggregates, visible-row counts, preset defaults, other structured numeric properties, and displayed Table cells. The final expression still follows dice notation and uses safe integer values.
 - Use clickable dice expressions in statblock text; rolling uses the Atlas dice service when the integration is available.
 - Track Resources and Counter uses, including maximums, spending, and recovery.
 - Configure Rest buttons with rules, player choices, and actions that affect compatible Resources and Counters.

@@ -132,6 +132,10 @@ attack + stance.aggressive * 2
 
 Each option reference always returns `1` or `0`. This works with both single-choice Selection and Selection with **Pick several** enabled: in multiple-choice mode, every selected option independently evaluates to `1`.
 
+### Numbered Selection options
+
+When **Each with a number** is enabled, an option can store an associated number. Use the `.number` suffix to read it, for example `@languages.common.number` or `{languages.common.number}`. If the option number is blank, the resolver returns `0`; this is separate from the option's boolean reference, which returns `1` or `0` according to selection.
+
 If different labels produce the same key, Forge adds a numeric suffix (`_2`, `_3`, ...). Avoid identical labels: because the native Value stores the option text, two options with exactly the same label cannot be distinguished. Since keys are derived from labels, renaming an option may change its formula reference; review formulas that use the option after changing its label. Custom values allowed by **Allow other values** make the Field itself evaluate to `1`, but do not create an option reference until they are added to the configured list.
 
 ### Example — stance bonus
@@ -151,10 +155,11 @@ Checkboxes and Selection references are resolved by the same formula evaluator. 
 | Context | Application |
 |---|---|
 | **Number/Rating Formula** | A numeric Field formula can reference Checkboxes and Selection options. |
+| **Dice Formula** | A Checkboxes Field or option supplies `1`/`0` to a roll formula, such as `({cb_strength}*{strength})d6kh3`. |
 | **Metric slot Formula** | A Metric slot formula can reference both categories and updates when one of those Fields changes. |
 | **Scores: derived column** | A derived column can reference both categories and the current cell's `value`. |
 
-Rest formulas and Dice Formulas continue to use their own grammars and do not automatically receive these boolean references.
+Rest formulas continue to use their own reference grammar. Dice Formula now uses the same numeric-compatible reference resolver as Number/Rating formulas, so Checkboxes and Selection booleans can be used as `0`/`1` sources in a dice expression, subject to the dice parser’s whole-number requirements.
 
 ## Sheet Values and Samples
 

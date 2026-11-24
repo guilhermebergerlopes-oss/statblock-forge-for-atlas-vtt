@@ -10,6 +10,7 @@ import { resolveTableRowFormulaValues, TABLE_DISPLAYED_FIELD_KEYS_CONTEXT } from
 import type { TableCellReferenceIndex } from '../statblocks/tableFormulaModel.ts';
 import { calculateNumericFieldValue, isFormulaCapableNumericField } from '../templates/numericFieldModel.ts';
 import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
+import { resolveCounterFormulaReference } from '../statblocks/counterFormulaReferenceModel.ts';
 
 export interface ScorePreviewGrid {
   columns: string[];
@@ -445,6 +446,7 @@ function evaluatePreviewFormulaInternal(
   const truthy = (value: FormulaAtom): boolean => typeof value === 'boolean' ? value : value !== 0;
   const selectionFields = new Map(fields.filter((field) => field.type === 'choice').map((field) => [field.key, field]));
   const checkboxFields = new Map(fields.filter((field) => field.type === 'checkboxes').map((field) => [field.key, field]));
+  const counterFields = new Map(fields.filter((field) => field.type === 'counters').map((field) => [field.key, field]));
   const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
 
   /**
@@ -575,6 +577,11 @@ function evaluatePreviewFormulaInternal(
         return option ? (raw[option.key] === true ? 1 : 0) : undefined;
       }
       return undefined;
+    }
+    const counterField = counterFields.get(rootKey);
+    if (counterField && parts.length > 0) {
+      const counterReference = resolveCounterFormulaReference(counterField, sample[rootKey], parts);
+      if (counterReference.matched) return counterReference.value;
     }
     if (parts.length === 0) {
       const displayedKeys = sample[TABLE_DISPLAYED_FIELD_KEYS_CONTEXT];

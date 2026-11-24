@@ -16,6 +16,11 @@ Um Field do tipo **Checkboxes** armazena várias opções independentes, cada um
 
 Use Checkboxes para características que ligam/desligam: voar, nadar, estar protegido por escudo, possuir visão no escuro, ativar uma postura ou receber uma condição de equipamento. Não use um Checkbox quando o dado precisa contar mais de dois estados; nesse caso, Choice, Number ou outro Field pode ser mais adequado.
 
+## Escolhas únicas e múltiplas
+
+No inspetor do Field, a opção **Multiple choices** permite marcar mais de uma opção no mesmo Field. Quando está desativada, marcar uma opção desmarca as outras opções daquele Field. Desmarcar a opção selecionada deixa o conjunto sem seleção. **Os outros Fields Checkboxes nunca são afetados**: cada Field mantém seu próprio estado. Templates antigos sem essa configuração abrem em modo de múltiplas escolhas para preservar o comportamento anterior; novos Fields começam em modo de escolha única.
+
+
 ## Criar e configurar as opções
 
 1. No editor do Template, crie um Field da categoria **Checkboxes**.
@@ -102,6 +107,32 @@ strength + traits.flying * 2 + defenses.armored
 
 Cada opção contribui `0` ou `1` independentemente.
 
+## Selection como Booleano
+
+Um Field **Selection** também pode ser usado como entrada booleana de uma fórmula. Cada opção configurada pode ser referenciada individualmente: a opção selecionada retorna `1`; as demais retornam `0`. Quando nenhuma opção está selecionada, todas retornam `0`. O próprio Field, sem o sufixo de uma opção, retorna `1` quando contém uma escolha e `0` quando está vazio.
+
+A referência de uma opção usa a key do Field, um ponto e uma key derivada do rótulo. Por exemplo:
+
+| Field | Opção configurada | Referência |
+|---|---|---|
+| `stance` | `Aggressive` | `stance.aggressive` |
+| `stance` | `Defensive` | `stance.defensive` |
+| `stance` | `Night Vision` | `stance.night_vision` |
+
+Também é possível usar `@` ou chaves:
+
+```text
+@stance.aggressive
+{stance.night_vision}
+attack + stance.aggressive * 2
+```
+
+Isso funciona em Selection de escolha única e com **Pick several** ativado. Se rótulos diferentes produzirem a mesma key, o Forge acrescenta um sufixo numérico (`_2`, `_3` etc.). Renomear um rótulo pode alterar a key derivada, então revise fórmulas depois de editar opções. Values personalizados permitidos por **Allow other values** fazem o Field retornar `1`, mas não criam uma referência de opção até serem adicionados à lista configurada.
+
+### Opções Selection com números
+
+Quando **Each with a number** está ativo, uma opção pode ter um número associado. Use o sufixo `.number` para ler esse número, por exemplo `@languages.common.number` ou `{languages.common.number}`. Se o número estiver vazio, o resolvedor retorna `0`; isso é diferente da referência booleana da opção, que retorna `1` ou `0` conforme a seleção.
+
 ## Onde referências booleanas funcionam
 
 As opções booleanas podem ser consultadas nos contextos que usam `evaluatePreviewFormula()`:
@@ -109,8 +140,11 @@ As opções booleanas podem ser consultadas nos contextos que usam `evaluatePrev
 | Contexto | Aplicação |
 |---|---|
 | **Number/Rating Formula** | A fórmula de um Field numérico pode usar `traits.flying`. Consulte [[25 - Fórmulas em Number e Rating]]. |
+| **Dice Formula** | Um Field Checkboxes ou uma opção fornece `1`/`0` para uma rolagem, como `({cb_strength}*{strength})d6kh3`. |
 | **Metric slot Formula** | Uma fórmula escrita diretamente no slot Metric pode usar opções Checkboxes e atualiza quando a opção muda. |
 | **Scores: coluna derivada** | Uma coluna derivada que usa a expressão compartilhada pode consultar opções booleanas e o `value` da célula correspondente. |
+
+Dice Formula usa o mesmo resolvedor de referências da Number/Rating. Um Field Checkboxes inteiro retorna `1` se alguma opção estiver marcada e `0` caso contrário; uma referência de opção, como `{traits.flying}`, retorna o estado daquela opção. Os resultados ainda precisam ser inteiros seguros para a notação de rolagem.
 
 O bloco **Checkboxes** é onde o usuário marca/desmarca as opções; ele não é, por si só, um bloco de cálculo. O cálculo ocorre em outro contexto que referencia a opção.
 

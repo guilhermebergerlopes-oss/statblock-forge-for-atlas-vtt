@@ -11,17 +11,6 @@ import {
 } from '../src/documentation/documentationPackage.ts';
 import { FORGE_DOCUMENTATION_FILES_EN } from '../src/documentation/documentationPackage.en.ts';
 
-test('downloadable Portuguese and English appearance guides document block and Field line spacing', () => {
-  const portuguese = FORGE_DOCUMENTATION_FILES.map((file) => file.content).join('\n');
-  const english = FORGE_DOCUMENTATION_FILES_EN.map((file) => file.content).join('\n');
-  assert.match(portuguese, /Line spacing \(×\)/);
-  assert.match(portuguese, /0,8× a 3×/);
-  assert.match(portuguese, /Tipografia do Field/);
-  assert.match(english, /Line spacing \(×\)/);
-  assert.match(english, /0\.8×–3×/);
-  assert.match(english, /Field-level overrides follow the Field/);
-});
-
 function createVaultMock() {
   const folders = new Set();
   const files = new Map();
@@ -95,6 +84,80 @@ test('does not overwrite a folder that conflicts with a documentation filename',
     writeForgeDocumentation(vault, folder, 'en'),
     /já existe como pasta/,
   );
+});
+
+test('Dice Formula guides document Number Formula-compatible values and checkbox-weighted dice pools', () => {
+  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '27 - Dice Fields e Set Dice.md');
+  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '27 - Dice Fields and Set Dice.md');
+  assert.ok(portuguese);
+  assert.ok(english);
+  for (const guide of [portuguese.content, english.content]) {
+    assert.match(guide, /same resolver as Number\/Rating|same Number\/Rating|mesmo resolvedor|mesmas referências/i);
+    assert.match(guide, /\{cb_strength\}\*\{strength\}/);
+    assert.match(guide, /d\{strength\}kh\{strength\}/);
+    assert.match(guide, /Checkboxes/);
+    assert.match(guide, /Selection/);
+    assert.match(guide, /Counter/);
+    assert.match(guide, /Table/);
+    assert.match(guide, /safe integer|inteiro seguro/i);
+    assert.match(guide, /own Formula|fórmula própria/i);
+  }
+});
+
+test('downloadable Counter guides document indexed row values, aliases, aggregates, presets, and formula contexts', () => {
+  const portugueseCounters = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '28 - Counters.md');
+  const englishCounters = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '28 - Counters.md');
+  const portugueseNumeric = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '25 - Fórmulas em Number e Rating.md');
+  const englishNumeric = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '25 - Formulas in Number and Rating.md');
+  const portugueseRest = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '31 - Regras e fórmulas de Rest.md');
+  const englishRest = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '31 - Rest Rules and Formulas.md');
+  const all = [portugueseCounters, englishCounters, portugueseNumeric, englishNumeric, portugueseRest, englishRest];
+  for (const guide of all) assert.ok(guide, 'both language bundles must include the Counter reference guides');
+
+  for (const guide of [portugueseCounters.content, englishCounters.content]) {
+    assert.match(guide, /spell_slots\.0\.max/);
+    assert.match(guide, /spell_slots\.0\.used/);
+    assert.match(guide, /spell_slots\.0\.spent/);
+    assert.match(guide, /spell_slots\.0\.remaining/);
+    assert.match(guide, /spell_slots\.0\.current/);
+    assert.match(guide, /spell_slots\.0\.available/);
+    assert.match(guide, /spell_slots\.total\.max/);
+    assert.match(guide, /spell_slots\.total\.used/);
+    assert.match(guide, /spell_slots\.total\.spent/);
+    assert.match(guide, /spell_slots\.total\.remaining/);
+    assert.match(guide, /total\.current/);
+    assert.match(guide, /spell_slots\.total\.available/);
+    assert.match(guide, /spell_slots\.count/);
+    assert.match(guide, /spell_slots\.total\.count/);
+    assert.match(guide, /spell_slots\.0\.remainingPercent/);
+    assert.match(guide, /spell_slots\.0\.currentPercent/);
+    assert.match(guide, /spell_slots\.0\.usedPercent/);
+    assert.match(guide, /spell_slots\.0\.isFull/);
+    assert.match(guide, /spell_slots\.0\.isEmpty/);
+    assert.match(guide, /spell_slots\.total\.remainingPercent/);
+    assert.match(guide, /spell_slots\.total\.isFull/);
+    assert.match(guide, /spell_slots\.remaining/);
+    assert.match(guide, /max = 0/);
+    assert.match(guide, /preset|predefinid/i);
+  }
+
+  for (const guide of [portugueseNumeric.content, englishNumeric.content]) {
+    assert.match(guide, /Counter Field references|Referências a (?:Fields )?Counter|Counter Field.*referenc/i);
+    assert.match(guide, /total\.current/);
+    assert.match(guide, /spell_slots\.0\.remaining/);
+    assert.match(guide, /remainingPercent/);
+    assert.match(guide, /isEmpty/);
+    assert.match(guide, /spell_slots\.remaining/);
+  }
+  for (const guide of [portugueseRest.content, englishRest.content]) {
+    assert.match(guide, /spell_slots\.0\.remaining/);
+    assert.match(guide, /spell_slots\.total\.used/);
+    assert.match(guide, /total\.current/);
+    assert.match(guide, /remainingPercent/);
+    assert.match(guide, /isEmpty/);
+    assert.match(guide, /spell_slots\.remaining/);
+    assert.match(guide, /regain/);
+  }
 });
 
 test('downloadable Portuguese and English guides document Checkbox multiple choices and Selection boolean formulas', () => {
@@ -250,17 +313,4 @@ test('downloadable Table guides distinguish always-available Template row contro
   assert.match(portuguese.content, /Allow adding rows in statblocks.*somente.*statblocks/i);
   assert.match(english.content, /Template construction mode.*controls.*always visible/i);
   assert.match(english.content, /Allow adding rows in statblocks.*only in rendered statblocks/i);
-});
-
-test('downloadable per-block appearance guides explain copy and paste without changing destination content', () => {
-  const portuguese = FORGE_DOCUMENTATION_FILES.find((file) => file.name === '21 - Aparência individual dos blocos.md');
-  const english = FORGE_DOCUMENTATION_FILES_EN.find((file) => file.name === '21 - Per-Block Appearance.md');
-  assert.ok(portuguese);
-  assert.ok(english);
-  for (const guide of [portuguese.content, english.content]) {
-    assert.match(guide, /Copy appearance|Copiar aparência/);
-    assert.match(guide, /Paste appearance|Colar aparência/);
-    assert.match(guide, /Ctrl\+C.*Ctrl\+V/);
-    assert.match(guide, /content.*unchanged|conteúdo.*inalterados/i);
-  }
 });

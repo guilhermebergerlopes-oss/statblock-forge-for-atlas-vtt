@@ -65,7 +65,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEditorContext, 'renderPreviewOnly' | 'language'>, field: ForgeField): HTMLElement {
+export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEditorContext, 'renderPreviewOnly' | 'language' | 'template'>, field: ForgeField): HTMLElement {
   const panel = el('div', 'statblock-forge__numeric-field-formula-editor');
   if (field.type === 'number' || field.type === 'rating') {
     const formula = textareaInput(typeof field.formula === 'string' ? field.formula : '', 'Formula', 5);
@@ -80,19 +80,19 @@ export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEdito
   } else if (field.type === 'dice') {
     const formula = inputText(typeof field.diceFormula === 'string' ? field.diceFormula : '', '{proficiency}d{might}+{level}');
     const hint = el('small', 'statblock-forge__detail', translateForgeText(
-      'Use {fieldKey} to insert a whole-number value from a Number or Rating Field. The formula updates when those values change.',
+      'Use the same references as Number/Rating formulas: {fieldKey}, @fieldKey, bare keys, Checkboxes, Selection, calculated Fields, structured values, and Table cells. Resolved values must be whole numbers, and the outer expression must remain valid dice notation.',
       contextLanguage(context),
     ));
     const warning = el('small', 'statblock-forge__hint is-warning', translateForgeText(
       'Enter a valid dice formula with at least one die.', contextLanguage(context),
     ));
-    warning.hidden = !formula.value.trim() || isDiceFieldFormulaSyntaxValid(formula.value);
+    warning.hidden = !formula.value.trim() || isDiceFieldFormulaSyntaxValid(formula.value, context.template.fields);
     formula.addEventListener('input', () => {
-      warning.hidden = formula.value.trim() === '' || isDiceFieldFormulaSyntaxValid(formula.value);
+      warning.hidden = formula.value.trim() === '' || isDiceFieldFormulaSyntaxValid(formula.value, context.template.fields);
     });
     formula.addEventListener('change', () => {
       setDiceFieldFormula(field, formula.value);
-      warning.hidden = formula.value.trim() === '' || isDiceFieldFormulaSyntaxValid(formula.value);
+      warning.hidden = formula.value.trim() === '' || isDiceFieldFormulaSyntaxValid(formula.value, context.template.fields);
       context.renderPreviewOnly();
     });
     panel.append(labeledControl(translateForgeText('Dice Formula', contextLanguage(context)), formula), hint, warning);
@@ -211,7 +211,7 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
       formula = inputText(diceFormulaValue, '{proficiency}d{might}+{level}');
       formula.addEventListener('input', () => { diceFormulaValue = formula?.value ?? ''; });
       typeSpecificHost.append(labeledControl(translateForgeText('Dice Formula', context.language), formula, translateForgeText(
-        'Use {fieldKey} to insert a whole-number value from a Number or Rating Field. The formula updates when those values change.', context.language,
+        'Use the same references as Number/Rating formulas: {fieldKey}, @fieldKey, bare keys, Checkboxes, Selection, calculated Fields, structured values, and Table cells. Resolved values must be whole numbers, and the outer expression must remain valid dice notation.', context.language,
       )));
     }
     if (selectedType === 'choice') {

@@ -23,7 +23,6 @@ function isUserField(field: ForgeField): boolean {
 export function renderTemplateFieldTypographyInspector(options: TemplateFieldTypographyInspectorOptions): HTMLElement {
   const { template, layout, language } = options;
   const panel = el('details', 'statblock-forge__field-typography-inspector');
-  panel.dataset.forgeDisclosureKey = 'field-typography:panel';
   panel.append(el('summary', '', translateForgeText('Field typography', language)));
   panel.append(el('p', 'statblock-forge__detail', translateForgeText(
     'Customize the text of one Field everywhere it appears in this statblock. These settings override block typography for that Field.',
@@ -61,9 +60,9 @@ export function renderTemplateFieldTypographyInspector(options: TemplateFieldTyp
     options.renderPreviewOnly();
   };
   const controlsContext = { language, renderPreviewOnly: onChange };
-  appendTypographyControls(panel, translateForgeText('All text', language), 'text', mutableAppearance, controlsContext, 'field-typography:scope:text');
-  appendTypographyControls(panel, translateForgeText('Labels', language), 'label', mutableAppearance, controlsContext, 'field-typography:scope:label');
-  appendTypographyControls(panel, translateForgeText('Values', language), 'value', mutableAppearance, controlsContext, 'field-typography:scope:value');
+  appendTypographyControls(panel, translateForgeText('All text', language), 'text', mutableAppearance, controlsContext);
+  appendTypographyControls(panel, translateForgeText('Labels', language), 'label', mutableAppearance, controlsContext);
+  appendTypographyControls(panel, translateForgeText('Values', language), 'value', mutableAppearance, controlsContext);
 
   const reset = button(translateForgeText('Reset field typography', language), () => {
     resetFieldTypographyForField(layout, selected);

@@ -22,12 +22,6 @@ A aparência individual permite que um bloco específico use a paleta global do 
 
 Cada bloco possui seu próprio estado de aparência. Alterar um `Stat` não altera automaticamente outro `Stat`, mesmo quando ambos apresentam Fields do mesmo tipo.
 
-### Copiar aparência entre blocos
-
-No painel **Block appearance**, use **Copiar aparência** no bloco de origem. Selecione outro bloco e clique em **Colar aparência**. O botão de colar fica habilitado depois que uma aparência é copiada. O recurso funciona entre blocos e Templates enquanto a sessão do plugin estiver ativa.
-
-Somente o modo de aparência (**Theme** ou **Custom**) e as configurações visuais do bloco são copiadas. O conteúdo, os Fields vinculados, fórmulas, dimensões, posição, visibilidade e demais propriedades estruturais do bloco de destino permanecem inalterados. As ações explícitas no inspetor foram escolhidas em vez de `Ctrl+C`/`Ctrl+V` para não interferir na cópia de texto, edição de inputs nem nos atalhos nativos do Obsidian.
-
 ## Modos Theme e Custom
 
 | Modo | Comportamento |

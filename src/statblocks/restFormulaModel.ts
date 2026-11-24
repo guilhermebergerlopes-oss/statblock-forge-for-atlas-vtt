@@ -5,6 +5,7 @@
  */
 import { evaluatePreviewFormula } from '../render/previewValueModel.ts';
 import { calculateNumericFieldValue } from '../templates/numericFieldModel.ts';
+import { resolveCounterFormulaReference } from './counterFormulaReferenceModel.ts';
 import { isRecord, type ForgeTemplate, type JsonRecord } from '../templates/forgeTemplate.ts';
 import { evaluateFormula } from './atlasDiceEngine/evaluateFormula.ts';
 import { FORMULA_LIMITS, parseFormula } from './atlasDiceEngine/parseFormula.ts';
@@ -55,6 +56,12 @@ function nestedValue(data: JsonRecord, path: string): unknown {
 
 /** Atlas-style statblock lookup over the Forge field record, including calculated numeric fields. */
 function lookupValue(template: ForgeTemplate, data: JsonRecord, path: string): unknown {
+  const [rootKey, ...segments] = path.split('.');
+  const rootField = template.fields.find((candidate) => candidate.key === rootKey);
+  if (rootField?.type === 'counters' && segments.length > 0) {
+    const counterReference = resolveCounterFormulaReference(rootField, data[rootField.key], segments);
+    if (counterReference.matched) return counterReference.value;
+  }
   const field = template.fields.find((candidate) => candidate.key === path);
   if (field && (field.type === 'number' || field.type === 'rating')) {
     // Match the value shown by the Field. If its Formula is unavailable, do

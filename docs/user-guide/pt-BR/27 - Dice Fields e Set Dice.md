@@ -18,7 +18,7 @@ Um Field do tipo **Dice** representa uma expressão que será rolada, como `2d6+
 Há dois modos distintos de configurar um Dice Field:
 
 1. **Fórmula literal:** o texto da rolagem é o próprio Value do Field em cada statblock.
-2. **Dice Formula:** a expressão é definida no Template e usa Values Number/Rating da ficha para construir a fórmula resolvida.
+2. **Dice Formula:** a expressão é definida no Template e usa as mesmas referências numéricas compatíveis das fórmulas Number/Rating para construir a rolagem resolvida.
 
 A ação **Set Dice** escolhe qual conjunto de dados/regras acompanhará rolagens compatíveis do Template. Ela não substitui a expressão do Field.
 
@@ -39,11 +39,11 @@ O conteúdo precisa ser uma expressão reconhecida pelo parser e conter pelo men
 
 ### Referências `@field` em texto de dados
 
-A validação do editor reconhece referências explícitas em expressões de dados como placeholders numéricos ao verificar a sintaxe. Para uma rolagem controlada pelo Template, use **Dice Formula**, que valida dependências de Fields Number/Rating e aceita tanto `@fieldKey` quanto `{fieldKey}`.
+A validação do editor reconhece referências explícitas em expressões de dados como placeholders numéricos ao verificar a sintaxe. Para uma rolagem controlada pelo Template, use **Dice Formula**, que aceita `@fieldKey`, `{fieldKey}` e keys simples, usando o mesmo resolvedor de referências compatíveis com números das fórmulas Number/Rating.
 
 ## 2. Dice Formula dinâmica com `@field` ou `{fieldKey}`
 
-**Dice Formula** é configurada nas propriedades do Field Dice no Template. Ela transforma os Values da ficha em uma expressão de dados resolvida. Use `@key` ou `{key}` em torno da key exata do Field de origem. As duas formas podem aparecer na mesma expressão; use chaves para keys que contenham hífen:
+**Dice Formula** é configurada nas propriedades do Field Dice no Template. Ela transforma os Values da ficha em uma expressão de dados resolvida. As referências usam o mesmo resolvedor das fórmulas Number/Rating: use a key simples, `@key` ou `{key}`. Caminhos com pontos podem acessar opções de Checkboxes e Selection, propriedades numéricas de Values estruturados e células de Tables. As chaves são a forma mais segura para keys com hífen:
 
 ```text
 @proficiency d{might}+{level}
@@ -71,36 +71,66 @@ A fórmula configurada permanece no Template. Os números `2`, `8` e `3` pertenc
 1. Crie ou selecione um Field do tipo **Dice**.
 2. Abra as propriedades desse Field.
 3. Preencha **Dice Formula** com a expressão usando `@fieldKey` ou `{fieldKey}`.
-4. Confira se cada placeholder corresponde a outro Field **Number** ou **Rating** do mesmo Template.
+4. Confira se cada referência aponta para outro Field do mesmo Template e retorna um valor compatível com números.
 5. Preencha os Samples com inteiros válidos para conferir a fórmula resolvida.
 6. Salve o Template e teste em uma ficha real.
 
 O campo aceita até **500 caracteres** para a fórmula configurada. O texto final ainda precisa respeitar os limites do parser de dados.
 
-### Quais Fields podem ser usados
+### Quais Values podem ser referenciados
 
-Somente Fields do tipo **Number** e **Rating** podem ser referenciados por `@fieldKey` ou `{fieldKey}`. O próprio Dice Field não pode referenciar a si mesmo.
+A Dice Formula usa o mesmo resolvedor de referências das fórmulas Number/Rating. Ela pode acessar:
 
-Cada valor substituído precisa ser um **inteiro seguro**. Isso é importante porque o número antes de `d` representa a quantidade de dados e o número depois de `d` representa suas faces.
+- Values Number e Rating, incluindo o resultado exibido da fórmula própria do Field;
+- opções de Checkboxes e Selection como booleanos (`true` vira `1`, `false` vira `0`);
+- opções Selection configuradas com **Each with a number**, usando `.number`;
+- propriedades de objetos e posições de arrays quando contêm um valor numérico/booleano;
+- células exibidas de Tables, incluindo Row Formulas e fórmulas Number/Rating dos Fields filhos;
+- qualquer outro Value de Field que o resolvedor Number Formula consiga interpretar como número ou booleano.
 
-| Valor de origem | Exemplo | Resolução |
-|---|---|---|
-| Inteiro | `proficiency = 2` | Válido. |
-| Inteiro negativo como modificador | `modifier = -1` | Pode participar de uma constante/soma quando a expressão resultante for válida. |
-| Fração de Rating | `challenge = 1/4` | Não é substituída: frações não são inteiros. |
-| Decimal | `might = 8.5` | Não é substituído. |
-| Texto | `might = "high"` | Não é substituído. |
-| Field ausente | `{missing}` | Não resolvido. |
-| Tipo incompatível | `{weaponName}` em Text | Não resolvido. |
+Exemplos:
 
-Se alguma referência estiver ausente, vazia, fracionária ou for de tipo incompatível, a fórmula não gera link de rolagem. O Forge mostra o estado indisponível (`—`) e não substitui o valor por zero silenciosamente.
+```text
+{traits.flying} * {strength}
+{stance.aggressive} * {proficiency}
+{slots.0.max}d6kh{slots.0.used}
+{scores.row2.power}d{strength}kh{strength}
+```
+
+Para keys simples, também são aceitas referências sem delimitador e com `@key`. Use chaves em keys com hífen e em caminhos com pontos quando quiser evitar ambiguidades.
+
+### Pools de dados ponderados por Checkboxes
+
+Um Field Checkboxes pode ser referenciado como um Field inteiro: ele retorna `1` quando pelo menos uma opção configurada está marcada e `0` quando nenhuma está marcada. Multiplique esse booleano por um Field numérico para incluir ou excluir sua contribuição de um pool:
+
+```text
+({cb_strength}*{strength} + {cb_skill1}*{skill1} + {cb_skill2}*{skill2})d{strength}kh{strength}
+```
+
+Por exemplo, com Strength `3`, Skill 1 `2`, Skill 2 `4`, e somente `cb_strength` e `cb_skill1` marcados, a fórmula resulta em `5d3kh3`: role cinco d3 e mantenha os três maiores. Também é possível referenciar uma opção individual, como `{traits.flying}`.
+
+Fields Counter possuem referências por linha e agregadas. Por exemplo, `{spell_slots.0.max}`, `{spell_slots.0.used}` e `{spell_slots.0.remaining}` leem o máximo, os usos gastos e os usos restantes da primeira linha. `.spent` é alias de `.used`; `.current` e `.available` são aliases de `.remaining`. Os índices começam em zero e seguem a ordem combinada dos presets do Template e das linhas da ficha. Uma linha de preset pode ser consultada antes de ser materializada no Value da ficha; seu `used` inicial é zero.
+
+Os totais podem ser consultados por caminhos `.total`, como `{spell_slots.total.remaining}`, ou por atalhos na raiz, como `{spell_slots.remaining}`, `{spell_slots.used}` e `{spell_slots.max}`. `{spell_slots.count}` retorna a quantidade de linhas visíveis. Linhas com `max = 0` mantêm seu índice, mas ficam ocultas e são excluídas dos agregados.
+
+Counters também oferecem valores derivados: `.remainingPercent` (aliases `.percent`, `.availablePercent` e `.currentPercent`), `.usedPercent` (alias `.spentPercent`), `.isFull` e `.isEmpty`. Percentuais são valores não arredondados de `0` a `100`; estados cheio/vazio são booleanos numéricos (`1` ou `0`). Percentuais agregados são ponderados pelos máximos das linhas. Os nomes das propriedades não diferenciam maiúsculas de minúsculas, e formas com sublinhado/hífen como `.remaining_percent` são aceitas. Uma linha oculta com `max = 0` não possui percentual nem estado cheio/vazio.
+
+Os mesmos caminhos de Counter funcionam em fórmulas Number/Rating, Dice Formula, Table/Metric e Rest. Somente propriedades numéricas são valores de fórmula; propriedades textuais como `name`, `reset` e `regain` não são. Dice Formula exige que todo valor resolvido usado na rolagem seja um inteiro seguro, então percentuais fracionários não podem ser inseridos diretamente como quantidade de dados/faces. Use uma fórmula Number/Rating como `floor({spell_slots.0.remainingPercent})` quando precisar de um inteiro.
+
+Se um Field Number/Rating referenciado possui uma fórmula própria, a Number Formula completa é calculada primeiro — incluindo operações aritméticas, comparações, lógica, condições ternárias e funções suportadas como `floor`, `ceil`, `round`, `abs`, `min` e `max`. Em seguida, Dice Formula substitui o valor calculado.
+
+O valor substituído ainda precisa ser um **inteiro seguro**. Quantidade de dados, faces, valores de keep/drop e constantes são inteiros no parser de dados. Um Rating fracionário como `1/4`, um decimal como `8.5`, dados ausentes ou texto não numérico não geram um link de rolagem. Essa é uma restrição da notação de dados; ela não altera como as fórmulas Number/Rating exibem resultados fracionários.
+
+A própria Dice Formula continua sendo uma expressão de rolagem, não uma Number Formula geral. Quando precisar calcular um valor com funções ou condições da Number Formula, use um Field Number/Rating referenciado; o resultado ainda precisa ser um inteiro seguro para o parser de dados.
+
+Um Dice Field não pode referenciar a si próprio. Referências ausentes, caminhos inválidos ou cálculos circulares deixam a fórmula indisponível (`—`); o Forge não substitui silenciosamente esses valores por zero.
 
 ### O que acontece quando um Field é alterado
 
-- Alterar o Value de um Number/Rating de origem atualiza a Dice Formula exibida na ficha.
-- Alterar o Value de um Field de origem que possui sua própria fórmula usa o resultado numérico calculado desse Field como substituição.
+- Alterar qualquer Value referenciado — incluindo uma opção de Checkboxes, uma opção de Selection, uma propriedade estruturada ou uma célula de Table — atualiza a Dice Formula exibida na ficha.
+- Se um Field Number/Rating referenciado possui sua própria fórmula, o resultado calculado exibido por esse Field é usado na substituição.
 - Renomear a key pelo editor atualiza referências `@oldKey` e `{oldKey}` reconhecidas.
-- Um Field Number/Rating usado por Dice Formula não pode ser excluído ou convertido para um tipo incompatível até que a dependência seja corrigida.
+- Um Field referenciado por Dice Formula não pode ser excluído até que a dependência seja corrigida. Alterar o tipo é permitido, mas o Value resultante ainda precisa ser interpretado como número ou booleano.
 - O usuário da ficha edita os Values de origem, não a expressão definida no Template.
 
 ### Exemplo: dano por atributo e proficiência
@@ -255,7 +285,7 @@ As rolagens feitas por links do Forge guardam a fórmula, a origem, o Dice Set e
 
 | Sintoma | Verificação |
 |---|---|
-| Dice Formula mostra `—` | Verifique se todos os placeholders existem e apontam para Number/Rating. |
+| Dice Formula mostra `—` | Verifique se todas as referências existem, se o caminho/opção é válido e se cada valor resolvido é um inteiro seguro. |
 | Fórmula não resolve apesar dos Fields existirem | Confira se todos os Values substituídos são inteiros seguros. |
 | Parser rejeita a expressão | Confira operadores, parênteses, modificadores e limites do parser. |
 | `avg` não aparece | A expressão pode conter modificadores, referências ou operações sem média simples confiável. |

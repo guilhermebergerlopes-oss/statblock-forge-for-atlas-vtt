@@ -29,9 +29,6 @@ test('Field typography accepts only supported text properties and clamps numeric
     fontStyle: 'italic',
     textDecoration: 'underline',
     letterSpacing: -5,
-    lineHeight: 3.4,
-    labelLineHeight: 0.3,
-    valueLineHeight: Number.NaN,
     labelFontSize: 4,
     labelFontWeight: '900',
     valueFontSize: 21,
@@ -45,9 +42,6 @@ test('Field typography accepts only supported text properties and clamps numeric
   assert.equal(appearance.fontStyle, 'italic');
   assert.equal(appearance.textDecoration, 'underline');
   assert.equal(appearance.letterSpacing, -1);
-  assert.equal(appearance.lineHeight, 3);
-  assert.equal(appearance.labelLineHeight, 0.8);
-  assert.equal(appearance.valueLineHeight, undefined);
   assert.equal(appearance.labelFontSize, 8);
   assert.equal(appearance.labelFontWeight, undefined);
   assert.equal(appearance.valueFontSize, 21);
@@ -74,9 +68,6 @@ test('Field typography survives a Field key rename and Forge sidecar save/reload
   const originalId = layout.fieldIds.mana;
   setFieldTypographyForField(layout, field, {
     fontSize: 19,
-    lineHeight: 1.6,
-    labelLineHeight: 1.1,
-    valueLineHeight: 1.9,
     fontWeight: '700',
     fontStyle: 'italic',
     labelFontSize: 11,
@@ -96,9 +87,6 @@ test('Field typography survives a Field key rename and Forge sidecar save/reload
   assert.equal(reopened.fileFormat, 'forge');
   assert.equal(reopened.layout.fieldIds.mana_points, originalId);
   assert.equal(fieldTypographyForField(reopened.layout, reopenedField).fontSize, 19);
-  assert.equal(fieldTypographyForField(reopened.layout, reopenedField).lineHeight, 1.6);
-  assert.equal(fieldTypographyForField(reopened.layout, reopenedField).labelLineHeight, 1.1);
-  assert.equal(fieldTypographyForField(reopened.layout, reopenedField).valueLineHeight, 1.9);
   assert.equal(fieldTypographyForField(reopened.layout, reopenedField).fontWeight, '700');
   assert.equal(fieldTypographyForField(reopened.layout, reopenedField).fontStyle, 'italic');
   assert.equal(fieldTypographyForField(reopened.layout, reopenedField).labelFontSize, 11);
@@ -148,7 +136,7 @@ test('Appearance tab exposes a Field selector and independent general, label and
   for (const label of ["'All text'", "'Labels'", "'Values'"]) {
     assert.ok(inspector.includes(label), `missing ${label} typography group`);
   }
-  for (const option of ['Font size (px)', 'Font weight', 'Font style', 'Text decoration', 'Letter spacing (px)', 'Line spacing (×)', 'Customize line spacing']) {
+  for (const option of ['Font size (px)', 'Font weight', 'Font style', 'Text decoration', 'Letter spacing (px)']) {
     assert.ok(blockInspector.includes(`'${option}'`), `missing control ${option}`);
   }
 });
@@ -168,9 +156,6 @@ test('Field typography is applied to values in Lists, Pairs, Checkboxes, Spells,
   ];
   for (const selector of selectors) assert.ok(renderer.includes(selector), `missing typography selector ${selector}`);
   assert.match(renderer, /applyFieldTypographyToNode\(maximumNumber, layout, maximumField\.key\)/);
-  assert.match(renderer, /'lineHeight', 'line-height', String/);
-  assert.match(renderer, /'labelLineHeight', 'line-height', String/);
-  assert.match(renderer, /'valueLineHeight', 'line-height', String/);
   assert.match(renderer, /applyFieldTypographyToNode\(th, layout, field\.key\)/);
   assert.match(renderer, /applyFieldTypographyToNode\(cell, layout, field\.key\)/);
   assert.match(renderer, /applyFieldTypographyToNode\(fieldGroup, layout, field\?\.key\)/);

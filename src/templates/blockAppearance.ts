@@ -219,9 +219,9 @@ export function normalizeBlockAppearance(value: unknown): BlockAppearance {
     ['imagePositionY', 0, 100],
   ];
   const typographyNumeric: Array<[keyof BlockAppearance, number, number]> = [
-    ['fontSize', 8, 48], ['letterSpacing', -1, 8], ['lineHeight', 0.8, 3],
-    ['labelFontSize', 8, 48], ['labelLetterSpacing', -1, 8], ['labelLineHeight', 0.8, 3],
-    ['valueFontSize', 8, 48], ['valueLetterSpacing', -1, 8], ['valueLineHeight', 0.8, 3],
+    ['fontSize', 8, 48], ['letterSpacing', -1, 8],
+    ['labelFontSize', 8, 48], ['labelLetterSpacing', -1, 8],
+    ['valueFontSize', 8, 48], ['valueLetterSpacing', -1, 8],
   ];
   for (const [key, min, max] of [...numeric, ...typographyNumeric]) {
     const parsed = clamp(record[key as string], min, max);
@@ -370,19 +370,16 @@ export function buildBlockAppearanceCss(appearance: BlockAppearance): Record<str
     ['fontStyle', '--forge-block-font-style', String],
     ['textDecoration', '--forge-block-text-decoration', String],
     ['letterSpacing', '--forge-block-letter-spacing', (value) => `${value}px`],
-    ['lineHeight', '--forge-block-line-height', String],
     ['labelFontSize', '--forge-block-label-font-size', (value) => `${value}px`],
     ['labelFontWeight', '--forge-block-label-font-weight', String],
     ['labelFontStyle', '--forge-block-label-font-style', String],
     ['labelTextDecoration', '--forge-block-label-text-decoration', String],
     ['labelLetterSpacing', '--forge-block-label-letter-spacing', (value) => `${value}px`],
-    ['labelLineHeight', '--forge-block-label-line-height', String],
     ['valueFontSize', '--forge-block-value-font-size', (value) => `${value}px`],
     ['valueFontWeight', '--forge-block-value-font-weight', String],
     ['valueFontStyle', '--forge-block-value-font-style', String],
     ['valueTextDecoration', '--forge-block-value-text-decoration', String],
     ['valueLetterSpacing', '--forge-block-value-letter-spacing', (value) => `${value}px`],
-    ['valueLineHeight', '--forge-block-value-line-height', String],
   ];
   for (const [key, variable, format] of typographyVariables) {
     const value = appearance[key];
