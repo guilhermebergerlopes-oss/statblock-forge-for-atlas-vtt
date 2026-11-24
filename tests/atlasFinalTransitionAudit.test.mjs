@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { auditForgeRelease } from '../scripts/audit-release.mjs';
 
-test('final release audit confirms Atlas-native runtime and Forge 0.5.9 identity', () => {
+test('final release audit confirms Atlas-native runtime and Forge 0.5.10 identity', () => {
   const report = auditForgeRelease();
   assert.equal(report.ok, true, report.errors.join('\n'));
   assert.equal(report.pluginId, 'statblock-forge');
-  assert.equal(report.version, '0.5.9');
+  assert.equal(report.version, '0.5.10');
   assert.equal(report.forkDependencies, 0);
   assert.equal(report.legacyRuntimeMatches, 0);
   assert.equal(report.missingImports, 0);

@@ -1,4 +1,4 @@
-# Statblock Forge v0.5.9 — Copy/Paste Block Appearance
+# Statblock Forge v0.5.10 — Copy/Paste Block Appearance
 
 - Restores the inspector actions **Copy appearance** and **Paste appearance**. The clipboard stores a detached snapshot of appearance mode and visual settings only. Pasting does not change block content, Field links, formulas, dimensions, position, visibility, or structure. The clipboard works across blocks and Templates during the active plugin session. Explicit buttons are used instead of Ctrl+C/Ctrl+V to avoid interfering with text editing and Obsidian shortcuts.
 
@@ -73,6 +73,14 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 - Right-click also provides the roll menu and access to that statblock's roll history. With Atlas 0.18.0 or newer, choose **Save roll to Atlas collection** to create a named roll in the collection. When the formula can be represented as a Dice Lab look, the save dialog offers to make it an individual roll with its own dice and rules: a matching active Dice Set is copied (including names, colours, critical, explosion, advantage, and disadvantage), while other simple additive dice formulas start with their written dice and natural criticals. You can further edit the saved roll in Atlas' native Dice Lab saved-roll editor. Written `adv`/`dis` and formulas with unsupported modifiers stay as formula presets to preserve their meaning. Right-click the source formula again to **Pin** or **Unpin** matching saved rolls in Atlas' native dice row. The row holds up to 10 positions (including its standard dice); use Atlas' own row editor to reorder or remove entries. Forge retains up to 20 history entries per statblock (500 total) in plugin data; it also reads Atlas map history while the originating map is open. Repeating an Atlas roll uses its original visible map when available, or the saved Dice Set through Forge's local engine after the map closes.
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
+
+## Version 0.5.10
+
+- Advances the plugin, manifest, package identity, release audit, and bundled documentation to **0.5.10**. This is a release-number update; it preserves the Copy appearance / Paste appearance feature introduced in 0.5.9 without changing its behavior.
+
+## Version 0.5.9
+
+- Adds **Copy appearance** and **Paste appearance** to the block Appearance inspector. The actions copy only the appearance mode and visual settings between blocks during the active plugin session; block content, Fields, formulas, dimensions, position, visibility, and layout are not copied.
 
 ## Version 0.5.8
 
