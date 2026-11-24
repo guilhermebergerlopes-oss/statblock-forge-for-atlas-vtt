@@ -23,14 +23,14 @@ Isso **não** é um sistema de contas do Obsidian, permissões de pasta do Vault
 | **Players can edit** | `edit` | Jogadores podem visualizar e editar o Value do Field. |
 | **Players can only read** | `read` | Jogadores podem visualizar o Value, mas não editá-lo. |
 | **Hidden from players** | `hidden` | O Field não é apresentado aos jogadores, mas permanece no statblock final para o mestre. |
-| **Total Hidden** | Metadado de layout Forge + `hidden` | Remove o bloco do statblock final do Forge e marca seus Fields como `hidden` nos dados do Template Forge. |
+| **Total Hidden** | Metadado de layout Forge + `hidden` | Remove o bloco do statblock final do Forge e marca seus Fields como `hidden` para a exportação Atlas. |
 
 `Total Hidden` não é um quarto valor da propriedade `players`. É uma configuração local de visibilidade do layout do Forge que também aplica a permissão `hidden` aos Fields representados.
 
 ## Valores padrão
 
 - Fields comuns usam `edit` por padrão.
-- Fields `groups` usam `read` por padrão; o inspetor não oferece `edit` para um bloco que representa somente Fields `groups`.
+- Fields `spells` usam `read` por padrão; o inspetor não oferece `edit` para um bloco que representa somente Fields `spells`.
 - Fields fixos do cabeçalho, como `name`, a key `image`, Fields com significado `display-name` e Fields do tipo Image são tratados como somente leitura por Atlas.
 
 O Forge grava apenas exceções ao padrão. Quando o acesso de um Field volta ao padrão, sua entrada é removida de `players`. Se não restarem exceções, a propriedade inteira pode ser removida. Keys antigas registradas em `formerKeys` também são limpas ao alterar o acesso pela key atual.
@@ -41,7 +41,7 @@ O inspetor só mostra **Players** quando o bloco selecionado representa Fields c
 
 | Tipo de bloco | Fields considerados pelo inspetor |
 |---|---|
-| **Metric Container** | Todos os Fields-filhos listados em `fields`, mais o Field de `headingField`, se houver. |
+| **Metric** | Todos os Fields listados em `fields`, mais o Field de `headingField`, se houver. |
 | **Entries** | O Field associado em `field`, mais `headingField`, se houver. |
 | **Tabs de Abilities** | Os Fields de Entries quando cada aba tem exatamente uma Section e essa Section tem exatamente um bloco Entries. |
 | **Bloco ligado a um Field** | O Field associado em `field`, mais o Field de título/cabeçalho quando aplicável. |
@@ -69,7 +69,7 @@ O bloco continua no layout e no statblock final do Forge. Os jogadores não rece
 O Forge grava `visibility: total-hidden` nos metadados de layout do bloco e marca os Fields representados como `hidden` na propriedade `players`.
 
 - No statblock final renderizado pelo Forge, o bloco é omitido.
-- Em um Template Forge, o bloco permanece no layout e seus Fields usam a permissão `hidden`, para que os jogadores não os vejam e o mestre ainda possa consultá-los. Templates importados do Atlas são convertidos para essa representação Forge.
+- Na cópia/template publicada para Atlas, o bloco permanece no layout, mas os Fields são exportados com permissão `hidden`, para que os jogadores não os vejam e o mestre ainda possa consultá-los.
 - O `.forgetemplate` original mantém o bloco no Canvas do editor para que continue disponível para edição.
 
 Se você escolher novamente `edit`, `read` ou `hidden`, a marca `Total Hidden` é removida do metadado do bloco e a visibilidade normal do bloco é restaurada.
@@ -82,13 +82,13 @@ As permissões só têm efeito em visualizações e fluxos que respeitam os meta
 
 ## Exemplo de configuração
 
-Considere um Metric Container com os Fields-filhos `hp`, `armor` e `secret_dc`:
+Considere um bloco Metric com `hp`, `armor` e `secret_dc`:
 
 - `hp`: `edit`, para permitir atualização pelos jogadores;
 - `armor`: `read`, para permitir consulta sem alteração;
 - `secret_dc`: `hidden`, para manter o dado no statblock do mestre, sem apresentá-lo aos jogadores.
 
-Se todos estiverem dentro do mesmo Metric Container, uma única configuração Players aplica a mesma permissão a todos eles. Para permissões distintas, coloque Fields em blocos separados ou use estruturas de layout separadas.
+Se todos estiverem no mesmo Metric, uma única configuração Players aplica a mesma permissão a todos eles. Para permissões distintas, coloque Fields em blocos separados ou use estruturas de layout separadas.
 
 ## Veja também
 

@@ -70,9 +70,9 @@ With Atlas VTT 0.17.0 or newer active, click a dice link in an Atlas Ctrl-hover 
 
 Queued modifiers are temporary: they apply to the next successful roll for that statblock and are not written into the Template or statblock note.
 
-## Version 0.5.6
+## Version 0.5.7
 
-- Keeps the plugin/package version at **0.5.6**; this maintenance update does not increment the version.
+- Updates the plugin/package release identity to **0.5.7** without changing runtime behavior.
 - Applies configurable Custom block padding equally to the top, right, bottom, and left sides. Theme-only spacing resets no longer override Custom padding, including on value and divider blocks.
 - Publishes native `.atlastemplate` mirrors so Forge Templates appear in Atlas collection Roles. Each mirror has its own stable Atlas ID, and notes created from a Role resolve back to the original `.forgetemplate`.
 - Includes independent typography controls for all block text, labels, values, and individual Fields.

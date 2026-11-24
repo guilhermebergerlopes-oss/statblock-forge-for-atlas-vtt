@@ -21,7 +21,7 @@ Um **Container** é uma estrutura do Canvas que reúne Fields ou outros elemento
 | **Row** | Estrutural | Itens compatíveis distribuídos horizontalmente. | Alinhar conteúdo em uma faixa, como AC, HP e Speed. |
 | **Tabs** | Estrutural | Sections, uma por aba. | Separar grandes grupos, como ataques, magias e equipamentos. |
 | **Metric** | Dados | Fields escalares compatíveis, como In-line, Number, Rating, Dice e Selection. | Apresentar Fields como métricas/valores alinhados, sem criar Fields adicionais. |
-| **Table** | Dados | Fields compatíveis, com armazenamento interno do Atlas. | Apresentar valores dos Fields em formato de tabela. |
+| **Table** | Dados | Fields compatíveis, com armazenamento `scores` interno. | Apresentar valores dos Fields em formato de tabela. |
 
 ## Metric e Table são Containers de dados
 
@@ -35,10 +35,10 @@ Metric aceita Fields `inline` (In-line), `number`, `rating`, `dice` e `selection
 
 Uma **Table** também é um Container de dados. Crie-a por **Add Container → Table**. O Forge administra internamente um Field nativo Atlas `scores` para armazenar as linhas e os valores da tabela; esse Field técnico não aparece como um Field comum na paleta.
 
-Para acrescentar dados à Table, arraste um Field compatível ou use **Fields inside this Table** no inspetor. Cada Field vira uma coluna. **Show Labels in columns** controla os cabeçalhos dos Fields; **Show Labels in rows** exibe um Label para cada linha de dados, independentemente da opção de colunas. As duas opções podem ficar ativadas ao mesmo tempo. Quando **Allow adding rows in statblocks** está ativado, um statblock editável mostra a ação **Add row**. As linhas adicionais guardam seus próprios valores sem alterar os Values originais dos Fields. Reorganize os Fields pelos botões de seta no inspetor. Pairs permanece uma Collection independente e não pode ser vinculada à Table.
+Para acrescentar dados à Table, arraste um Field compatível ou use **Fields inside this Table** no inspetor. Cada Field vira uma coluna. **Show Labels in columns** controla os cabeçalhos dos Fields; **Show Labels in rows** exibe um Label para cada linha de dados, de forma independente. As duas opções podem ficar ativadas ao mesmo tempo. Quando **Allow adding rows in statblocks** está ativado, statblocks editáveis mostram a ação **Add row**. As linhas adicionais guardam seus próprios valores sem alterar os Values originais dos Fields. Reorganize os Fields pelos botões de seta no inspetor.
 
 > [!warning] Limite de apresentação das colunas vinculadas
-> Templates antigos são migrados removendo vínculos de Pairs e configurações antigas de colunas, sem apagar os Fields nem seus Values.
+> Fields Pairs não são vinculados à Table. Templates antigos são migrados removendo esses vínculos e as configurações antigas de colunas, sem apagar os Fields nem seus valores.
 
 ## Como os Containers se relacionam com o Canvas
 
@@ -66,7 +66,7 @@ A posição de cada Container é definida pelo seu pai; seus Fields-filhos são 
 
 - **Tabs** aceita somente Sections como filhos diretos. Para usar Metric ou Table em uma aba, adicione-os dentro da Section da aba.
 - **Metric** aceita Fields escalares `inline` (In-line), `number`, `rating`, `dice` e `selection` (Selection).
-- **Table** aceita Fields compatíveis. Cada Field vira uma coluna; os Labels dos cabeçalhos e das linhas de dados são opções independentes. A Table também pode permitir adicionar linhas diretamente em statblocks editáveis. Pairs permanece uma Collection independente.
+- **Table** aceita Fields compatíveis. Cada Field vira uma coluna por padrão; os Labels dos cabeçalhos e das linhas de dados são opções independentes; a Table também pode permitir adicionar linhas em statblocks editáveis. Pairs permanece uma Collection independente.
 - **Section** e **Row** seguem suas regras próprias de composição e o direcionamento automático de inserção do Canvas.
 - Um bloco ou Container não pode ser movido para dentro de si mesmo ou de um descendente, pois isso criaria um ciclo.
 
@@ -93,7 +93,7 @@ Os dados de Table usam armazenamento `scores` nativo do Atlas, gerenciado pelo p
 | Distribuir conteúdo compatível horizontalmente. | **Row** | AC, HP e Speed na mesma faixa. |
 | Alternar entre grupos. | **Tabs** | Abas `Melee`, `Ranged` e `Spells`. |
 | Agrupar valores escalares alinhados. | **Metric** | HP, AC e Speed como Fields internos do Metric. |
-| Organizar Fields compatíveis em colunas ou linhas identificadas por Labels. | **Table** | Armadura, peso, movimento ou outros valores organizados em colunas. |
+| Organizar valores de Fields compatíveis em colunas ou linhas identificadas por Labels. | **Table** | Atributos, defesas ou outros valores. |
 
 ## Próximas notas
 

@@ -16,7 +16,7 @@ A aparência individual permite que um bloco específico use a paleta global do 
 ## Abrir o inspetor
 
 1. Abra o Template no editor.
-2. Selecione um bloco no Canvas ou na árvore **Data**.
+2. Selecione um bloco no Canvas ou na árvore **Structure**.
 3. No inspetor lateral, expanda **Block appearance**.
 4. Ative **Custom appearance** para editar os controles individuais.
 

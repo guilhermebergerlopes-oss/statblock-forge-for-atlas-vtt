@@ -18,7 +18,7 @@ O objetivo central é separar **estrutura reutilizável** de **dados de cada ins
 ## O que o Forge oferece
 
 - **Templates:** criar modelos do zero, abrir modelos existentes, editar Fields e salvar alterações ou cópias.
-- **Fields:** organizar dados nos grupos Values (Number, Rating, Dice, Counter), Text (In-line, Markdown), Choice (Checkboxes, Selection), Image e Collections (List, Entries, Pairs, Groups).
+- **Fields:** definir tipos de dados como Text, Number, Rating, Dice, Choice, Markdown, List, Scores, Entries, Pairs, Image, Spells, Counters e Checkboxes.
 - **Canvas:** compor blocos e containers, escolher a posição, ajustar largura/altura e organizar o layout.
 - **Blocos de apresentação:** exibir valores individuais, métricas, linhas de Fields, listas, tabelas, habilidades, pares, imagens, magias, Counters e controles relacionados.
 - **Aparência:** aplicar temas, molduras, cores, bordas, geometrias e estilos individuais.
@@ -81,19 +81,19 @@ Atlas VTT (quando instalado e compatível)
 ```
 
 > [!important] O Forge não é um fork do editor nativo do Atlas
-> O Statblock Forge é um plugin independente. Ele integra-se aos runtimes internos do Atlas usando os códigos-fonte inspecionados das versões 0.17.0 e 0.18.0 como bases para pré-visualizações, tokens, Resources e rolagens em mapas. Versões posteriores não são bloqueadas por uma lista de versões exatas: o Forge tenta manter a compatibilidade e verifica os métodos e serviços necessários a cada recurso. Isso não garante compatibilidade com toda API futura; recursos cujas estruturas internas mudarem podem ficar indisponíveis até uma atualização do Forge. O Forge não substitui as interfaces nem assume a propriedade dos dados de cena, tokens ou Resources do Atlas.
+> O Statblock Forge é um plugin independente. Ele lê e produz formatos compatíveis em fluxos definidos, e pode utilizar APIs públicas do Atlas quando disponíveis. A existência dessa integração não significa que as interfaces ou os dados internos do Atlas tenham sido substituídos pelo Forge.
 
 ## Formatos e arquivos
 
 | Arquivo/dado | Uso |
 |---|---|
-| `.forgetemplate` | Template salvo pelo Forge. Usa os identificadores de Fields próprios do Forge e inclui metadados no namespace `statblockForge`, onde ficam dados exclusivos do layout. |
-| `.atlastemplate` | Template nativo do Atlas. O Forge pode importá-lo como origem somente leitura e criar uma cópia editável `.forgetemplate`; o arquivo original não é alterado. |
+| `.forgetemplate` | Template salvo pelo Forge. Mantém a estrutura JSON compatível com Atlas e inclui metadados Forge no namespace `statblockForge`, onde ficam dados exclusivos do layout do Forge. |
+| `.atlastemplate` | Template nativo do Atlas. O Forge pode abrir formatos compatíveis e exportar uma cópia sem os metadados exclusivos do Forge. |
 | Nota `.md` | Statblock individual, com Values e vínculo com o Template de origem. |
-| Sidecar de layout | Durante a importação, o Forge pode ler um sidecar antigo correspondente em `.statblock-forge/layouts/`. Sidecars são apenas entrada de leitura; o Forge não cria nem atualiza sidecars Atlas. |
+| Sidecar de layout | Para fluxos de edição/salvamento de formato Atlas, o Forge pode manter metadados próprios em `.statblock-forge/layouts/` dentro da pasta de Templates configurada. |
 | `.forgestyle` | Pacote portátil de temas e molduras personalizadas. |
 
-Não edite manualmente os metadados de vínculo ou o sidecar sem saber a relação entre `templateId`, Field keys e IDs de blocos. A integração profunda com o Atlas usa os códigos-fonte inspecionados das versões 0.17.0 e 0.18.0 como bases de runtime e depende de estruturas internas do Atlas. Versões posteriores são permitidas por verificações de capacidades; cada recurso só funciona quando os métodos necessários estão presentes.
+Não edite manualmente os metadados de vínculo ou o sidecar sem saber a relação entre `templateId`, Field keys e IDs de blocos. Consulte a Parte 5 quando a nota de integração estiver disponível.
 
 ## Forge e Atlas: o que pertence a cada projeto
 
@@ -101,16 +101,12 @@ Não edite manualmente os metadados de vínculo ou o sidecar sem saber a relaç�
 |---|---|
 | Editor visual Forge, Templates `.forgetemplate` e sidecars Forge | Forge |
 | Nota Markdown de statblock e editor de Values do Forge | Forge |
-| Campos e layout no formato `.atlastemplate` | Formato nativo Atlas usado como entrada; o Forge importa os dados compatíveis para uma cópia `.forgetemplate` |
+| Campos e layout no formato `.atlastemplate` | Contrato de template compatível com Atlas; a exportação Forge remove metadados exclusivos |
 | Dados de cena, tokens e Resources pertencentes ao Atlas | Atlas |
-| Rolagens em mapa encaminhadas ao DiceTool do Atlas; motor de rolagens sem mapa e histórico próprio | Atlas e Forge, conforme a origem |
-| Botões e regras locais de Rest do Forge | Forge; atualização dos Resources utiliza os serviços e stores internos do Atlas |
+| Interpretação, execução e exibição de rolagens encaminhadas à API Atlas | Atlas |
+| Botões e regras locais de Rest do Forge | Forge, com adaptadores para Resources/ro lagens Atlas quando aplicável |
 
-A integração profunda com o Atlas usa como bases os runtimes internos inspecionados nas versões 0.17.0 e 0.18.0. Versões 0.17.0 ou superiores são permitidas; nas versões posteriores, o Forge verifica os métodos e serviços necessários antes de executar cada recurso. Se o Atlas alterar uma API interna, o recurso afetado ficará indisponível, enquanto o editor do Forge e os fluxos baseados apenas em arquivos do Vault continuarão funcionando.
-
-## Sincronização dos Resources do Atlas
-
-Quando uma nota de statblock Forge v2 está vinculada a um Character do Atlas, o Forge acompanha os Resources definidos pelas regras da campanha em jogo ou, na ausência delas, pela coleção do mapa. Alterações nos Fields correspondentes atualizam os Resources dos Characters vinculados em mapas GM abertos usando o store nativo do Atlas. Os valores atuais são preservados e limitados ao novo máximo; máximos definidos manualmente são respeitados; Resources novos começam cheios (`drains`) ou vazios (`fills`). Um Field explicitamente vazio remove o Resource correspondente, enquanto Fields ausentes ou valores não numéricos não apagam dados existentes. Mapas fechados são sincronizados quando forem abertos, e visualizações de jogadores não são modificadas diretamente. O Atlas continua responsável pelos valores e pela sincronização de Resources; as ações de Rest do Forge são tratadas separadamente.
+O comportamento exato de compatibilidade depende da versão e da API pública disponível. O Forge mantém mecanismos de fallback para fluxos que não oferecem determinada capacidade; não presuma que toda função de Atlas esteja disponível em qualquer instalação.
 
 ## Requisitos e limites conhecidos
 
