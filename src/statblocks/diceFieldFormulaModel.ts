@@ -13,6 +13,85 @@ const RESERVED_DICE_WORDS = new Set([
   'd', 'kh', 'kl', 'dh', 'dl', 'k', 'h', 'l', 'r', 'ro', 'rr', 'x', 'xo', 'cs', 'cf', 'adv', 'dis',
 ]);
 
+
+const EXPRESSION_MODIFIERS = ['kh', 'kl', 'dh', 'dl', 'ro', 'rr', 'xo', 'cs', 'cf', 'k', 'h', 'l', 'r', 'x'] as const;
+
+/** Evaluates bounded arithmetic used inside a dice modifier, without eval/Function. */
+function evaluateModifierExpression(source: string): number | null {
+  const tokens = source.match(/\d+(?:\.\d+)?|[()+*/%\-]/g) ?? [];
+  if (tokens.join('') !== source.replace(/\s+/g, '')) return null;
+  let cursor = 0;
+  const primary = (): number | null => {
+    if (tokens[cursor] === '+') { cursor += 1; return primary(); }
+    if (tokens[cursor] === '-') { cursor += 1; const value = primary(); return value === null ? null : -value; }
+    if (tokens[cursor] === '(') {
+      cursor += 1;
+      const value = expression();
+      if (tokens[cursor] !== ')') return null;
+      cursor += 1;
+      return value;
+    }
+    const token = tokens[cursor++];
+    return token && /^\d+(?:\.\d+)?$/.test(token) ? Number(token) : null;
+  };
+  const product = (): number | null => {
+    let value = primary();
+    while (value !== null && ['*', '/', '%'].includes(tokens[cursor] ?? '')) {
+      const operator = tokens[cursor++];
+      const right = primary();
+      if (right === null || ((operator === '/' || operator === '%') && right === 0)) return null;
+      value = operator === '*' ? value * right : operator === '/' ? value / right : value % right;
+      if (!Number.isFinite(value)) return null;
+    }
+    return value;
+  };
+  const expression = (): number | null => {
+    let value = product();
+    while (value !== null && ['+', '-'].includes(tokens[cursor] ?? '')) {
+      const operator = tokens[cursor++];
+      const right = product();
+      if (right === null) return null;
+      value = operator === '+' ? value + right : value - right;
+      if (!Number.isFinite(value)) return null;
+    }
+    return value;
+  };
+  const value = expression();
+  return cursor === tokens.length && value !== null && Number.isSafeInteger(value) && value >= 0 && value <= 999 ? value : null;
+}
+
+/** Turns forms such as kh({strength} + 1) into the engine's ordinary khN syntax. */
+function resolveDiceModifierExpressions(source: string): string | null {
+  let result = '';
+  let cursor = 0;
+  while (cursor < source.length) {
+    const modifier = EXPRESSION_MODIFIERS.find((name) => source.slice(cursor, cursor + name.length).toLowerCase() === name
+      && (cursor === 0 || !/[A-Za-z]/.test(source[cursor - 1] ?? '')));
+    if (!modifier) { result += source[cursor++]; continue; }
+    let open = cursor + modifier.length;
+    while (source[open] === ' ' || source[open] === '\t') open += 1;
+    const comparison = /^(?:>=|<=|>|<|=)/.exec(source.slice(open))?.[0] ?? '';
+    if (comparison) {
+      open += comparison.length;
+      while (source[open] === ' ' || source[open] === '\t') open += 1;
+    }
+    if (source[open] !== '(') { result += source.slice(cursor, open); cursor = open; continue; }
+    let depth = 1;
+    let close = open + 1;
+    while (close < source.length && depth > 0) {
+      if (source[close] === '(') depth += 1;
+      else if (source[close] === ')') depth -= 1;
+      close += 1;
+    }
+    if (depth !== 0) return null;
+    const value = evaluateModifierExpression(source.slice(open + 1, close - 1));
+    if (value === null) return null;
+    result += `${modifier}${comparison}${value}`;
+    cursor = close;
+  }
+  return result;
+}
+
 export function diceFieldFormula(field: ForgeField): string {
   return typeof field.diceFormula === 'string' ? field.diceFormula : '';
 }
@@ -177,8 +256,9 @@ export function isDiceFieldFormulaSyntaxValid(formula: string, fields: readonly 
   const replaced = transformed.text
     .replace(/([0-9)])\s+(?=[dD](?:\s*(?:\d|%|[fF])))/g, '$1')
     .replace(/([dD])\s+(?=\d|%|[fF])/g, '$1');
-  if (/[{}]/.test(replaced)) return false;
-  return isDiceFieldValue(replaced);
+  const modifiersResolved = resolveDiceModifierExpressions(replaced);
+  if (modifiersResolved === null || /[{}]/.test(modifiersResolved)) return false;
+  return isDiceFieldValue(normalizeDiceCountExpressions(modifiersResolved));
 }
 
 /**
@@ -214,8 +294,10 @@ export function resolveDiceFieldFormula(
     .replace(/([0-9)])\s+(?=[dD](?:\s*(?:\d|%|[fF])))/g, '$1')
     .replace(/([dD])\s+(?=\d|%|[fF])/g, '$1');
   // An unmatched brace is almost certainly a misspelled or malformed placeholder.
-  if (transformed.invalid || /[{}]/.test(normalized) || !isDiceFieldValue(normalized)) return '';
-  const resolved = normalizeDiceCountExpressions(normalized);
+  if (transformed.invalid || /[{}]/.test(normalized)) return '';
+  const modifiersResolved = resolveDiceModifierExpressions(normalized);
+  if (modifiersResolved === null || !isDiceFieldValue(normalizeDiceCountExpressions(modifiersResolved))) return '';
+  const resolved = normalizeDiceCountExpressions(modifiersResolved);
   return writtenSide.word ? `${resolved} ${writtenSide.word}` : resolved;
 }
 

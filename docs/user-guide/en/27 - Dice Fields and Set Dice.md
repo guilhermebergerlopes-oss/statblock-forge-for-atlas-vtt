@@ -293,6 +293,19 @@ Rolls made through Forge links store the formula, source, Dice Set, and advantag
 | Custom Set is missing | Check the JSON in `atlas-vtt/dice-sets/`, especially `id`, `name`, `dice`, and `crit`. |
 | A roll does not use the expected Set | Check the Template's `diceSetId` and the collection set when using **Collection default**. |
 
+## Arithmetic expressions in dice modifiers
+
+Numeric modifier arguments can be calculated dynamically. Put the arithmetic expression in parentheses; Field references use the same `{fieldKey}` / `@fieldKey` syntax as the dice pool:
+
+```text
+8d6kh({strength} + {skill})
+8d6kl({minimum} + 1)
+8d6dh({strength} - 1)
+8d6r>=({difficulty} + 1)
+```
+
+This applies to keep/drop (`kh`, `kl`, `dh`, `dl`, `k`, `h`, `l`), reroll (`r`, `ro`, `rr`), explosion (`x`, `xo`) thresholds, and success/failure counting (`cs`, `cf`) thresholds. The expression must resolve to a non-negative whole number within the dice engine limit. Invalid or unresolved expressions do not produce a roll.
+
 ## See also
 
 - [[25 - Formulas in Number and Rating]] — deterministic calculations.

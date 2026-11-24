@@ -60,30 +60,6 @@ O analisador reconhece identificadores diretos iniciados por letra ou `_`, segui
 
 Uma referência precisa existir e resolver para um número ou booleano utilizável. Um Field ausente, vazio ou com texto não numérico torna o resultado indisponível; o Forge não transforma automaticamente texto inválido em zero.
 
-### Referências a Fields Counter
-
-Um Field Counter possui caminhos próprios para referências numéricas. O índice da linha começa em zero e segue a ordem combinada dos presets do Template e das linhas da ficha:
-
-| Referência | Significado |
-|---|---|
-| `{spell_slots.0.max}` | Máximo da linha. |
-| `{spell_slots.0.used}` / `{spell_slots.0.spent}` | Usos gastos. |
-| `{spell_slots.0.remaining}` / `{spell_slots.0.current}` / `{spell_slots.0.available}` | Usos restantes (`max - used`). |
-| `{spell_slots.total.max}` | Soma dos máximos das linhas visíveis. |
-| `{spell_slots.total.used}` / `{spell_slots.total.spent}` | Soma dos usos gastos nas linhas visíveis. |
-| `{spell_slots.total.remaining}` / `{spell_slots.total.current}` / `{spell_slots.total.available}` | Soma dos usos restantes nas linhas visíveis. |
-| `{spell_slots.count}` / `{spell_slots.total.count}` | Quantidade de linhas visíveis. |
-| `{spell_slots.0.remainingPercent}` / `{spell_slots.0.currentPercent}` / `{spell_slots.0.percent}` | Usos restantes como percentual do máximo da linha (`0`–`100`). |
-| `{spell_slots.0.usedPercent}` / `{spell_slots.0.spentPercent}` | Usos gastos como percentual do máximo da linha. |
-| `{spell_slots.0.isFull}` / `{spell_slots.0.isEmpty}` | Estado da linha como booleano numérico (`1` ou `0`). |
-| `{spell_slots.total.remainingPercent}` / `{spell_slots.total.usedPercent}` | Percentual restante/gasto do conjunto agregado, ponderado pelos máximos das linhas. |
-| `{spell_slots.total.isFull}` / `{spell_slots.total.isEmpty}` | Estado cheio/vazio do conjunto visível como `1` ou `0`. |
-| `{spell_slots.remaining}` / `{spell_slots.used}` / `{spell_slots.max}` | Formas curtas das propriedades agregadas `.total` correspondentes. |
-
-Uma linha com `max = 0` mantém seu índice, mas fica oculta e é excluída dos totais. Linhas configuradas no Template são resolvidas mesmo antes de seu estado ser materializado no Value da ficha; uma linha de preset sem usos gastos começa com `used = 0`. As propriedades textuais `name`, `reset` e `regain` não são referências numéricas. Esses caminhos também estão disponíveis para Dice Formula e fórmulas de Rest; consulte [[27 - Dice Fields e Set Dice]] e [[28 - Counters]].
-
-Propriedades percentuais retornam um decimal não arredondado de `0` a `100`; `percent`, `availablePercent` e `currentPercent` são aliases de `remainingPercent`. `isFull` vale `1` quando a linha/conjunto visível tem máximo positivo e nenhum uso gasto; `isEmpty` vale `1` quando tem máximo positivo e nenhum uso restante. Linhas ocultas com máximo zero não possuem percentual nem estado cheio/vazio. Os nomes das propriedades não diferenciam maiúsculas de minúsculas, e variantes com sublinhado/hífen como `remaining_percent` também são aceitas. Percentuais agregados usam os valores somados (ponderados pelos máximos de cada linha), não a média dos percentuais individuais.
-
 ### Rating fracionário
 
 Um Rating pode armazenar a representação `1/4`. No contexto numérico, o Forge converte esse formato para decimal (`0.25`) sem substituir a representação original salva na ficha.

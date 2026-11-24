@@ -8,7 +8,7 @@ tags:
   - documentação
   - índice
 status: revisão ampliada
-versao-forge: 0.4.0
+versao-forge: 0.5.0
 ---
 
 # Statblock Forge — documentação
@@ -16,7 +16,7 @@ versao-forge: 0.4.0
 Este manual explica como criar Templates reutilizáveis, organizar statblocks no Canvas, configurar Fields, montar fórmulas e usar os recursos avançados do **Statblock Forge for Atlas VTT**. As notas são destinadas a um Vault do Obsidian e utilizam Markdown, frontmatter YAML, wikilinks e callouts.
 
 > [!info] Escopo desta edição
-> A edição acompanha o código do Forge **0.5.6**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 35 notas no idioma escolhido: este índice e 34 notas de assunto, organizadas em quatro partes.
+> A edição acompanha o código do Forge **0.5.0**. Inclui validação de Dice Fields com o parser de rolagens, reconhecimento de expressões completas em textos, histórico de rolagens integrado ao Atlas e fórmulas dinâmicas em Fields `dice` baseadas em Values Number/Rating. O manual distribuído pelo comando **Download documentation** contém 34 notas no idioma escolhido: este índice e 33 notas de assunto, organizadas em quatro partes.
 
 ## Roteiro recomendado
 
@@ -74,15 +74,13 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 | Família | Onde é usada | Sintaxe e exemplo |
 |---|---|---|
 | **Number/Rating Formula** | Calcula o Value numérico de um Field Number/Rating. | [[25 - Fórmulas em Number e Rating]]; aceita keys diretas, `@key` e `{key}`. Ex.: `floor(@strength / 2)`. |
-| **Dice Formula** | Configurada em um Field `dice`; constrói uma rolagem a partir dos Values da ficha. | [[27 - Dice Fields e Set Dice]]; usa o resolvedor de referências Number/Rating para Checkboxes, Selection, Counters (linhas, agregados, percentuais e estados cheio/vazio), Fields calculados, valores estruturados e células de Tables, mantendo a sintaxe de rolagem e o requisito de inteiros. Ex.: `({cb_strength}*{strength})d{strength}kh{strength}`. |
+| **Dice Formula** | Configurada em um Field `dice`; constrói uma rolagem a partir dos Values da ficha. | [[27 - Dice Fields e Set Dice]]; aceita `@fieldKey` e `{fieldKey}`; as formas podem ser misturadas. Ex.: `@proficiency d{might}+{level}`. |
 | **Rest formula** | Recuperação, gasto por unidade e regras `regain`. | [[31 - Regras e fórmulas de Rest]]; aceita `@field_key` e `{field_key}`. Ex.: `@level d4` ou `{level}d4`. |
 | **Scores column formula** | Calcula uma célula derivada em uma tabela Scores. | [[05 - Fields]]; usa `value` para a célula da linha atual e a sintaxe documentada para a coluna. |
-| **Table formulas** | Calcula cada célula por linha e o resumo da coluna em uma Table. | [[34 - Fórmulas em Tables]]; inclui **Row Formula** e **Column Formula**, com valores exibidos e referências numéricas compartilhadas. |
 | **Metric formula** | Calcula o valor de um slot Metric. | [[05 - Fields]] e [[25 - Fórmulas em Number e Rating]]; é configuração do slot e não substitui a fórmula do Field. |
 
 > [!warning] Não misture sintaxes
 > `@key` e `{key}` são formas alternativas de referenciar Fields em fórmulas Number/Rating, Dice Formula e Rest. Fórmulas Number/Rating também mantêm a referência direta por key. `value` é a entrada do contexto de fórmulas Number/Rating, Scores ou Metric. Consulte a nota específica antes de copiar uma expressão.
-> Em **Table formulas**, `value` sem delimitadores representa a célula/entrada do contexto atual; `{value}` e `@value` fazem referência explícita a um Field cuja key é `value`. Essa distinção evita confundir o valor da linha com um Field chamado `value`.
 
 ## Como ler os exemplos
 
@@ -100,7 +98,7 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 | **Field** | Definição de um dado, com `key`, `label`, `type` e opções específicas. |
 | **Value** | Conteúdo de um Field em uma ficha específica. |
 | **Bloco** | Elemento do layout que apresenta um Field ou conteúdo estático. |
-| **Container** | Bloco estrutural que organiza outros blocos, como Section, Row e Tabs. |
+| **Container** | Estrutura do Canvas. Section, Row e Tabs são Containers estruturais; Metric e Table são Containers de dados que agrupam Fields-filhos. |
 | **Statblock** | Instância preenchida de um Template. |
 | **Sample** | Values de exemplo armazenados no Template, usados na prévia e opcionalmente ao criar uma ficha. |
 | **Resource** | Valor rastreado que pode ser gasto e recuperado por regras de Rest ou pelo Atlas. |
@@ -109,7 +107,7 @@ O Forge possui famílias de fórmulas diferentes. Elas não são intercambiávei
 
 ## Escopo, versão e idioma
 
-- Base: Statblock Forge **v0.5.6**.
+- Base: Statblock Forge **v0.5.0**.
 - Requisito mínimo declarado no manifesto: Obsidian **1.8.7**.
 - O plugin é marcado como desktop-only.
 - Os nomes dos controles aparecem em inglês quando esse é o texto da interface; Português (Brasil) está disponível nas configurações.

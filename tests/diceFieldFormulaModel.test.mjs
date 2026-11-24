@@ -273,6 +273,29 @@ test('Dice Formula supports checkbox-weighted dice pools with the requested dyna
   assert.equal(resolve(), '6d3kh3', 'unselected Checkboxes contribute zero while checked options contribute one');
 });
 
+test('Dice Formula evaluates checkbox-weighted keep counts from arithmetic Field references', () => {
+  const fields = [
+    ...['cb_strength', 'cb_attribute2', 'cb_skill1', 'cb_skill2'].map((key) => ({
+      key, label: key, type: 'checkboxes', options: [{ key: 'enabled', label: 'Enabled' }],
+    })),
+    ...['strength', 'attribute2', 'skill1', 'skill2'].map((key) => ({ key, label: key, type: 'number' })),
+    {
+      key: 'attack', label: 'Attack', type: 'dice',
+      diceFormula: '({cb_strength} * {strength} + {cb_attribute2} * {attribute2} + {cb_skill1} * {skill1} + {cb_skill2} * {skill2})d6kh({cb_strength} * {strength} + {cb_attribute2} * {attribute2})',
+    },
+  ];
+  const sample = {
+    cb_strength: { enabled: true }, cb_attribute2: { enabled: true },
+    cb_skill1: { enabled: true }, cb_skill2: { enabled: false },
+    strength: 3, attribute2: 2, skill1: 4, skill2: 5,
+  };
+  const field = fields.at(-1);
+  assert.equal(isDiceFieldFormulaSyntaxValid(field.diceFormula, fields), true);
+  const resolved = resolveDiceFieldFormula(field, fields, sample, undefined, (reference) =>
+    evaluatePreviewFormula(`{${reference}}`, sample, undefined, fields));
+  assert.equal(resolved, '9d6kh5');
+});
+
 test('Dice Formula can consume the full Number Formula calculation of a referenced Field', () => {
   const fields = [
     { key: 'base', label: 'Base', type: 'number' },
@@ -347,4 +370,54 @@ test('Dice Formula dependency tracking and renaming include dotted references an
   assert.equal(fields[3].diceFormula, '{features.flying}d{scores.row2.might}kh{might}');
   assert.equal(findFieldReferences(template, 'features').some((ref) => ref.property === 'diceFormula'), true);
   assert.equal(findFieldReferences(template, 'might').some((ref) => ref.property === 'diceFormula'), true);
+});
+
+test('Dice Field formulas evaluate arithmetic expressions in keep/drop and other numeric modifiers', () => {
+  const fields = [
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'skill', label: 'Skill', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '8d6kh({strength} + {skill})' },
+  ];
+  const sample = { strength: 3, skill: 2 };
+  const resolved = resolveDiceFieldFormula(fields[2], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[2].diceFormula), true);
+  assert.equal(resolved, '8d6kh5');
+  fields[2].diceFormula = '8d6dl({strength} - 1)';
+  assert.equal(resolveDiceFieldFormula(fields[2], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula)), '8d6dl2');
+});
+
+test('Dice Field formulas reject invalid or non-integer modifier expressions', () => {
+  const field = { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '8d6kh(3 / 0)' };
+  assert.equal(isDiceFieldFormulaSyntaxValid(field.diceFormula), false);
+  assert.equal(resolveDiceFieldFormula(field, [], {}, () => null), '');
+});
+
+test('Dice Field formulas evaluate comparison thresholds in reroll, explosion, and tally modifiers', async () => {
+  const fields = [
+    { key: 'difficulty', label: 'Difficulty', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '4d6r>=({difficulty} + 1)x>=({difficulty} * 2)' },
+  ];
+  const sample = { difficulty: 3 };
+  const resolved = resolveDiceFieldFormula(fields[1], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(isDiceFieldFormulaSyntaxValid(fields[1].diceFormula), true);
+  assert.equal(resolved, '4d6r>=4x>=6');
+  const parsed = (await import('../src/statblocks/diceFieldEditorModel.ts')).parseDiceField(resolved);
+  assert.equal(parsed?.terms[0]?.reroll?.when.value, 4);
+  assert.equal(parsed?.terms[0]?.explode?.highFaces, 1);
+});
+
+test('Dice Field formulas evaluate arithmetic success and failure counting thresholds', async () => {
+  const fields = [
+    { key: 'difficulty', label: 'Difficulty', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '4d6cs>=({difficulty} + 1)' },
+  ];
+  const sample = { difficulty: 3 };
+  const resolved = resolveDiceFieldFormula(fields[1], fields, sample, (field) =>
+    calculateNumericFieldValue(field, sample, evaluatePreviewFormula));
+  assert.equal(resolved, '4d6cs>=4');
+  const parsed = (await import('../src/statblocks/diceFieldEditorModel.ts')).parseDiceField(resolved);
+  assert.equal(parsed?.terms[0]?.tally?.when.value, 4);
 });

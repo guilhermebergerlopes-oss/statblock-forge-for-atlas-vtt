@@ -292,6 +292,19 @@ As rolagens feitas por links do Forge guardam a fórmula, a origem, o Dice Set e
 | Custom Set não aparece | Verifique o JSON em `atlas-vtt/dice-sets/`, especialmente `id`, `name`, `dice` e `crit`. |
 | Uma rolagem não usa o Set esperado | Confira o `diceSetId` do Template e o conjunto da coleção quando estiver em **Collection default**. |
 
+## Cálculos aritméticos nos modificadores de dados
+
+Os argumentos numéricos dos modificadores podem ser calculados dinamicamente. Coloque a expressão entre parênteses; referências a Fields usam a mesma sintaxe `{fieldKey}` / `@fieldKey` do conjunto de dados:
+
+```text
+8d6kh({strength} + {skill})
+8d6kl({minimum} + 1)
+8d6dh({strength} - 1)
+8d6r>=({difficulty} + 1)
+```
+
+Isso se aplica aos modificadores de manter/descartar (`kh`, `kl`, `dh`, `dl`, `k`, `h`, `l`), rerrolagem (`r`, `ro`, `rr`) explosão (`x`, `xo`) e contagem de sucessos/falhas (`cs`, `cf`). O resultado precisa ser um número inteiro não negativo dentro do limite do motor de dados. Expressões inválidas ou sem referência resolvida não geram uma rolagem.
+
 ## Veja também
 
 - [[25 - Fórmulas em Number e Rating]] — cálculos determinísticos.

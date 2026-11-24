@@ -1,3 +1,8 @@
+## 0.5.7 — Arithmetic expressions in dice modifiers
+
+- Dice Field formulas now evaluate arithmetic expressions inside numeric dice modifiers, including keep/drop (`kh`, `kl`, `dh`, `dl`, `k`, `h`, `l`), reroll (`r`, `ro`, `rr`), and explosion (`x`, `xo`) counts/thresholds. Expressions support references, parentheses, and `+`, `-`, `*`, `/`, and `%`; results must be non-negative whole numbers within the dice engine limit.
+- Invalid, unresolved, fractional, or out-of-range expressions are rejected safely. Existing literal modifier syntax remains unchanged.
+
 ## 0.5.6 — Dice Formula shares Number/Rating reference resolution
 
 - Routes every Dice Formula reference through the same Number/Rating evaluator used by the live renderer. Dice Fields can now read Number/Rating values and calculated formulas, whole-Field and individual-option Checkboxes booleans, Selection options and `.number`, nested numeric properties in structured Values (including stored Counter rows), and displayed Table cells with Row Formula precedence. Bare keys, `@key`, and `{key}` are supported where the Number Formula grammar permits them; all substituted values must be safe integers for the dice parser.

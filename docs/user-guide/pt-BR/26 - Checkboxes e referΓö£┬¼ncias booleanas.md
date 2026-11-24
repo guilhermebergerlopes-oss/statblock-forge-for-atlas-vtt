@@ -1,8 +1,9 @@
 ---
-title: Statblock Forge — Checkboxes e referências booleanas
+title: Statblock Forge — Checkboxes, Selection e referências booleanas
 aliases:
   - Boolean Fields
   - Opções booleanas
+  - Selection como Booleano
 tags:
   - statblock-forge
   - documentação/recursos-avançados
@@ -10,7 +11,7 @@ tags:
 parte: 4
 ---
 
-# Checkboxes e referências booleanas
+# Checkboxes, Selection e referências booleanas
 
 Um Field do tipo **Checkboxes** armazena opções com estado booleano: marcada (`true`) ou desmarcada (`false`). Cada conjunto possui a opção **Escolhas múltiplas**. Em Fields novos, ela começa desativada e somente uma opção pode ficar marcada por vez. Ative-a para permitir várias opções marcadas no mesmo conjunto. A configuração é independente por Field: outros conjuntos Checkboxes podem ter sua própria seleção, sem interferência.
 
@@ -108,17 +109,52 @@ strength + traits.flying * 2 + defenses.armored
 
 Cada opção contribui `0` ou `1` independentemente.
 
+
+## Selection como Booleano
+
+Um Field **Selection** também pode servir como entrada booleana de fórmulas. Cada opção configurada pode ser consultada individualmente: a opção atualmente selecionada vale `1`; as outras opções do mesmo Field valem `0`. Quando nenhuma opção está selecionada, todas valem `0`. O próprio Field, sem sufixo de opção, vale `1` quando contém alguma escolha e `0` quando está vazio.
+
+A referência de uma opção usa a key do Field, um ponto e uma chave derivada do rótulo da opção. O Forge gera essa chave automaticamente: converte para minúsculas, remove acentos e troca espaços e pontuação por `_`. Por exemplo:
+
+| Field | Opção configurada | Referência em fórmulas |
+|---|---|---|
+| `stance` | `Aggressive` | `stance.aggressive` |
+| `stance` | `Defensive` | `stance.defensive` |
+| `stance` | `Visão Noturna` | `stance.visao_noturna` |
+
+Use `@` ou chaves como nos demais campos de fórmula:
+
+```text
+@stance.aggressive
+{stance.visao_noturna}
+attack + stance.aggressive * 2
+```
+
+O resultado de cada referência de opção é sempre `1` ou `0`. Isso funciona tanto em Selection de escolha única quanto em Selection com **Pick several** ativado: em múltipla escolha, cada opção selecionada vale `1` independentemente das demais.
+
+Se dois rótulos diferentes gerarem a mesma chave, o Forge acrescenta um sufixo numérico (`_2`, `_3`...). Evite rótulos idênticos: como o Value nativo guarda o texto da opção, duas opções com exatamente o mesmo rótulo não podem ser distinguidas. Como as chaves são derivadas dos rótulos, renomear uma opção pode alterar sua referência; revise as fórmulas que usam essa opção depois de mudar o rótulo. Opções personalizadas permitidas por **Allow other values** fazem o próprio Field valer `1`, mas não criam uma referência de opção enquanto não estiverem configuradas na lista.
+
+### Exemplo — bônus por postura
+
+Com `stance = Aggressive` e `attack = 4`:
+
+```text
+attack + stance.aggressive * 2
+```
+
+O resultado é `6`. Se a postura for `Defensive` ou nenhuma opção estiver selecionada, o resultado é `4`.
+
 ## Onde referências booleanas funcionam
 
-As opções booleanas podem ser consultadas nos contextos que usam `evaluatePreviewFormula()`:
+As referências de Checkboxes e Selection são resolvidas pelo mesmo avaliador de fórmulas. Estão disponíveis em:
 
 | Contexto | Aplicação |
 |---|---|
-| **Number/Rating Formula** | A fórmula de um Field numérico pode usar `traits.flying`. Consulte [[25 - Fórmulas em Number e Rating]]. |
-| **Metric slot Formula** | Uma fórmula escrita diretamente no slot Metric pode usar opções Checkboxes e atualiza quando a opção muda. |
-| **Scores: coluna derivada** | Uma coluna derivada que usa a expressão compartilhada pode consultar opções booleanas e o `value` da célula correspondente. |
+| **Number/Rating Formula** | A fórmula de um Field numérico pode consultar opções de Checkboxes e Selection. |
+| **Metric slot Formula** | Uma fórmula de slot Metric pode consultar as duas categorias e é atualizada quando o usuário altera um desses Fields. |
+| **Scores: coluna derivada** | Uma coluna derivada pode consultar as duas categorias e o `value` da célula atual. |
 
-O bloco **Checkboxes** é onde o usuário marca/desmarca as opções; ele não é, por si só, um bloco de cálculo. O cálculo ocorre em outro contexto que referencia a opção.
+As regras de Rest e as fórmulas Dice continuam usando suas próprias gramáticas e não recebem automaticamente essas referências booleanas.
 
 ## Dados da ficha e Samples
 

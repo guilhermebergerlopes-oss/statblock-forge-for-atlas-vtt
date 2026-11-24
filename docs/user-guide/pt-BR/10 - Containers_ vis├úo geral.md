@@ -1,5 +1,5 @@
 ---
-title: "Statblock Forge — Containers: visão geral"
+title: Statblock Forge — Containers: visão geral
 aliases:
   - Containers do Forge
   - Estrutura de containers
@@ -11,96 +11,93 @@ parte: 2
 
 # Containers: visão geral
 
-Um **container** é um bloco estrutural que organiza outros blocos. Ele define como os filhos são agrupados, posicionados e dimensionados. Containers não representam propriedades da ficha: não precisam de Field, não armazenam Value e não criam dados novos por si só.
-
-O Forge possui três containers: **Section**, **Row** e **Tabs**. Eles não são intercambiáveis: cada um tem regras diferentes de composição e de aninhamento.
+Um **Container** é uma estrutura do Canvas que reúne Fields ou outros elementos de layout. No Forge, há duas famílias: **Containers estruturais** (Section, Row e Tabs) e **Containers de dados** (Metric e Table). Todos são Containers, mas cada tipo aceita conteúdos e organiza dados de uma maneira própria.
 
 ## Comparação rápida
 
-| Container | Modelo de composição | Como os filhos são posicionados | Melhor aplicação |
+| Container | Família | O que contém | Uso principal |
 |---|---|---|---|
-| **Section** | Grupo com uma Grid própria. | Cada filho ocupa uma posição independente na Grid interna. | Separar atributos, defesas, características ou equipamento em uma área nomeada. |
-| **Row** | Faixa horizontal flexível. | Os filhos compartilham a largura proporcionalmente por `Span` e seguem a ordem da lista. | Alinhar valores curtos, como AC, HP e Speed, ou criar uma faixa de indicadores. |
-| **Tabs** | Navegação entre painéis. | Cada aba é uma Section filha direta; somente o painel ativo é mostrado. | Separar grupos extensos — ataques, magias e equipamento — sem exibi-los simultaneamente. |
+| **Section** | Estrutural | Blocos e Containers compatíveis em uma Grid interna. | Agrupar atributos, defesas, características ou equipamentos em uma área com título. |
+| **Row** | Estrutural | Itens compatíveis distribuídos horizontalmente. | Alinhar conteúdo em uma faixa, como AC, HP e Speed. |
+| **Tabs** | Estrutural | Sections, uma por aba. | Separar grandes grupos, como ataques, magias e equipamentos. |
+| **Metric** | Dados | Fields escalares compatíveis, como In-line, Number, Rating, Dice e Selection. | Apresentar Fields como métricas/valores alinhados, sem criar Fields adicionais. |
+| **Table** | Dados | Fields compatíveis, com armazenamento `scores` interno. | Apresentar valores dos Fields em formato de tabela. |
 
-## Como os containers se relacionam com a Grid
+## Metric e Table são Containers de dados
 
-A Grid principal organiza os filhos diretos do Canvas. Uma **Section** cria outra Grid para seus próprios filhos. As Sections que funcionam como abas também têm uma Grid interna. Essas Grids usam a mesma quantidade física de colunas configurada no template; uma Grid aninhada não reduz a contagem porque sua Section ocupa apenas uma parte da área externa.
+### Metric
 
-Uma **Row não cria uma Grid interna**. Ela distribui os filhos em linhas flexíveis, usando `Span` como peso relativo. Um **Tabs** organiza Sections em painéis; não é uma Grid para inserir blocos diretamente.
+Um **Metric** não é um Field nem um bloco comum: é um Container de dados. Para criá-lo, use **Add Container → Metric**. Depois, arraste Fields compatíveis sobre o Metric no Canvas ou adicione-os pelo inspetor **Fields inside this Metric**.
+
+Metric aceita Fields `inline` (In-line), `number`, `rating`, `dice` e `selection` (Selection). Os próprios Fields continuam sendo a fonte dos dados; o Metric apenas os agrupa e controla sua apresentação. Remover um Field do Metric remove somente o vínculo com o Container, não exclui o Field nem seu Value.
+
+### Table
+
+Uma **Table** também é um Container de dados. Crie-a por **Add Container → Table**. O Forge administra internamente um Field nativo Atlas `scores` para armazenar as linhas e os valores da tabela; esse Field técnico não aparece como um Field comum na paleta.
+
+Para acrescentar dados à Table, arraste um Field compatível ou use **Fields inside this Table** no inspetor. Cada Field vira uma coluna. **Show Labels in columns** controla os cabeçalhos dos Fields; **Show Labels in rows** exibe um Label para cada linha de dados, de forma independente. As duas opções podem ficar ativadas ao mesmo tempo. Quando **Allow adding rows in statblocks** está ativado, statblocks editáveis mostram a ação **Add row**. As linhas adicionais guardam seus próprios valores sem alterar os Values originais dos Fields. Reorganize os Fields pelos botões de seta no inspetor.
+
+> [!warning] Limite de apresentação das colunas vinculadas
+> Fields Pairs não são vinculados à Table. Templates antigos são migrados removendo esses vínculos e as configurações antigas de colunas, sem apagar os Fields nem seus valores.
+
+## Como os Containers se relacionam com o Canvas
+
+O Canvas organiza os elementos em uma árvore. Section cria uma Grid interna; Row distribui seus filhos horizontalmente; Tabs apresenta Sections como painéis. Metric e Table são Containers de dados colocados no layout, e não Fields independentes nem blocos de apresentação comuns.
 
 ```text
-Canvas / Grid principal
-├── Section: Defesas          ← possui sua própria Grid
-│   ├── Stat: Armor Class
-│   ├── Stat: Saving Throws
-│   └── Row: Resistências     ← faixa horizontal dentro da Section
-│       ├── Tags: Resistances
-│       └── Tags: Immunities
-└── Tabs: Conteúdo            ← ocupa uma posição na Grid principal
-    ├── Section: Ataques      ← painel / aba com Grid própria
-    │   └── Entries: Attacks
-    └── Section: Magias
-        └── Spells: Spell list
+Canvas
+├── Section: Defesas
+│   ├── Metric: Valores principais
+│   │   ├── Field: Armor Class (number)
+│   │   └── Field: Speed (number)
+│   └── Table: Defesas
+│       ├── Field: Armor Class (number)
+│       └── Field: Weight (number)
+└── Tabs: Conteúdo
+    ├── Section: Ataques
+    │   └── Entries: Ataques
+    └── Section: Habilidades especiais
+        └── Groups: Habilidades especiais
 ```
 
-O diagrama é um exemplo de árvore. A posição de cada container é definida pelo seu pai; a posição dos filhos é definida pelo container imediato.
+A posição de cada Container é definida pelo seu pai; seus Fields-filhos são associados ao Metric ou à Table. Para colocar um Container de dados em uma aba, coloque-o dentro da Section daquela aba. Tabs aceita Sections como filhos diretos.
 
 ## Regras de aninhamento
 
-O Forge preserva a árvore de containers. As regras para filhos diretos são:
+- **Tabs** aceita somente Sections como filhos diretos. Para usar Metric ou Table em uma aba, adicione-os dentro da Section da aba.
+- **Metric** aceita Fields escalares `inline` (In-line), `number`, `rating`, `dice` e `selection` (Selection).
+- **Table** aceita Fields compatíveis. Cada Field vira uma coluna por padrão; os Labels dos cabeçalhos e das linhas de dados são opções independentes; a Table também pode permitir adicionar linhas em statblocks editáveis. Pairs permanece uma Collection independente.
+- **Section** e **Row** seguem suas regras próprias de composição e o direcionamento automático de inserção do Canvas.
+- Um bloco ou Container não pode ser movido para dentro de si mesmo ou de um descendente, pois isso criaria um ciclo.
 
-| Pai | Pode receber | Não pode receber diretamente |
-|---|---|---|
-| **Canvas / Grid principal** | Blocos de conteúdo, Section, Row e Tabs. | — |
-| **Section** | Blocos de conteúdo, outras Sections, Rows e Tabs. | — |
-| **Row** | Blocos de conteúdo e Sections. | Outra Row ou Tabs. |
-| **Tabs** | Somente Sections. | Stat, Metric, Entries, Row, Tabs ou qualquer bloco de conteúdo diretamente. |
+### Arrastar Fields para Containers de dados
 
-Além disso, um bloco não pode ser movido para dentro de si mesmo ou de um descendente. Isso criaria um ciclo na árvore e é recusado.
+Ao soltar um Field compatível dentro de Metric ou Table, o Forge o associa ao Container em vez de criar um bloco independente. Um Field incompatível é rejeitado sem perder sua colocação atual. Ao arrastar um Field de dentro de um Container para uma posição comum do Canvas, o Forge remove o vínculo com o Container e cria uma colocação normal; o Field e seus Values são preservados.
 
-### O que acontece quando a inserção não é compatível?
+Ao soltar um Field diretamente sobre Tabs, o comportamento especial de Tabs cria uma Section para a nova aba. Para acrescentar conteúdo a uma aba existente, solte-o sobre a Section correspondente.
 
-A barra **Add block** / **Add container** considera a última seleção:
+## Containers, Fields e Values
 
-1. Se o último bloco selecionado for um container que aceita o tipo escolhido, o novo item entra dentro dele.
-2. Se não aceitar, o Forge procura o nível ancestral mais próximo que aceite aquele tipo e insere o item ao lado do bloco ou container selecionado.
-3. Se houver vários blocos selecionados, o último selecionado é a referência de inserção.
+- **Field** define o dado e seu tipo, como `hp` (`number`) ou `resistances` (`pairs`).
+- **Value** é o dado de uma ficha específica.
+- **Container estrutural** organiza outros elementos do layout.
+- **Container de dados** agrupa Fields-filhos e controla sua apresentação; não substitui nem duplica esses Fields.
 
-Por isso, uma opção pode continuar disponível mesmo quando não pode ser filha direta do container atual: o Forge pode redirecionar a inserção para um nível compatível. Para inserir conteúdo em uma aba existente, selecione a **Section daquela aba**, não o Tabs.
-
-### Arrastar um Field para Tabs
-
-Se um Field da paleta for solto diretamente em um Tabs, o Forge cria uma Section nova, usa o label do Field como título da nova aba e coloca o bloco vinculado dentro dela. Se o Field já tiver um bloco no layout, o Forge move essa representação existente para a nova Section em vez de criar uma segunda apresentação independente.
-
-Para acrescentar o Field a uma aba existente, solte-o sobre a Section que representa essa aba.
-
-## Containers não são Fields nem blocos de conteúdo
-
-- **Field** define uma propriedade e seu tipo de dado, como `might`, `hp` ou `attacks`.
-- **Value** é o dado de uma ficha específica, como `might = 8`.
-- **Bloco de conteúdo** apresenta um Field ou texto, por exemplo `Stat`, `Metric`, `Entries` ou `Image`.
-- **Container** organiza blocos de conteúdo e outros containers.
-
-Criar uma Section, Row ou Tabs não cria uma nova propriedade na ficha. Consulte [[05 - Fields]] para os dados e [[07 - Canvas e layout]] para os blocos.
-
-## Containers vazios
-
-Um container recém-criado pode mostrar um placeholder no Canvas até receber filhos. Isso não significa que o Template esteja inválido. Se o preview mostrar uma mensagem como “Adicione uma Section para criar uma aba”, adicione o tipo de filho exigido pelo container.
+Os dados de Table usam armazenamento `scores` nativo do Atlas, gerenciado pelo próprio Container e oculto da paleta de Fields. Templates antigos com blocos Metric ou Scores são reconhecidos como Containers durante a migração; os Fields e os dados existentes são preservados.
 
 ## Como escolher
 
 | Necessidade | Escolha | Exemplo |
 |---|---|---|
-| Dar um título a um conjunto e organizar seus itens livremente. | **Section** | `Defesas`, com AC, saving throws e resistências. |
-| Colocar pequenos blocos lado a lado. | **Row** | AC, HP e Speed na mesma faixa. |
-| Alternar entre grupos que não precisam aparecer juntos. | **Tabs** | Abas `Melee`, `Ranged` e `Spells`. |
-
-Não crie uma Row apenas para obter uma área com título: use Section. Não crie várias Sections lado a lado para simular uma faixa de largura proporcional: use Row. Não use Tabs quando todos os grupos precisarem ficar visíveis simultaneamente.
+| Dar título a um grupo e organizar os itens livremente. | **Section** | `Defesas`, com AC, saving throws e resistências. |
+| Distribuir conteúdo compatível horizontalmente. | **Row** | AC, HP e Speed na mesma faixa. |
+| Alternar entre grupos. | **Tabs** | Abas `Melee`, `Ranged` e `Spells`. |
+| Agrupar valores escalares alinhados. | **Metric** | HP, AC e Speed como Fields internos do Metric. |
+| Organizar valores de Fields compatíveis em colunas ou linhas identificadas por Labels. | **Table** | Atributos, defesas ou outros valores. |
 
 ## Próximas notas
 
-- [[11 - Section]] — título fixo/dinâmico, comportamento recolhível e Grid interna.
+- [[11 - Section]] — títulos, comportamento recolhível e Grid interna.
 - [[12 - Row]] — Span, distribuição horizontal, alinhamento e altura das linhas.
 - [[13 - Tabs]] — criação, edição, abas de Abilities e remoção.
 - [[14 - Dense Layout]] — posicionamento dos filhos nas Grids.
