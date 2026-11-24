@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renameTemplateFieldKey, validateTemplateFields } from '../src/templates/fieldEditorModel.ts';
+import { fieldKeyProblem, renameTemplateFieldKey, validateTemplateFields } from '../src/templates/fieldEditorModel.ts';
+import { registerTemplateField } from '../src/templates/forgeTemplate.ts';
 
 function template(fields, sample = {}) {
   return {
@@ -37,15 +38,46 @@ test('renaming back to an own Former Key removes its alias case-insensitively', 
   assert.deepEqual(validateTemplateFields(value), []);
 });
 
-test('renaming a Field to another Field Former Key is rejected without mutation', () => {
+test('a Field can reclaim another Field Former Key and releases the old alias', () => {
   const value = template([
-    { key: 'hp', label: 'HP', type: 'number' },
-    { key: 'vitality', label: 'Vitality', type: 'number', formerKeys: ['oldHp'] },
-  ], { hp: 12, vitality: 8 });
-  const before = structuredClone(value);
+    { key: 'stamina', label: 'Stamina', type: 'number' },
+    { key: 'vitality', label: 'Vitality', type: 'number', formerKeys: ['oldStamina'] },
+  ], { stamina: 12, vitality: 8 });
 
-  assert.throws(() => renameTemplateFieldKey(value, 'hp', 'oldHp'), /já está sendo usada/);
-  assert.deepEqual(value, before);
+  renameTemplateFieldKey(value, 'stamina', 'oldStamina');
+
+  assert.equal(value.fields[0].key, 'oldStamina');
+  assert.deepEqual(value.fields[0].formerKeys, ['stamina']);
+  assert.deepEqual(value.fields[1].formerKeys, []);
+  assert.deepEqual(validateTemplateFields(value), []);
+});
+
+test('a key that is currently owned by another Field remains unavailable', () => {
+  const value = template([
+    { key: 'stamina', label: 'Stamina', type: 'number' },
+    { key: 'vitality', label: 'Vitality', type: 'number', formerKeys: ['oldVitality'] },
+  ]);
+
+  assert.equal(
+    fieldKeyProblem(value, 'vitality', 'stamina'),
+    'A chave "vitality" já está sendo usada por outro campo.',
+  );
+  assert.throws(() => renameTemplateFieldKey(value, 'stamina', 'vitality'), /já está sendo usada/);
+});
+
+test('new Fields can reuse former keys, while current keys still generate a suffix', () => {
+  const value = template([
+    { key: 'essence', label: 'Essence', type: 'number', formerKeys: ['mana'] },
+    { key: 'focus', label: 'Focus', type: 'number' },
+  ]);
+
+  const reclaimed = registerTemplateField(value, 'Mana', 'number');
+  const unique = registerTemplateField(value, 'Focus', 'number');
+
+  assert.equal(reclaimed.key, 'mana');
+  assert.deepEqual(value.fields[0].formerKeys, []);
+  assert.equal(unique.key, 'focus_2');
+  assert.deepEqual(validateTemplateFields(value), []);
 });
 
 test('native validation rejects two Fields claiming the same Former Key', () => {
@@ -55,4 +87,13 @@ test('native validation rejects two Fields claiming the same Former Key', () => 
   ]);
 
   assert.ok(validateTemplateFields(value).some((issue) => issue.code === 'duplicate-key'));
+});
+
+test('an active Field key takes precedence over another Field legacy alias', () => {
+  const value = template([
+    { key: 'strength', label: 'Strength', type: 'number', formerKeys: ['might'] },
+    { key: 'might', label: 'Might', type: 'number' },
+  ]);
+
+  assert.deepEqual(validateTemplateFields(value), []);
 });

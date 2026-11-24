@@ -93,12 +93,9 @@ export function fieldKeyProblem(template: ForgeTemplate, key: string, currentKey
   if (!FIELD_KEY_PATTERN.test(candidate)) return 'Use de 1 a 40 caracteres: comece com uma letra e use apenas letras, números, _ ou -.';
   if (RESERVED_FIELD_KEYS.has(candidate.toLowerCase())) return `A chave "${candidate}" é reservada pelo Atlas ou pelo JavaScript.`;
 
-  const taken = template.fields.some((field) => {
-    if (field.key === currentKey) return false;
-    return field.key.toLowerCase() === candidate.toLowerCase()
-      || formerKeys(field).some((former) => former.toLowerCase() === candidate.toLowerCase());
-  });
-  if (taken) return `A chave "${candidate}" já está sendo usada por outro campo ou foi usada anteriormente.`;
+  const taken = template.fields.some((field) =>
+    field.key !== currentKey && field.key.toLowerCase() === candidate.toLowerCase());
+  if (taken) return `A chave "${candidate}" já está sendo usada por outro campo.`;
   return null;
 }
 
@@ -387,8 +384,16 @@ export function renameTemplateFieldKey(template: ForgeTemplate, from: string, to
 
   const candidateIdentity = candidate.toLowerCase();
   const fromIdentity = from.toLowerCase();
-  // Restoring one of this Field's own historical keys (including a case-only spelling change)
-  // makes that key current again; it must no longer remain in formerKeys as a duplicate alias.
+  // A former key is only a compatibility alias while it is not claimed by a
+  // current Field. Reclaiming it removes the alias from its previous owner.
+  for (const otherField of template.fields) {
+    if (otherField === field) continue;
+    const aliases = formerKeys(otherField);
+    const remaining = aliases.filter((key) => key.toLowerCase() !== candidateIdentity);
+    if (remaining.length !== aliases.length) otherField.formerKeys = remaining;
+  }
+  // Restoring one of this Field's own historical keys makes it current again;
+  // it must no longer remain in formerKeys as a duplicate alias.
   const oldFormer = formerKeys(field).filter((key) => {
     const identity = key.toLowerCase();
     return identity !== candidateIdentity && identity !== fromIdentity;
@@ -727,7 +732,9 @@ function inspectBlockReferences(blocks: readonly ForgeBlock[], knownKeys: Set<st
 /** Validates keys and all recognized field references before a native save. */
 export function validateTemplateFields(template: ForgeTemplate): FieldValidationIssue[] {
   const issues: FieldValidationIssue[] = [];
-  const seen = new Set<string>();
+  const currentKeys = new Set(template.fields.map((field) => field.key.toLowerCase()));
+  const seenCurrentKeys = new Set<string>();
+  const seenFormerKeys = new Set<string>();
   const meanings = new Set<string>();
   for (const field of template.fields) {
     const key = field.key;
@@ -737,18 +744,24 @@ export function validateTemplateFields(template: ForgeTemplate): FieldValidation
     if (RESERVED_FIELD_KEYS.has(key.toLowerCase())) {
       issues.push({ code: 'reserved-key', fieldKey: key, message: `A chave "${key}" é reservada.` });
     }
-    if (seen.has(key.toLowerCase())) {
+    if (seenCurrentKeys.has(key.toLowerCase())) {
       issues.push({ code: 'duplicate-key', fieldKey: key, message: `A chave "${key}" está duplicada (chaves não diferenciam maiúsculas de minúsculas).` });
     }
-    seen.add(key.toLowerCase());
+    seenCurrentKeys.add(key.toLowerCase());
     const meaning = typeof field.meaning === 'string' ? field.meaning : '';
     if (HEADER_MEANINGS.has(meaning)) {
       if (meanings.has(meaning)) issues.push({ code: 'duplicate-meaning', fieldKey: key, message: `Há mais de um campo com o significado especial "${meaning}".` });
       meanings.add(meaning);
     }
     for (const former of formerKeys(field)) {
-      if (seen.has(former.toLowerCase())) issues.push({ code: 'duplicate-key', fieldKey: key, message: `A chave anterior "${former}" conflita com outro campo.` });
-      seen.add(former.toLowerCase());
+      const identity = former.toLowerCase();
+      // Current keys always win over legacy aliases. A former key does not
+      // reserve an identifier after another Field intentionally reclaims it.
+      if (currentKeys.has(identity)) continue;
+      if (seenFormerKeys.has(identity)) {
+        issues.push({ code: 'duplicate-key', fieldKey: key, message: `A chave anterior "${former}" conflita com outro campo.` });
+      }
+      seenFormerKeys.add(identity);
     }
   }
   const knownKeys = new Set(template.fields.flatMap((field) => [field.key, ...formerKeys(field)]).map((key) => key.toLowerCase()));

@@ -59,6 +59,18 @@ A aparência personalizada pode controlar, conforme o tipo de bloco:
 
 Mudar de **Custom** para **Theme** suspende a aplicação dos overrides, mas não os apaga. Voltar a **Custom** recupera os valores. **Reset** remove a aparência individual e retorna ao modo **Theme**. Consulte [[21 - Aparência individual dos blocos]].
 
+### Tipografia por Field
+
+Na aba **Appearance** do Template, abra **Tipografia do Field** para escolher um Field e personalizar sua tipografia em todos os lugares em que ele aparece no statblock. Há três grupos independentes:
+
+- **Todo o texto:** tamanho, peso, estilo normal/itálico, decoração e espaçamento entre letras para rótulos e valores.
+- **Rótulos:** substitui somente a tipografia dos nomes e cabeçalhos associados ao Field.
+- **Valores:** substitui somente a tipografia dos valores apresentados pelo Field.
+
+Cada propriedade pode permanecer no padrão do tema. Os ajustes de tipografia do Field têm prioridade sobre os ajustes tipográficos do bloco para aquele Field, sem alterar as cores do tema ou do bloco. Isso permite, por exemplo, deixar o valor de HP em negrito em todos os blocos onde HP aparece, mesmo que esses blocos tenham aparências diferentes.
+
+A configuração acompanha o ID estável do Field, portanto continua vinculada a ele quando sua key é renomeada. **Redefinir tipografia do Field** remove somente os ajustes daquele Field. Os dados são salvos nos metadados de layout do Forge, sem modificar o JSON nativo do Template do Atlas.
+
 ## 5. O que é salvo onde
 
 | Dado | Local de armazenamento | Efeito ao reutilizar o template |

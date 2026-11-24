@@ -388,6 +388,22 @@ test('Dice Field formulas evaluate arithmetic expressions in keep/drop and other
     calculateNumericFieldValue(field, sample, evaluatePreviewFormula)), '8d6dl2');
 });
 
+test('Dice Formula accepts multiline text and resolves line breaks as formula whitespace', () => {
+  const fields = [
+    { key: 'strength', label: 'Strength', type: 'number' },
+    { key: 'skill', label: 'Skill', type: 'number' },
+    { key: 'attack', label: 'Attack', type: 'dice' },
+  ];
+  const sample = { strength: 2, skill: 1 };
+  const formula = '({strength} * {strength}\n  + {skill})d6kh(\n  {strength} + 1\n)';
+  fields[2].diceFormula = formula;
+  const resolved = resolveDiceFieldFormula(fields[2], fields, sample, (sourceField) =>
+    calculateNumericFieldValue(sourceField, sample, evaluatePreviewFormula));
+  assert.equal(isDiceFieldFormulaSyntaxValid(formula, fields), true);
+  assert.equal(resolved, '5d6kh3');
+  assert.equal(fields[2].diceFormula, formula, 'resolving must preserve the original multiline text');
+});
+
 test('Dice Field formulas reject invalid or non-integer modifier expressions', () => {
   const field = { key: 'attack', label: 'Attack', type: 'dice', diceFormula: '8d6kh(3 / 0)' };
   assert.equal(isDiceFieldFormulaSyntaxValid(field.diceFormula), false);

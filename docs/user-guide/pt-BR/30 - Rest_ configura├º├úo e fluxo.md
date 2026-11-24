@@ -80,10 +80,8 @@ Sem repetição, uma ação só pode ser selecionada uma vez e o máximo não po
 2. Se houver etapas de escolha ou gastos, o seletor solicita as escolhas e quantidades.
 3. O Forge lê novamente os dados atuais da nota e valida o pedido. Isso evita aplicar escolhas feitas com valores que ficaram desatualizados enquanto o seletor estava aberto.
 4. O cálculo aplica primeiro as regras diretas do botão e depois as regras das ações selecionadas, respeitando a ordem das escolhas.
-5. Resources locais e Counters são gravados na ficha. Um Resource de coleção Atlas é gravado no estado do personagem/Token Atlas correspondente. Antes da primeira gravação no Atlas, o Forge valida os stores envolvidos e confirma que os valores ainda correspondem ao snapshot usado no cálculo.
+5. Resources locais e Counters são gravados na ficha. Um Resource de coleção Atlas é gravado no estado do personagem/Token Atlas correspondente.
 6. O modal de resultado mostra as rolagens, gastos, alterações de Counters e Resources e as regras que foram ignoradas.
-
-As gravações de Resources do Atlas usam uma transação compensatória, não uma transação de banco de dados compartilhada entre sistemas. Se uma gravação posterior falhar, o Forge tenta restaurar somente as entradas alteradas por aquele descanso. Valores que permaneceram intactos são ignorados, e edições feitas por outra operação não são sobrescritas. Conflitos no rollback são informados junto ao erro original.
 
 Uma regra inválida não impede necessariamente as demais regras válidas de serem calculadas. O resumo identifica os alvos ou fórmulas que não puderam ser aplicados.
 
@@ -97,7 +95,7 @@ O editor preserva propriedades e registros de recuperação que não reconhece. 
 
 ## Exemplo de desenho: Short Rest e Long Rest
 
-Considere um personagem com `hp` rastreado, um Field `mana` configurado como Resource e um Field `counter` chamado `abilities`:
+Considere um personagem com `hp` rastreado, um Field `mana` configurado como Resource e um Field `counters` chamado `abilities`:
 
 - **Short Rest:** uma regra direta recupera `1d8` de `hp`; outra regra recupera metade do máximo de `mana`, arredondando para baixo. Uma regra de Counter pode recuperar apenas linhas marcadas para Short Rest.
 - **Long Rest:** recupera `hp` até o máximo e recupera linhas de Counter marcadas para Long Rest. Como as linhas podem ser associadas a mais de um botão, configure a associação para refletir quais descansos podem recuperá-las.

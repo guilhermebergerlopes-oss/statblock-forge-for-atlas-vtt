@@ -129,10 +129,16 @@ test('Appearance tab exposes a Field selector and independent general, label and
 
   assert.match(editor, /renderTemplateFieldTypographyInspector\(/);
   assert.match(editor, /appearanceFieldKey/);
+  assert.match(editor, /getDisclosureOpen: \(key\) => this\.propertiesDisclosureOpen\.get\(key\) \?\? false/);
+  assert.match(editor, /setDisclosureOpen: \(key, open\) => this\.propertiesDisclosureOpen\.set\(key, open\)/);
   assert.match(inspector, /Field to customize/);
   assert.match(inspector, /fieldTypographyForField/);
   assert.match(inspector, /setFieldTypographyForField/);
   assert.match(inspector, /Reset field typography/);
+  assert.match(inspector, /panel\.dataset\.forgeDisclosure = `properties-\$\{panelDisclosureKey\}`/);
+  assert.match(inspector, /getDisclosureOpen\?\.\(panelDisclosureKey\)/);
+  assert.match(inspector, /setDisclosureOpen\?\.\(panelDisclosureKey, panel\.open\)/);
+  assert.match(inspector, /field-typography:\$\{fieldId\}:text/);
   for (const label of ["'All text'", "'Labels'", "'Values'"]) {
     assert.ok(inspector.includes(label), `missing ${label} typography group`);
   }

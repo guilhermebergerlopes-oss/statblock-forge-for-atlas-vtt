@@ -2,6 +2,7 @@
 import type { BlockAppearance, ForgeBlockLayout } from '../templates/forgeTemplate.ts';
 import { translateForgeText } from '../i18n/localization.ts';
 import { resolveBlockAppearanceForMode } from '../templates/blockAppearance.ts';
+import { copyBlockAppearance, hasCopiedBlockAppearance, pasteBlockAppearance } from '../templates/blockAppearanceClipboard.ts';
 import { checkboxInput, collapsibleAppearanceGroup, button, el, labeledControl, numberInput, selectInput, toggleControl } from './templateEditorDom.ts';
 import { renderForgeColorControl } from './templateAppearanceEditor.ts';
 import type { TemplateBlockInspectorContext } from './templateBlockInspectorContext.ts';
@@ -22,10 +23,16 @@ export function appendTypographyControls(
   title: string,
   scope: TypographyScope,
   appearance: BlockAppearance,
-  context: Pick<TemplateBlockInspectorContext, 'language' | 'renderPreviewOnly'>,
+  context: Pick<TemplateBlockInspectorContext, 'language' | 'renderPreviewOnly' | 'getDisclosureOpen' | 'setDisclosureOpen'>,
+  disclosureKey?: string,
 ): void {
   const record = appearance as unknown as Record<string, unknown>;
   const group = collapsibleAppearanceGroup(title, undefined, false);
+  if (disclosureKey) {
+    group.dataset.forgeDisclosure = `properties-${disclosureKey}`;
+    group.open = context.getDisclosureOpen?.(disclosureKey) ?? false;
+    group.addEventListener('toggle', () => context.setDisclosureOpen?.(disclosureKey, group.open));
+  }
   const sizeKey = typographyKey(scope, 'fontSize');
   const currentSize = typeof record[sizeKey] === 'number' ? Number(record[sizeKey]) : undefined;
   const size = numberInput(currentSize ?? 14, 8, 48);
@@ -137,7 +144,26 @@ export function renderBlockAppearanceInspector(options: TemplateBlockAppearanceI
   const advanced = el('details', 'statblock-forge__appearance-advanced statblock-forge__block-appearance-advanced');
   advanced.open = advancedOpen;
   advanced.addEventListener('toggle', () => setAdvancedOpen(advanced.open));
-  advanced.append(el('summary', '', 'Block appearance'));
+  advanced.append(el('summary', '', translateForgeText('Block appearance', context.language)));
+
+  const appearanceActions = el('div', 'statblock-forge__block-appearance-copy-actions');
+  const pasteAppearance = button(translateForgeText('Paste appearance', context.language), () => {
+    if (!pasteBlockAppearance(metadata)) return;
+    context.showNotice(translateForgeText('Block appearance pasted. Content and layout were not changed.', context.language));
+    context.render();
+  }, true);
+  pasteAppearance.classList.add('statblock-forge__properties-utility-button');
+  pasteAppearance.disabled = !hasCopiedBlockAppearance();
+  pasteAppearance.title = translateForgeText('Apply the copied visual settings to this block.', context.language);
+  const copyAppearance = button(translateForgeText('Copy appearance', context.language), () => {
+    copyBlockAppearance(metadata);
+    pasteAppearance.disabled = false;
+    context.showNotice(translateForgeText('Block appearance copied.', context.language));
+  }, true);
+  copyAppearance.classList.add('statblock-forge__properties-utility-button');
+  copyAppearance.title = translateForgeText('Copy only this block’s visual settings.', context.language);
+  appearanceActions.append(copyAppearance, pasteAppearance);
+  advanced.append(appearanceActions);
 
   const customAppearance = toggleControl(translateForgeText('Custom appearance', context.language), metadata.appearanceMode === 'custom', (enabled) => {
     if (enabled && metadata.appearanceMode !== 'custom') {
@@ -275,9 +301,9 @@ export function renderBlockAppearanceInspector(options: TemplateBlockAppearanceI
       labeledControl('Vertical alignment', verticalAlign),
       labeledControl('Padding (px)', padding),
     );
-    appendTypographyControls(textGroup, translateForgeText('All text', context.language), 'text', appearance, context);
-    appendTypographyControls(textGroup, translateForgeText('Labels', context.language), 'label', appearance, context);
-    appendTypographyControls(textGroup, translateForgeText('Values', context.language), 'value', appearance, context);
+    appendTypographyControls(textGroup, translateForgeText('All text', context.language), 'text', appearance, context, `block-appearance:${block.id}:text`);
+    appendTypographyControls(textGroup, translateForgeText('Labels', context.language), 'label', appearance, context, `block-appearance:${block.id}:label`);
+    appendTypographyControls(textGroup, translateForgeText('Values', context.language), 'value', appearance, context, `block-appearance:${block.id}:value`);
     advanced.append(textGroup);
 
     if (block.type === 'track' || block.type === 'counters' || hasNumericTracking) {

@@ -9612,3 +9612,17 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
 
 /* Field-specific typography wrapper for one entry in a multi-Field Line. */
 .statblock-forge__preview-line-field { display: contents; }
+
+.statblock-forge__block-appearance-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0.6rem;
+}
+.statblock-forge__block-appearance-copy-actions .statblock-forge__button {
+  flex: 1 1 auto;
+}
+.statblock-forge__block-appearance-copy-actions .statblock-forge__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

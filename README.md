@@ -1,3 +1,7 @@
+# Statblock Forge v0.5.9 — Copy/Paste Block Appearance
+
+- Restores the inspector actions **Copy appearance** and **Paste appearance**. The clipboard stores a detached snapshot of appearance mode and visual settings only. Pasting does not change block content, Field links, formulas, dimensions, position, visibility, or structure. The clipboard works across blocks and Templates during the active plugin session. Explicit buttons are used instead of Ctrl+C/Ctrl+V to avoid interfering with text editing and Obsidian shortcuts.
+
 # Statblock Forge
 
 Statblock Forge is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online.

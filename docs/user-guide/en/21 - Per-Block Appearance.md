@@ -33,6 +33,15 @@ Switching from **Custom** to **Theme** suspends the overrides but does not delet
 
 Appearance is saved in the Template's Forge layout and associated with the block ID. It is not stored in the Field Value. A duplicated or newly created block has its own appearance configuration.
 
+## Copy appearance between blocks
+
+The inspector provides **Copy appearance** and **Paste appearance** to reuse visual settings:
+
+1. Select the source block and click **Copy appearance**.
+2. Select the destination block and click **Paste appearance**.
+
+The copy includes the block's **Theme** or **Custom** mode and visual settings. It remains available across blocks and Templates during the active plugin session. The destination's content, linked Fields, formulas, dimensions, position, visibility, and structure are not changed.
+
 ## Surface
 
 **Surface** controls customize the block box.

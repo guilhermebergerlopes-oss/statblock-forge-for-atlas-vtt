@@ -72,3 +72,13 @@ test('Number/Rating, Table, and Metric formula editors use multiline wrapping te
   assert.match(metricEditor, /textareaInput\(currentFormula/);
   assert.match(styles, /\.statblock-forge__formula-textarea\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
 });
+
+
+test('Dice Formula editors use multiline textareas in both Field Properties and Add Field', async () => {
+  const editor = await readFile(new URL('../src/views/templateFieldEditor.ts', import.meta.url), 'utf8');
+  const diceProperties = editor.slice(editor.indexOf("} else if (field.type === 'dice')"), editor.indexOf("\n  }\n  return panel;"));
+  assert.match(diceProperties, /textareaInput\(typeof field\.diceFormula === 'string' \? field\.diceFormula : '', '\{proficiency\}d\{might\}\+\{level\}', 5\)/);
+  assert.match(diceProperties, /formula\.classList\.add\('statblock-forge__formula-textarea'\)/);
+  assert.match(diceProperties, /formula\.maxLength = MAX_DICE_FIELD_FORMULA_LENGTH/);
+  assert.match(editor, /if \(selectedType === 'dice'\) \{\s*formulaInputKind = 'dice';\s*formula = textareaInput\(diceFormulaValue, '\{proficiency\}d\{might\}\+\{level\}', 5\)/);
+});

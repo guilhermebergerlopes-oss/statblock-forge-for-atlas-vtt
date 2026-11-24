@@ -249,7 +249,7 @@ function numericSample(value: unknown): number | null {
  * the same bare-key references accepted by Number/Rating formulas.
  */
 export function isDiceFieldFormulaSyntaxValid(formula: string, fields: readonly ForgeField[] = []): boolean {
-  const source = formula.trim();
+  const source = formula.trim().replace(/[\r\n]+/g, ' ');
   if (!source || source.length > MAX_DICE_FIELD_FORMULA_LENGTH) return false;
   const side = writtenAdvantage(source);
   const transformed = transformDiceFormulaReferences(side.formula, fields, () => 2);
@@ -275,7 +275,9 @@ export function resolveDiceFieldFormula(
   numericValue?: (source: ForgeField) => number | null,
   referenceValue?: (reference: string) => number | null,
 ): string | null {
-  const source = diceFieldFormula(field).trim();
+  // Textareas may insert line breaks for readability. Treat them as ordinary formula spaces
+  // at evaluation time while preserving the user's original multiline text in the Template.
+  const source = diceFieldFormula(field).trim().replace(/[\r\n]+/g, ' ');
   if (!source) return null;
   const writtenSide = writtenAdvantage(source);
 

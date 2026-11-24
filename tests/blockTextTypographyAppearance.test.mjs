@@ -113,6 +113,10 @@ test('Block Appearance inspector exposes general, label and value typography con
   assert.match(inspector, /delete record\[weightKey\]/);
   assert.match(inspector, /delete record\[styleKey\]/);
   assert.match(inspector, /delete record\[decorationKey\]/);
+  assert.match(inspector, /group\.dataset\.forgeDisclosure = `properties-\$\{disclosureKey\}`/);
+  assert.match(inspector, /getDisclosureOpen\?\.\(disclosureKey\)/);
+  assert.match(inspector, /setDisclosureOpen\?\.\(disclosureKey, group\.open\)/);
+  assert.match(inspector, /block-appearance:\$\{block\.id\}:text/);
 });
 
 test('renderer maps typography metadata to scoped data flags and stylesheet rules', async () => {

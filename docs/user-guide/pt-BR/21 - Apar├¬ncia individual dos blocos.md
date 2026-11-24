@@ -16,7 +16,7 @@ A aparência individual permite que um bloco específico use a paleta global do 
 ## Abrir o inspetor
 
 1. Abra o Template no editor.
-2. Selecione um bloco no Canvas ou na árvore **Data**.
+2. Selecione um bloco no Canvas ou na árvore **Structure**.
 3. No inspetor lateral, expanda **Block appearance**.
 4. Ative **Custom appearance** para editar os controles individuais.
 
@@ -32,6 +32,15 @@ Cada bloco possui seu próprio estado de aparência. Alterar um `Stat` não alte
 Trocar de **Custom** para **Theme** suspende os overrides, mas não os apaga. Ao voltar para **Custom**, os valores anteriores reaparecem. **Reset** remove a aparência individual daquele bloco e retorna para **Theme**.
 
 A aparência é salva no layout Forge do Template, associada ao ID do bloco. Ela não é salva no Value do Field. Duplicar ou criar um bloco novo cria outra configuração de aparência.
+
+## Copiar aparência entre blocos
+
+O inspetor oferece **Copy appearance** e **Paste appearance** para reutilizar a configuração visual:
+
+1. Selecione o bloco de origem e clique em **Copy appearance**.
+2. Selecione o bloco de destino e clique em **Paste appearance**.
+
+A cópia inclui o modo **Theme** ou **Custom** e as configurações visuais do bloco. Ela fica disponível entre blocos e Templates durante a sessão ativa do plugin. O conteúdo, os Fields vinculados, fórmulas, dimensões, posição, visibilidade e estrutura do destino não são alterados.
 
 ## Surface
 

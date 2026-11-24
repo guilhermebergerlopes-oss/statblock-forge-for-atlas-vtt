@@ -2625,6 +2625,8 @@ export class TemplateEditorView extends FileView {
         setSelectedFieldKey: (key) => { this.appearanceFieldKey = key; },
         render: () => this.render(),
         renderPreviewOnly: () => this.renderPreviewOnly(),
+      getDisclosureOpen: (key) => this.propertiesDisclosureOpen.get(key) ?? false,
+      setDisclosureOpen: (key, open) => this.propertiesDisclosureOpen.set(key, open),
       }));
     }
     return content;

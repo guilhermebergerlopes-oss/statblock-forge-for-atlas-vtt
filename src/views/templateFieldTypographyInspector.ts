@@ -14,6 +14,8 @@ export interface TemplateFieldTypographyInspectorOptions {
   setSelectedFieldKey(key: string | null): void;
   render(): void;
   renderPreviewOnly(): void;
+  getDisclosureOpen?(key: string): boolean;
+  setDisclosureOpen?(key: string, open: boolean): void;
 }
 
 function isUserField(field: ForgeField): boolean {
@@ -37,6 +39,11 @@ export function renderTemplateFieldTypographyInspector(options: TemplateFieldTyp
 
   const selected = fields.find((field) => field.key === options.selectedFieldKey) ?? fields[0]!;
   if (selected.key !== options.selectedFieldKey) options.setSelectedFieldKey(selected.key);
+  const fieldId = ensureFieldId(layout, selected);
+  const panelDisclosureKey = `field-typography:${fieldId}:panel`;
+  panel.dataset.forgeDisclosure = `properties-${panelDisclosureKey}`;
+  panel.open = options.getDisclosureOpen?.(panelDisclosureKey) ?? false;
+  panel.addEventListener('toggle', () => options.setDisclosureOpen?.(panelDisclosureKey, panel.open));
   const fieldPicker = selectInput(selected.key, fields.map((field) => ({
     value: field.key,
     label: `${field.label.trim() || field.key} (${field.key})`,
@@ -47,9 +54,8 @@ export function renderTemplateFieldTypographyInspector(options: TemplateFieldTyp
   });
   panel.append(labeledControl(translateForgeText('Field to customize', language), fieldPicker));
 
-  // Ensure identity exists before editing. The stable ID is independent of
-  // the editable Field key and therefore survives key renames.
-  ensureFieldId(layout, selected);
+  // Typography and disclosure state follow the stable ID rather than the
+  // editable Field key, so both survive key renames.
   const current = fieldTypographyForField(layout, selected);
   const appearance = { ...current } as FieldTypographyAppearance;
   const mutableAppearance = appearance as FieldTypographyAppearance & Record<string, unknown>;
@@ -59,10 +65,15 @@ export function renderTemplateFieldTypographyInspector(options: TemplateFieldTyp
     if (resetButton) resetButton.disabled = Object.keys(mutableAppearance).length === 0;
     options.renderPreviewOnly();
   };
-  const controlsContext = { language, renderPreviewOnly: onChange };
-  appendTypographyControls(panel, translateForgeText('All text', language), 'text', mutableAppearance, controlsContext);
-  appendTypographyControls(panel, translateForgeText('Labels', language), 'label', mutableAppearance, controlsContext);
-  appendTypographyControls(panel, translateForgeText('Values', language), 'value', mutableAppearance, controlsContext);
+  const controlsContext = {
+    language,
+    renderPreviewOnly: onChange,
+    getDisclosureOpen: options.getDisclosureOpen,
+    setDisclosureOpen: options.setDisclosureOpen,
+  };
+  appendTypographyControls(panel, translateForgeText('All text', language), 'text', mutableAppearance, controlsContext, `field-typography:${fieldId}:text`);
+  appendTypographyControls(panel, translateForgeText('Labels', language), 'label', mutableAppearance, controlsContext, `field-typography:${fieldId}:label`);
+  appendTypographyControls(panel, translateForgeText('Values', language), 'value', mutableAppearance, controlsContext, `field-typography:${fieldId}:value`);
 
   const reset = button(translateForgeText('Reset field typography', language), () => {
     resetFieldTypographyForField(layout, selected);

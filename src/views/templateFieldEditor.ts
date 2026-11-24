@@ -17,7 +17,7 @@ import { removePinnedTemplateImageField, renamePinnedTemplateImageField } from '
 import { renameFieldCompendiumIdentity } from '../templates/fieldCompendiumModel.ts';
 import { setNumericFieldFormula } from '../templates/numericFieldModel.ts';
 import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
-import { isDiceFieldFormulaSyntaxValid, setDiceFieldFormula } from '../statblocks/diceFieldFormulaModel.ts';
+import { isDiceFieldFormulaSyntaxValid, MAX_DICE_FIELD_FORMULA_LENGTH, setDiceFieldFormula } from '../statblocks/diceFieldFormulaModel.ts';
 import { FIELD_CATEGORY_DEFAULT_TYPES, fieldTypesForCategory, resolveFieldCategory, type ForgeFieldCategory } from '../templates/fieldCategoryModel.ts';
 import { renderChoiceFieldSettings } from './templateChoiceFieldSettings.ts';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from '../i18n/localization.ts';
@@ -78,7 +78,10 @@ export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEdito
     });
     panel.append(labeledControl('Formula', formula));
   } else if (field.type === 'dice') {
-    const formula = inputText(typeof field.diceFormula === 'string' ? field.diceFormula : '', '{proficiency}d{might}+{level}');
+    const formula = textareaInput(typeof field.diceFormula === 'string' ? field.diceFormula : '', '{proficiency}d{might}+{level}', 5);
+    formula.classList.add('statblock-forge__formula-textarea');
+    formula.maxLength = MAX_DICE_FIELD_FORMULA_LENGTH;
+    formula.wrap = 'soft';
     const hint = el('small', 'statblock-forge__detail', translateForgeText(
       'Use the same references as Number/Rating formulas: {fieldKey}, @fieldKey, bare keys, Checkboxes, Selection, calculated Fields, structured values, and Table cells. Resolved values must be whole numbers, and the outer expression must remain valid dice notation.',
       contextLanguage(context),
@@ -154,7 +157,7 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
 
   const typeSpecificHost = el('div', 'statblock-forge__add-field-type-specific');
   let unit: HTMLInputElement | null = null;
-  let formula: HTMLInputElement | null = null;
+  let formula: HTMLInputElement | HTMLTextAreaElement | null = null;
   let choices: HTMLInputElement | null = null;
   let unitValue = '';
   let formulaValue = '';
@@ -208,7 +211,10 @@ export function renderAddTemplateField(context: TemplateFieldEditorContext): HTM
     }
     if (selectedType === 'dice') {
       formulaInputKind = 'dice';
-      formula = inputText(diceFormulaValue, '{proficiency}d{might}+{level}');
+      formula = textareaInput(diceFormulaValue, '{proficiency}d{might}+{level}', 5);
+      formula.classList.add('statblock-forge__formula-textarea');
+      formula.maxLength = MAX_DICE_FIELD_FORMULA_LENGTH;
+      formula.wrap = 'soft';
       formula.addEventListener('input', () => { diceFormulaValue = formula?.value ?? ''; });
       typeSpecificHost.append(labeledControl(translateForgeText('Dice Formula', context.language), formula, translateForgeText(
         'Use the same references as Number/Rating formulas: {fieldKey}, @fieldKey, bare keys, Checkboxes, Selection, calculated Fields, structured values, and Table cells. Resolved values must be whole numbers, and the outer expression must remain valid dice notation.', context.language,
@@ -314,7 +320,7 @@ export function renderTemplateFieldCard(context: TemplateFieldEditorContext, fie
         }
       }
     } catch (error) {
-      context.showNotice(error instanceof Error ? error.message : String(error));
+      context.showNotice(translateForgeText(error instanceof Error ? error.message : String(error), context.language));
     }
     context.render();
   });

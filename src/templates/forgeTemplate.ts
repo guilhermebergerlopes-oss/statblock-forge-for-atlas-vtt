@@ -269,22 +269,42 @@ export function createBlankTemplate(name: string): ForgeTemplate {
 
 function collectTemplateKeyWarnings(fields: unknown[], blocks: unknown[]): string[] {
   const warnings: string[] = [];
-  const fieldOwners = new Map<string, string>();
+  const currentFieldOwners = new Map<string, string>();
+  const formerKeyOwners = new Map<string, string>();
+  const seenCurrentKeys = new Set<string>();
+  for (const rawField of fields) {
+    if (!isRecord(rawField) || typeof rawField.key !== 'string') continue;
+    const fieldLabel = typeof rawField.label === 'string' ? rawField.label : rawField.key;
+    if (!currentFieldOwners.has(rawField.key.toLowerCase())) {
+      currentFieldOwners.set(rawField.key.toLowerCase(), fieldLabel);
+    }
+  }
   for (const rawField of fields) {
     if (!isRecord(rawField) || typeof rawField.key !== 'string') continue;
     const fieldLabel = typeof rawField.label === 'string' ? rawField.label : rawField.key;
     if (rawField.formerKeys !== undefined && !Array.isArray(rawField.formerKeys)) {
       warnings.push(`Field "${fieldLabel}": formerKeys não está em uma lista válida.`);
     }
-    const candidates = [rawField.key, ...(Array.isArray(rawField.formerKeys) ? rawField.formerKeys.filter((key): key is string => typeof key === 'string') : [])];
-    for (const candidate of candidates) {
-      if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(candidate)) {
-        warnings.push(`Identificador de Field inválido em "${fieldLabel}": "${candidate}".`);
+    const currentKey = rawField.key;
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(currentKey)) {
+      warnings.push(`Identificador de Field inválido em "${fieldLabel}": "${currentKey}".`);
+    }
+    const currentIdentity = currentKey.toLowerCase();
+    if (seenCurrentKeys.has(currentIdentity)) {
+      const previous = currentFieldOwners.get(currentIdentity) ?? fieldLabel;
+      warnings.push(`Identificador de Field duplicado: "${currentKey}" aparece em "${previous}" e "${fieldLabel}".`);
+    }
+    seenCurrentKeys.add(currentIdentity);
+    for (const former of Array.isArray(rawField.formerKeys) ? rawField.formerKeys.filter((key): key is string => typeof key === 'string') : []) {
+      if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(former)) {
+        warnings.push(`Identificador de Field inválido em "${fieldLabel}": "${former}".`);
       }
-      const normalized = candidate.toLowerCase();
-      const previous = fieldOwners.get(normalized);
-      if (previous) warnings.push(`Identificador de Field duplicado: "${candidate}" aparece em "${previous}" e "${fieldLabel}" (incluindo formerKeys).`);
-      else fieldOwners.set(normalized, fieldLabel);
+      const normalized = former.toLowerCase();
+      // An active key takes precedence over every inactive compatibility alias.
+      if (currentFieldOwners.has(normalized)) continue;
+      const previous = formerKeyOwners.get(normalized);
+      if (previous) warnings.push(`Identificador de Field duplicado: "${former}" aparece em "${previous}" e "${fieldLabel}" (incluindo formerKeys).`);
+      else formerKeyOwners.set(normalized, fieldLabel);
     }
 
     if (rawField.type === 'entries') {
@@ -708,12 +728,21 @@ export function registerTemplateField(template: ForgeTemplate, label: string, ty
   const cleanLabel = label.trim();
   if (!cleanLabel) throw new Error('Informe um nome para o campo.');
   const base = slugify(cleanLabel).replace(/-/g, '_').slice(0, 40) || 'field';
-  const used = new Set(template.fields.flatMap((field) => [field.key, ...(Array.isArray(field.formerKeys)
-    ? field.formerKeys.filter((value): value is string => typeof value === 'string') : [])]).map((key) => key.toLowerCase()));
+  // Former keys are compatibility aliases, not permanently reserved names.
+  // Only current Field keys prevent a new Field from using the same identifier.
+  const used = new Set(template.fields.map((field) => field.key.toLowerCase()));
   let key = base;
   let suffix = 2;
   while (used.has(key.toLowerCase()) || ['tags', '__forgeconditions', '__forgeconditionvalues', '__proto__', 'prototype', 'constructor'].includes(key.toLowerCase())) {
     key = `${base.slice(0, 40 - String(suffix).length - 1)}_${suffix++}`;
+  }
+  // The new Field takes ownership of a key that may still be listed as an
+  // inactive alias on an older Field. Remove that alias to keep references
+  // unambiguous and allow the old key to be reused intentionally.
+  for (const existingField of template.fields) {
+    if (!Array.isArray(existingField.formerKeys)) continue;
+    existingField.formerKeys = existingField.formerKeys.filter((former) =>
+      typeof former !== 'string' || former.toLowerCase() !== key.toLowerCase());
   }
   const field: ForgeField = { key, label: cleanLabel, type };
   if (type === 'choice') field.options = ['Option 1', 'Option 2'];

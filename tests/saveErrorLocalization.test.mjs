@@ -60,3 +60,9 @@ test('Portuguese interface keeps native Portuguese save errors', () => {
   const message = 'O caminho templates/creatures é um arquivo, não uma pasta.';
   assert.equal(translateForgeText(message, 'pt-BR'), message);
 });
+
+test('Field key conflict notices are localized in English and preserved in Portuguese', () => {
+  const message = 'A chave "vitality" já está sendo usada por outro campo.';
+  assert.equal(translateForgeText(message, 'en'), 'Key "vitality" is already used by another Field.');
+  assert.equal(translateForgeText(message, 'pt-BR'), message);
+});
