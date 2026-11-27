@@ -62,6 +62,7 @@ import {
   validateTemplateFields,
 } from '../templates/fieldEditorModel';
 import { resolveVaultImageResource } from '../render/vaultImageResolver.ts';
+import { listForgeAtlasDiceSetJsonFiles } from '../statblocks/restDiceRoller.ts';
 import { gridResizeSpanFromStep, resizeAutoScrollSpeed, resizeRowsMinHeight, rowResizePreviewWidth, rowResizeSpanFromDelta } from './templateCanvasResize.ts';
 import { readTemplateGridGeometry, templateGridColumnPitch } from './templateGridGeometry.ts';
 import { openImageSocketActionsMenu } from '../render/imageSocketActionsMenu.ts';
@@ -1881,15 +1882,16 @@ export class TemplateEditorView extends FileView {
     this.setSidebarMode('dice');
     this.diceOptions = diceSetOptions([]);
     this.render();
-    const files = this.app.vault.getFiles().filter((file: TFile) => file.path.startsWith('atlas-vtt/dice-sets/')
-      && file.extension.toLowerCase() === 'json');
+    const files = await listForgeAtlasDiceSetJsonFiles(this.app);
     const stored: DiceSetOption[] = [];
-    for (const file of files) {
+    for (const path of files) {
       try {
-        const option = readDiceSetOption(JSON.parse(await this.app.vault.cachedRead(file)), file.path);
+        const text = await this.app.vault.adapter.read(path);
+        if (text.length > 64 * 1024) continue;
+        const option = readDiceSetOption(JSON.parse(text), path);
         if (option) stored.push(option);
       } catch {
-        // Invalid files are ignored here; the source remains untouched in the Vault.
+        // Invalid or adapter-only library records are ignored without modifying the Vault.
       }
     }
     if (this.sidebarMode !== 'dice' || !this.template) return;
@@ -3047,6 +3049,7 @@ export class TemplateEditorView extends FileView {
         statblockPath: this.file?.path ?? `template-preview:${template.id}`,
         statblockName: this.displayName,
         language,
+        templatePreview: true,
       });
       dropzone.append(card);
     } else {

@@ -47,9 +47,9 @@ export function auditForgeRelease(root = ROOT) {
 
   if (packageJson.name !== 'statblock-forge') errors.push(`Unexpected package name: ${packageJson.name}`);
   if (manifest.id !== 'statblock-forge') errors.push(`Unexpected manifest ID: ${manifest.id}`);
-  if (packageJson.version !== '0.5.10' || manifest.version !== '0.5.10' || lock.version !== '0.5.10'
-    || lock.packages?.['']?.version !== '0.5.10') {
-    errors.push('package.json, manifest.json, and package-lock.json must all be at version 0.5.10.');
+  if (packageJson.version !== '0.5.13' || manifest.version !== '0.5.13' || lock.version !== '0.5.13'
+    || lock.packages?.['']?.version !== '0.5.13') {
+    errors.push('package.json, manifest.json, and package-lock.json must all be at version 0.5.13.');
   }
 
   const productionFiles = [
@@ -86,6 +86,15 @@ export function auditForgeRelease(root = ROOT) {
     }
   }
   if (missingImports.length) errors.push(`Unresolved relative imports:\n${missingImports.join('\n')}`);
+
+  const nodeBuiltinImports = [];
+  const nodeBuiltinImportPattern = /(?:\bfrom\s*|\bimport\s*\()\s*['\"]node:[^'\"]+['\"]/g;
+  for (const file of sourceFiles) {
+    const source = fs.readFileSync(file, 'utf8');
+    if (nodeBuiltinImportPattern.test(source)) nodeBuiltinImports.push(path.relative(root, file));
+    nodeBuiltinImportPattern.lastIndex = 0;
+  }
+  if (nodeBuiltinImports.length) errors.push(`Node built-in imports are not allowed in the browser-targeted Obsidian bundle: ${nodeBuiltinImports.join(', ')}`);
 
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   const requiredWiring = [

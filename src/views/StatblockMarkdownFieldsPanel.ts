@@ -47,6 +47,10 @@ export class StatblockMarkdownFieldsPanel {
     return this.source.path === sourcePath && this.templateFile.path === templatePath;
   }
 
+  belongsTo(sourcePath: string): boolean {
+    return this.source.path === sourcePath;
+  }
+
   usesTemplate(templatePath: string): boolean {
     return this.templateFile.path === templatePath;
   }

@@ -140,23 +140,221 @@ export function resolveForgeRestDiceSet(templateSetId: unknown, customSets: read
     ?? DEFAULT_REST_DICE_SET;
 }
 
-/** Reads a template's named Dice Set from the same Vault folder Atlas uses. */
+/**
+ * Dice Set JSON can be stored in Atlas' dice-sets folder, including nested
+ * collection folders. Normalize separators and folder casing because Obsidian
+ * Vault paths may preserve the casing chosen on Windows/macOS.
+ */
+function isAtlasDiceSetJsonPath(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/')
+    .normalize('NFC')
+    .toLocaleLowerCase()
+    .replace(/\s+/g, '-');
+  const segments = normalized.split('/').filter(Boolean);
+  return segments[0] === 'atlas-vtt' && segments.includes('dice-sets') && normalized.endsWith('.json');
+}
+
+export interface ForgeVaultDiceSetLookup {
+  set: ForgeRestDiceSet | null;
+  sourcePath?: string;
+  invalidSourcePath?: string;
+  /** Safe, bounded diagnostics for a missing/malformed set; contains paths and IDs, never file contents. */
+  diagnostic?: string;
+}
+
+/**
+ * Lists custom Dice Set JSON paths through Obsidian's Vault adapter rather
+ * than `vault.getFiles()`. Atlas' own DiceSetFiles service reads this library
+ * through `adapter.list()`/`adapter.read()` so it can see records even when
+ * they are not currently present in Obsidian's indexed File Explorer list.
+ * The walk is limited to Atlas' own data folder and keeps nested Dice Sets.
+ */
+export async function listForgeAtlasDiceSetJsonFiles(app: App): Promise<string[]> {
+  const adapter = app.vault.adapter;
+  const found = new Set<string>();
+  const visited = new Set<string>();
+  const pending: string[] = [];
+
+  const addFolder = (folder: string): void => {
+    const key = folder.replace(/\\/g, '/').normalize('NFC').toLocaleLowerCase();
+    if (!visited.has(key)) pending.push(folder);
+  };
+
+  // Atlas opens this exact library root directly with adapter.list(), rather
+  // than discovering it from the parent folder. Obsidian adapters and vault
+  // filters may omit hidden/excluded folders from their parent's listing even
+  // though the path itself is readable. Seed the canonical Atlas path first.
+  addFolder('atlas-vtt/dice-sets');
+
+  // Also discover a case/spacing variant of the Atlas root and nested
+  // collection Dice Sets folders for vaults created on other platforms.
+  try {
+    const rootListing = await adapter.list('');
+    for (const folder of rootListing.folders) {
+      const parts = folder.replace(/\\/g, '/').split('/').filter(Boolean);
+      const segment = parts[parts.length - 1] ?? folder;
+      if (segment.normalize('NFC').toLocaleLowerCase().replace(/\s+/g, '-') === 'atlas-vtt') {
+        addFolder(folder);
+      }
+    }
+  } catch {
+    // The direct canonical path above remains usable when root enumeration is restricted.
+  }
+
+  while (pending.length > 0) {
+    const folder = pending.shift()!;
+    const key = folder.replace(/\\/g, '/').normalize('NFC').toLocaleLowerCase();
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    let listing: { files: string[]; folders: string[] };
+    try {
+      listing = await adapter.list(folder);
+    } catch {
+      // A nonexistent canonical folder or an adapter restriction is not fatal;
+      // other discovered Atlas roots may still contain the set.
+      continue;
+    }
+
+    for (const path of listing.files) {
+      if (isAtlasDiceSetJsonPath(path)) found.add(path);
+    }
+    for (const child of listing.folders) addFolder(child);
+  }
+
+  // Merge the indexed Vault files as a second source. Some Obsidian adapters
+  // omit ignored/hidden folders from adapter.list(), while a TFile can still be
+  // present in the Vault index and readable through cachedRead().
+  try {
+    for (const file of app.vault.getFiles()) {
+      if (isAtlasDiceSetJsonPath(file.path)) found.add(file.path);
+    }
+  } catch {
+    // The adapter scan remains the primary source on runtimes without a usable index.
+  }
+
+  return [...found].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Resolves an explicit custom Dice Set ID from the GM Vault. A missing or
+ * malformed explicit set is not silently replaced with d20: doing so could
+ * change the game's rules. Duplicate IDs are rejected as ambiguous.
+ *
+ * Read through the adapter just like Atlas' RecordFolderFiles service. Do not
+ * rely on `vault.getFiles()`/`cachedRead()`: ignored or not-yet-indexed Atlas
+ * library records can be available to the adapter while absent from the UI list.
+ */
+export async function findForgeRestDiceSetInVault(app: App, id: string): Promise<ForgeVaultDiceSetLookup> {
+  const matches: Array<{ set: ForgeRestDiceSet; path: string }> = [];
+  const invalidPaths: string[] = [];
+  const unreadablePaths: string[] = [];
+  const malformedPaths: string[] = [];
+  const mismatchedIds: Array<{ path: string; id: string }> = [];
+  const candidatePaths = new Set<string>();
+  const indexedFiles = new Map<string, ReturnType<App['vault']['getFiles']>[number]>();
+  const foldersVisited = new Set<string>();
+
+  // Primary source: the same Vault adapter path Atlas' DiceSetFiles service reads.
+  try {
+    for (const path of await listForgeAtlasDiceSetJsonFiles(app)) candidatePaths.add(path);
+  } catch (error) {
+    foldersVisited.add(`adapter scan failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // Secondary source: the Obsidian index. Atlas-only JSON records can be absent
+  // from getFiles(), but some adapters expose them here even when list() omits them.
+  // Merge both sources rather than assuming either one is complete.
+  try {
+    for (const file of app.vault.getFiles()) {
+      if (isAtlasDiceSetJsonPath(file.path)) {
+        candidatePaths.add(file.path);
+        indexedFiles.set(file.path, file);
+      }
+    }
+  } catch (error) {
+    foldersVisited.add(`Vault index scan failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // Explicitly record the canonical folder state. This makes the error actionable
+  // when the Atlas folder is visible but the file list is unexpectedly empty.
+  try {
+    const exists = await app.vault.adapter.exists('atlas-vtt/dice-sets');
+    foldersVisited.add(`atlas-vtt/dice-sets exists: ${exists ? 'yes' : 'no'}`);
+  } catch (error) {
+    foldersVisited.add(`atlas-vtt/dice-sets exists: check failed (${error instanceof Error ? error.message : String(error)})`);
+  }
+
+  for (const path of [...candidatePaths].sort((a, b) => a.localeCompare(b))) {
+    try {
+      let text: string;
+      try {
+        text = await app.vault.adapter.read(path);
+      } catch (adapterError) {
+        const indexedFile = indexedFiles.get(path);
+        if (!indexedFile) throw adapterError;
+        text = await app.vault.cachedRead(indexedFile);
+      }
+      // Dice Set records are small JSON documents. Avoid parsing unexpectedly
+      // large files from the Vault while resolving one selected Template.
+      if (text.length > 64 * 1024) {
+        malformedPaths.push(`${path} (over 64 KiB)`);
+        continue;
+      }
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown;
+      } catch (error) {
+        malformedPaths.push(`${path} (${error instanceof Error ? error.message : 'invalid JSON'})`);
+        continue;
+      }
+      if (!isRecord(raw) || typeof raw.id !== 'string') {
+        malformedPaths.push(`${path} (JSON has no string id)`);
+        continue;
+      }
+      if (raw.id.trim() !== id) {
+        if (mismatchedIds.length < 8) mismatchedIds.push({ path, id: raw.id.slice(0, 100) });
+        continue;
+      }
+      const parsed = parseForgeRestDiceSet(raw);
+      if (!parsed) {
+        invalidPaths.push(path);
+        continue;
+      }
+      matches.push({ set: parsed, path });
+    } catch (error) {
+      unreadablePaths.push(`${path} (${error instanceof Error ? error.message : String(error)})`);
+    }
+  }
+  if (matches.length > 1) {
+    throw new Error(`More than one Dice Set file in atlas-vtt/dice-sets declares ID "${id}". Keep one valid definition so the Template resolves unambiguously.`);
+  }
+  if (matches.length === 1) return { set: matches[0]!.set, sourcePath: matches[0]!.path };
+
+  const details = [
+    `Requested ID: ${id}`,
+    `JSON candidates found: ${candidatePaths.size}`,
+    ...[...foldersVisited].slice(0, 4),
+    ...(invalidPaths.length ? [`Matching ID but invalid Set Dice structure: ${invalidPaths.slice(0, 4).join(', ')}`] : []),
+    ...(unreadablePaths.length ? [`Unreadable JSON: ${unreadablePaths.slice(0, 4).join('; ')}`] : []),
+    ...(malformedPaths.length ? [`Invalid JSON: ${malformedPaths.slice(0, 4).join('; ')}`] : []),
+    ...(mismatchedIds.length ? [`Other IDs found: ${mismatchedIds.slice(0, 4).map((entry) => `${entry.id} in ${entry.path}`).join('; ')}`] : []),
+    ...(candidatePaths.size === 0 ? ['No .json files were returned from the Atlas Dice Sets folder or the Obsidian Vault index.'] : []),
+  ].join(' | ').slice(0, 1800);
+  const invalidSourcePath = invalidPaths[0];
+  return invalidSourcePath
+    ? { set: null, invalidSourcePath, diagnostic: details }
+    : { set: null, diagnostic: details };
+}
+
+/** Reads a Template's named Dice Set from the GM Vault. */
 export async function loadForgeRestDiceSet(app: App, template: ForgeTemplate): Promise<ForgeRestDiceSet> {
   const templateSetId = template.diceSetId;
   if (typeof templateSetId !== 'string' || !templateSetId.trim()) return DEFAULT_REST_DICE_SET;
   const builtIn = BUILT_IN_REST_DICE_SETS.find((set) => set.id === templateSetId);
   if (builtIn) return builtIn;
-
-  for (const file of app.vault.getFiles()) {
-    if (!file.path.startsWith('atlas-vtt/dice-sets/') || file.extension.toLowerCase() !== 'json') continue;
-    try {
-      const parsed = parseForgeRestDiceSet(JSON.parse(await app.vault.cachedRead(file)) as unknown);
-      if (parsed?.id === templateSetId) return parsed;
-    } catch {
-      // Invalid or unreadable set files do not prevent the Rest itself from opening.
-    }
-  }
-  return DEFAULT_REST_DICE_SET;
+  const result = await findForgeRestDiceSetInVault(app, templateSetId);
+  return result.set ?? DEFAULT_REST_DICE_SET;
 }
 
 function cryptographicRandom(): number {

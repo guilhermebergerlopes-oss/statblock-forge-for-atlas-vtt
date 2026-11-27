@@ -116,13 +116,24 @@ function modifierTerm(entry: ForgeNextRollModifier): string {
   return `+(${formula})`;
 }
 
-export function formulaWithNextRollModifiers(
+export interface ForgeNextRollComposition {
+  /** Formula body after combining the clicked roll and queued modifiers. */
+  formula: string;
+  /** The GM's selected Template Dice Set must be prepended before this body. */
+  prependTemplateDefaultDice: boolean;
+}
+
+/**
+ * Combines the clicked formula with queued modifiers without requiring the
+ * player's local Dice Set. When the clicked link is a bare bonus and a queued
+ * modifier adds dice, the host must prepend its own Template default dice.
+ */
+export function formulaWithNextRollModifiersForTemplateHost(
   formula: string,
   modifiers: readonly ForgeNextRollModifier[],
-  defaultRoll?: string | null,
-): string | null {
+): ForgeNextRollComposition {
   const base = formula.trim();
-  if (modifiers.length === 0) return base;
+  if (modifiers.length === 0) return { formula: base, prependTemplateDefaultDice: false };
 
   const writtenBase = writtenAdvantage(base);
   let side: WrittenAdvantageSide | null = writtenBase.side;
@@ -133,12 +144,28 @@ export function formulaWithNextRollModifiers(
   const baseHasDice = formulaHasDice(baseFormula);
   const addedDice = modifiers.some((entry) => formulaHasDice(entry.formula));
   let combined = baseFormula;
+  let prependTemplateDefaultDice = false;
 
   if (!baseHasDice && addedDice) {
-    if (!defaultRoll?.trim()) return null;
     const bonus = /^[+-]/.test(baseFormula) ? baseFormula : `+${baseFormula}`;
-    combined = `${defaultRoll.trim()}${bonus}`;
+    combined = bonus;
+    prependTemplateDefaultDice = true;
   }
 
-  return withWrittenAdvantage(combined + modifiers.map(modifierTerm).join(''), side);
+  return {
+    formula: withWrittenAdvantage(combined + modifiers.map(modifierTerm).join(''), side),
+    prependTemplateDefaultDice,
+  };
+}
+
+export function formulaWithNextRollModifiers(
+  formula: string,
+  modifiers: readonly ForgeNextRollModifier[],
+  defaultRoll?: string | null,
+): string | null {
+  const composition = formulaWithNextRollModifiersForTemplateHost(formula, modifiers);
+  if (!composition.prependTemplateDefaultDice) return composition.formula;
+  if (!defaultRoll?.trim()) return null;
+  const written = writtenAdvantage(composition.formula);
+  return withWrittenAdvantage(`${defaultRoll.trim()}${written.formula}`, written.side);
 }

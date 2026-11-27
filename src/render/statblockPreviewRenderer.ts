@@ -66,7 +66,7 @@ import { rollableBonusFormula } from '../statblocks/statblockValueRolls.ts';
 import { tableCellRollFormulas } from '../statblocks/tableCellRollsModel.ts';
 import { resolveTableRowFormulaValues, tableCellReferenceIndex, tableColumnAggregateContext, tableColumnFormulaValue, tableFormulaMap } from '../statblocks/tableFormulaModel.ts';
 import { TABLE_DISPLAYED_FIELD_KEYS_CONTEXT } from '../statblocks/tableRowFormulaResolver.ts';
-import { appendForgeStatblockDiceText, setForgeStatblockDiceLink } from './statblockDiceLinkElement.ts';
+import { appendForgeStatblockDiceFieldDisplay, appendForgeStatblockDiceText, setForgeStatblockDiceLink, tagForgeStatblockDiceFieldLinks } from './statblockDiceLinkElement.ts';
 import { linkForgeStatblockDice } from './statblockDiceLinks.ts';
 
 export const FORGE_STATBLOCK_SOURCE_DATA_CHANGED_EVENT = 'forge:statblock-source-data-changed';
@@ -1359,7 +1359,10 @@ function createInlineNumericFieldValue(
       : null;
     value.textContent = display;
     setForgeStatblockDiceLink(value, rollFormula);
-    if (rollFormula) value.dataset.rollName = field.label.trim() || field.key;
+    if (rollFormula) {
+      value.dataset.rollName = field.label.trim() || field.key;
+      tagForgeStatblockDiceFieldLinks(value, field.key);
+    }
     else delete value.dataset.rollName;
   };
   redraw();
@@ -1942,7 +1945,8 @@ function createInlineTextFieldValue(
       display.classList.toggle('is-unresolved-dice-formula', !formula);
       if (formula) {
         display.removeAttribute('title');
-        appendForgeStatblockDiceText(display, formula);
+        appendForgeStatblockDiceFieldDisplay(display, field, formula);
+        tagForgeStatblockDiceFieldLinks(display, field.key);
       } else {
         display.textContent = '—';
         display.title = runtime?.language === 'pt-BR'
@@ -1950,7 +1954,7 @@ function createInlineTextFieldValue(
           : 'Could not resolve this formula. Check its referenced Fields and their Checkboxes/Selection options.';
       }
     } else if (field.type === 'markdown' && text) renderAtlasMarkdown(app, markdownComponent, sourcePath, display, text);
-    else if (field.type === 'dice') appendForgeStatblockDiceText(display, text || '—');
+    else if (field.type === 'dice') appendForgeStatblockDiceFieldDisplay(display, field, text || '—');
     else display.textContent = text || '—';
   };
   redraw();
@@ -2765,7 +2769,9 @@ function renderStat(app: App, markdownComponent: Component, sourcePath: string, 
       if (next !== null && valueNode.textContent !== next) valueNode.textContent = next;
     }
     const rollText = trackedCurrentText ? trackedCurrentText.data : (valueNode.textContent ?? '');
-    setForgeStatblockDiceLink(valueNode, rollableBonusFormula(rollText, block.rollable));
+    const rollFormula = rollableBonusFormula(rollText, block.rollable);
+    setForgeStatblockDiceLink(valueNode, rollFormula);
+    if (rollFormula && field?.key) tagForgeStatblockDiceFieldLinks(valueNode, field.key);
   };
   syncRollableValue();
   if (numericRuntime && trackedValue) {
@@ -2843,6 +2849,10 @@ function renderMetric(
         };
         const visibleLabel = label.trim();
         const cell = element('div', `statblock-forge__preview-metric-cell${visibleLabel ? '' : ' is-value-only'}`);
+        if (field?.key) {
+          cell.dataset.prop = field.key;
+          cell.dataset.forgeRollFieldKey = field.key;
+        }
         if (block.rollable === true && visibleLabel) cell.dataset.rollName = visibleLabel;
         if (visibleLabel) cell.append(markInlineFieldNameForEdit(
           element('span', 'statblock-forge__preview-field-label', visibleLabel),
@@ -2877,7 +2887,8 @@ function renderMetric(
           if (expression) {
             metricValue.classList.remove('is-unresolved-dice-formula');
             metricValue.removeAttribute('title');
-            appendForgeStatblockDiceText(metricValue, expression);
+            appendForgeStatblockDiceFieldDisplay(metricValue, diceField, expression);
+            if (field?.key) tagForgeStatblockDiceFieldLinks(metricValue, field.key);
           } else {
             metricValue.classList.toggle('is-unresolved-dice-formula', formulaBackedDice);
             metricValue.textContent = '—';
@@ -2888,7 +2899,9 @@ function renderMetric(
         };
         const syncRollableMetric = (): void => {
           if (isSelectionMetric) return;
-          setForgeStatblockDiceLink(metricValue, rollableBonusFormula(metricValue.textContent ?? '', block.rollable));
+          const rollFormula = rollableBonusFormula(metricValue.textContent ?? '', block.rollable);
+          setForgeStatblockDiceLink(metricValue, rollFormula);
+          if (rollFormula && field?.key) tagForgeStatblockDiceFieldLinks(metricValue, field.key);
         };
         if (diceField) syncDiceMetric();
         else if (isSelectionMetric) {
@@ -2983,6 +2996,7 @@ function renderTableCalculatedValue(
     const formulas = tableCellRollFormulas(rollText, rollable);
     if (formulas.length === 1) setForgeStatblockDiceLink(display, formulas[0]);
     else if (formulas.length > 1) appendForgeStatblockDiceText(display, rollText, rollable);
+    if (formulas.length > 0) tagForgeStatblockDiceFieldLinks(display, field.key);
   }
   cell.append(display);
 }
@@ -3164,7 +3178,8 @@ function renderTableSlotValue(
     } else if (field.type === 'dice') {
       rollText = runtime.diceFormula(field, sample);
       displayText = rollText || '—';
-      appendForgeStatblockDiceText(valueNode, displayText, rollable);
+      appendForgeStatblockDiceFieldDisplay(valueNode, field, displayText);
+      if (hasDiceFieldFormula(field)) tagForgeStatblockDiceFieldLinks(valueNode, field.key);
     } else if (field.type === 'choice') {
       displayText = selectionFieldValueText(field, current) || '—';
       valueNode.textContent = displayText;
@@ -3409,6 +3424,7 @@ function renderTableSlotValue(
     const valueNode = numeric.querySelector<HTMLElement>('.statblock-forge__preview-numeric-field-value');
     if (formula && valueNode) {
       setForgeStatblockDiceLink(valueNode, formula);
+      tagForgeStatblockDiceFieldLinks(valueNode, field.key);
       valueNode.dataset.rollName = field.label.trim() || field.key;
     }
     cell.append(numeric);
@@ -3662,6 +3678,8 @@ function renderTableFields(
       }
       childFields.forEach((field, fieldIndex) => {
         const cell = element('td', `statblock-forge__preview-table-cell statblock-forge__preview-table-cell--${field.type}`);
+        cell.dataset.prop = field.key;
+        cell.dataset.forgeRollFieldKey = field.key;
         cell.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
         // Counter Fields are row-oriented collections: their Nth configured
         // Counter is rendered on Table row N and keeps its own shared Field value.
@@ -3731,6 +3749,8 @@ function renderTableFields(
       }
       childFields.forEach((field, fieldIndex) => {
         const cell = element('td', `statblock-forge__preview-table-cell statblock-forge__preview-table-cell--${field.type} statblock-forge__preview-table-formula-cell`);
+        cell.dataset.prop = field.key;
+        cell.dataset.forgeRollFieldKey = field.key;
         cell.dataset.tableDataColumn = String(fieldIndex + (showRowLabels ? 1 : 0));
         const formula = columnFormulaMap[field.key];
         if (formula) {
@@ -3881,7 +3901,10 @@ function createInlineListFieldValue(
   language: ForgeLanguage,
 ): HTMLElement {
   const slot = createInlineEditSlot(look === 'comma' ? 'span' : 'div', `statblock-forge__preview-inline-list-field ${look === 'comma' ? 'is-inline-look' : 'is-block-look'}`, display, look !== 'comma');
-  const redraw = (): void => drawTagDisplay(display, look, inlineListItems(sample[field.key]), language);
+  const redraw = (): void => {
+    drawTagDisplay(display, look, inlineListItems(sample[field.key]), language);
+    tagForgeStatblockDiceFieldLinks(display, field.key);
+  };
   let refreshEditor: (() => void) | null = null;
   redraw();
   if (runtime.canEdit) {
@@ -5535,6 +5558,7 @@ function createInlinePairsFieldValue(
         // Explicit dice formulas are always links; `Roll as a bonus` additionally
         // turns signed whole-number values such as +5 into clickable rolls.
         appendForgeStatblockDiceText(valueNode, value, rollable);
+        tagForgeStatblockDiceFieldLinks(valueNode, field.key);
         item.append(valueNode);
       }
       display.append(item);
@@ -6903,7 +6927,10 @@ function applyAtlasBlockFrame(node: HTMLElement, block: ForgeBlock): void {
   const fsType = ATLAS_FS_TYPE_BY_FORGE_BLOCK[block.type];
   if (fsType) node.dataset.type = fsType;
   node.dataset.block = block.type;
-  if (typeof block.field === 'string' && block.field) node.dataset.prop = block.field;
+  if (typeof block.field === 'string' && block.field) {
+    node.dataset.prop = block.field;
+    node.dataset.forgeRollFieldKey = block.field;
+  }
   if (typeof block.className === 'string' && block.className.trim()) node.dataset.cls = block.className;
   node.dataset.blockId = block.id;
   const look = atlasBlockLook(block);

@@ -9,6 +9,8 @@ import { ForgeTemplatePickerModal } from './src/views/StatblockFilePickers';
 import { TemplateDeletionModal } from './src/views/TemplateDeletionModal';
 import { TemplateOverwriteModal } from './src/views/TemplateOverwriteModal.ts';
 import { TemplateBackupManagerModal } from './src/views/TemplateBackupManagerModal.ts';
+import { ForgeDiceRollResultModal } from './src/views/ForgeDiceRollResultModal.ts';
+import type { ForgeOffMapDiceRollResult } from './src/statblocks/atlasOffMapDiceRoller.ts';
 import { UnsavedTemplateChangesModal } from './src/views/UnsavedTemplateChangesModal.ts';
 import { normalizeTemplateFolder, FORGE_TEMPLATE_EXTENSION } from './src/templates/templateFormat';
 import { parseTemplateFileText } from './src/templates/forgeFileFormat.ts';
@@ -58,6 +60,13 @@ import {
   FORGE_TOKEN_LINKS_DATA_KEY,
   readPersistedForgeTokenLinks,
 } from './src/atlas/forgeTokenLinkStorage';
+import {
+  DICE_ROLL_TOGETHER_REST_STORE_KEY,
+  emptyDiceTogetherRestStore,
+  ForgeDiceRollTogetherApi,
+  type DiceTogetherForgeApiV2,
+  type DiceTogetherRestStoreV1,
+} from './src/integration/diceRollTogetherApi.ts';
 
 export interface StatblockForgeSettings {
   templateFolder: string;
@@ -98,6 +107,11 @@ export default class StatblockForgePlugin extends Plugin {
   private hasPersistedForgeDiceHistory = false;
   private forgeDiceHistoryDirty = false;
   private forgeDiceHistoryRevision = 0;
+  private diceRollTogetherRestStore: DiceTogetherRestStoreV1 = emptyDiceTogetherRestStore();
+  private persistedDiceRollTogetherRestStoreRaw: unknown = undefined;
+  private hasPersistedDiceRollTogetherRestStore = false;
+  private diceRollTogetherRestStoreDirty = false;
+  private diceRollTogetherApi: ForgeDiceRollTogetherApi | null = null;
   private hasPersistedForgeTokenLinks = false;
   private forgeTokenLinkStoreDirty = false;
   private dataWriteQueue: Promise<void> = Promise.resolve();
@@ -105,8 +119,14 @@ export default class StatblockForgePlugin extends Plugin {
   private editorRecoveryPromptOpen = false;
 
   async onload(): Promise<void> {
-    const storedData = await this.loadData() as (Partial<StatblockForgeSettings> & { editorDrafts?: unknown; forgeTokenLinks?: unknown; forgeDiceHistory?: unknown }) | null;
-    const { editorDrafts, forgeTokenLinks: storedForgeTokenLinks, forgeDiceHistory: storedForgeDiceHistory, ...storedSettings } = storedData ?? {};
+    const storedData = await this.loadData() as (Partial<StatblockForgeSettings> & { editorDrafts?: unknown; forgeTokenLinks?: unknown; forgeDiceHistory?: unknown; diceRollTogetherRestStore?: unknown }) | null;
+    const { editorDrafts, forgeTokenLinks: storedForgeTokenLinks, forgeDiceHistory: storedForgeDiceHistory, diceRollTogetherRestStore: storedDiceRollTogetherRestStore, ...storedSettings } = storedData ?? {};
+    this.hasPersistedDiceRollTogetherRestStore = Object.prototype.hasOwnProperty.call(storedData ?? {}, DICE_ROLL_TOGETHER_REST_STORE_KEY);
+    this.persistedDiceRollTogetherRestStoreRaw = storedDiceRollTogetherRestStore;
+    if (isRecord(storedDiceRollTogetherRestStore) && storedDiceRollTogetherRestStore.version === 1
+      && Array.isArray(storedDiceRollTogetherRestStore.receipts) && Array.isArray(storedDiceRollTogetherRestStore.pending)) {
+      this.diceRollTogetherRestStore = storedDiceRollTogetherRestStore as unknown as DiceTogetherRestStoreV1;
+    }
     this.editorRecoveryDrafts = readPersistedTemplateEditorDrafts(editorDrafts);
     this.hasPersistedForgeTokenLinks = Object.prototype.hasOwnProperty.call(storedData ?? {}, FORGE_TOKEN_LINKS_DATA_KEY);
     this.persistedForgeTokenLinksRaw = storedForgeTokenLinks;
@@ -313,7 +333,7 @@ export default class StatblockForgePlugin extends Plugin {
       this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
         if (file instanceof TFolder) {
           menu.addItem((item) => item
-            .setTitle(this.uiLabel('Add Forge statblock here', 'Adicionar statblock Forge aqui'))
+            .setTitle(this.uiLabel('Statblock Forge: Add statblock here', 'Statblock Forge: Adicionar statblock aqui'))
             .setIcon('file-plus')
             .onClick(() => this.openForgeTemplatePickerForFolder(file)));
           return;
@@ -322,17 +342,17 @@ export default class StatblockForgePlugin extends Plugin {
         const tokenAssessment = assessAtlasTokenCreation(this.app, file);
         if (tokenAssessment.status === 'ready') {
           menu.addItem((item) => item
-            .setTitle(this.uiLabel('Create Atlas token from this statblock', 'Criar token Atlas a partir deste statblock'))
+            .setTitle(this.uiLabel('Statblock Forge: Create Atlas token from this statblock', 'Statblock Forge: Criar token Atlas a partir deste statblock'))
             .setIcon('user-round-plus')
             .onClick(() => { void this.createAtlasTokenFromStatblock(file); }));
         }
         if (!readForgeTemplateLink(this.app, file)) return;
         menu.addItem((item) => item
-          .setTitle(this.uiLabel('Render statblock with Forge', 'Visualizar statblock com Forge'))
+          .setTitle(this.uiLabel('Statblock Forge: Render statblock', 'Statblock Forge: Visualizar statblock'))
           .setIcon('scroll-text')
           .onClick(() => { void this.openLinkedForgeStatblock(file); }));
         menu.addItem((item) => item
-          .setTitle(this.uiLabel('Edit linked Forge template', 'Editar template Forge vinculado'))
+          .setTitle(this.uiLabel('Statblock Forge: Edit linked template', 'Statblock Forge: Editar template vinculado'))
           .setIcon('layout-template')
           .onClick(() => { void this.openLinkedForgeTemplate(file); }));
       }));
@@ -891,6 +911,29 @@ export default class StatblockForgePlugin extends Plugin {
     await this.persistPluginData();
   }
 
+  /** Public, versioned integration provider consumed by Dice Roll Together. */
+  getDiceRollTogetherApi(): DiceTogetherForgeApiV2 {
+    if (!this.diceRollTogetherApi) {
+      this.diceRollTogetherApi = new ForgeDiceRollTogetherApi({
+        app: this.app,
+        initialStore: this.hasPersistedDiceRollTogetherRestStore
+          ? this.persistedDiceRollTogetherRestStoreRaw
+          : this.diceRollTogetherRestStore,
+        persistStore: async (store) => {
+          this.diceRollTogetherRestStore = store;
+          this.diceRollTogetherRestStoreDirty = true;
+          await this.persistPluginData();
+        },
+        getLanguage: () => normalizeForgeLanguage(this.settings.language),
+        presentSharedRollResult: (result: ForgeOffMapDiceRollResult, footerMessage: string) => {
+          new ForgeDiceRollResultModal(this.app, result, normalizeForgeLanguage(this.settings.language), footerMessage).open();
+        },
+        refreshCharacter: (characterPath: string) => this.refreshCharacterViews(characterPath),
+      });
+    }
+    return this.diceRollTogetherApi;
+  }
+
   /** Returns a detached snapshot of all currently persisted Forge token links. */
   getForgeTokenLinkStore(): ForgeTokenLinkStore {
     return cloneForgeTokenLinksForPersistence(this.requireForgeTokenLinkStore());
@@ -1034,6 +1077,14 @@ export default class StatblockForgePlugin extends Plugin {
         snapshot[FORGE_TOKEN_LINKS_DATA_KEY] = this.persistedForgeTokenLinksRaw;
       }
 
+      const shouldWriteDiceRollTogetherStore = this.diceRollTogetherRestStoreDirty || !this.hasPersistedDiceRollTogetherRestStore;
+      if (shouldWriteDiceRollTogetherStore) {
+        snapshot[DICE_ROLL_TOGETHER_REST_STORE_KEY] = this.diceRollTogetherRestStore;
+      } else if (this.hasPersistedDiceRollTogetherRestStore) {
+        // Preserve unknown/newer store data during unrelated Forge setting writes.
+        snapshot[DICE_ROLL_TOGETHER_REST_STORE_KEY] = this.persistedDiceRollTogetherRestStoreRaw;
+      }
+
       const historyRevisionAtSnapshot = this.forgeDiceHistoryRevision;
       const historySnapshot = this.forgeDiceHistoryDirty
         ? cloneForgeDiceHistory(this.forgeDiceHistoryEntries)
@@ -1063,6 +1114,11 @@ export default class StatblockForgePlugin extends Plugin {
           this.forgeTokenLinkStoreStatus = 'ready';
           this.forgeTokenLinkStoreIssues = [];
         }
+      }
+      if (shouldWriteDiceRollTogetherStore) {
+        this.persistedDiceRollTogetherRestStoreRaw = snapshot[DICE_ROLL_TOGETHER_REST_STORE_KEY];
+        this.hasPersistedDiceRollTogetherRestStore = true;
+        this.diceRollTogetherRestStoreDirty = false;
       }
     });
     this.dataWriteQueue = write.catch(() => undefined);
@@ -1134,6 +1190,17 @@ export default class StatblockForgePlugin extends Plugin {
     const refreshes: Promise<void>[] = [];
     for (const leaf of this.app.workspace.getLeavesOfType(STATBLOCK_FORGE_RENDER_VIEW)) {
       if (leaf.view instanceof StatblockRenderView && leaf.view.matchesTemplatePath(templatePath)) {
+        refreshes.push(leaf.view.refresh());
+      }
+    }
+    await Promise.all(refreshes);
+  }
+
+  async refreshCharacterViews(characterPath: string): Promise<void> {
+    await this.statblockNotePanels?.refreshSource(characterPath);
+    const refreshes: Promise<void>[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType(STATBLOCK_FORGE_RENDER_VIEW)) {
+      if (leaf.view instanceof StatblockRenderView && leaf.view.matchesSourcePath(characterPath)) {
         refreshes.push(leaf.view.refresh());
       }
     }

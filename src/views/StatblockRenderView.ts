@@ -45,6 +45,10 @@ export class StatblockRenderView extends ItemView {
     return this.sourcePath === sourcePath && this.templatePath === templatePath;
   }
 
+  matchesSourcePath(sourcePath: string): boolean {
+    return this.sourcePath === sourcePath;
+  }
+
   matchesTemplatePath(templatePath: string): boolean {
     return this.templatePath === templatePath;
   }

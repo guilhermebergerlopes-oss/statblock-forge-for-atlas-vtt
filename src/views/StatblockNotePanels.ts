@@ -190,6 +190,18 @@ export class StatblockNotePanels {
     }
   }
 
+  /** Refresh the currently open Forge surface for one character after an external integration writes its note. */
+  async refreshSource(sourcePath: string): Promise<void> {
+    const refreshes: Promise<void>[] = [];
+    for (const panel of this.panels.values()) {
+      if (panel.belongsTo(sourcePath)) refreshes.push(panel.refresh());
+    }
+    for (const panel of this.markdownPanels.values()) {
+      if (panel.belongsTo(sourcePath)) refreshes.push(panel.refresh());
+    }
+    await Promise.all(refreshes);
+  }
+
   /** Refresh only open notes linked to a template that has just been saved. */
   async refreshTemplate(templatePath: string): Promise<void> {
     const refreshes: Promise<void>[] = [];

@@ -18,6 +18,14 @@ import { renameFieldCompendiumIdentity } from '../templates/fieldCompendiumModel
 import { setNumericFieldFormula } from '../templates/numericFieldModel.ts';
 import { MAX_MATH_FORMULA_LENGTH } from '../templates/formulaLimits.ts';
 import { isDiceFieldFormulaSyntaxValid, MAX_DICE_FIELD_FORMULA_LENGTH, setDiceFieldFormula } from '../statblocks/diceFieldFormulaModel.ts';
+import {
+  DICE_FIELD_DISPLAY_ICON_SIDES,
+  getDiceFieldDisplaySettings,
+  setDiceFieldDisplayIconSides,
+  setDiceFieldDisplayMode,
+  setDiceFieldDisplayText,
+} from '../statblocks/diceFieldDisplayModel.ts';
+import { ATLAS_DICE_ICON_DATA_URLS } from '../render/atlasDiceIconAssets.ts';
 import { FIELD_CATEGORY_DEFAULT_TYPES, fieldTypesForCategory, resolveFieldCategory, type ForgeFieldCategory } from '../templates/fieldCategoryModel.ts';
 import { renderChoiceFieldSettings } from './templateChoiceFieldSettings.ts';
 import { normalizeForgeLanguage, translateForgeText, type ForgeLanguage } from '../i18n/localization.ts';
@@ -99,6 +107,81 @@ export function renderNumericFieldFormulaEditor(context: Pick<TemplateFieldEdito
       context.renderPreviewOnly();
     });
     panel.append(labeledControl(translateForgeText('Dice Formula', contextLanguage(context)), formula), hint, warning);
+
+    const display = getDiceFieldDisplaySettings(field);
+    const displayMode = selectInput(display.mode, [
+      { value: 'formula', label: translateForgeText('Formula', contextLanguage(context)) },
+      { value: 'icon', label: translateForgeText('Die icon', contextLanguage(context)) },
+      { value: 'text', label: translateForgeText('Custom word', contextLanguage(context)) },
+    ]);
+    displayMode.setAttribute('aria-label', translateForgeText('Dice display', contextLanguage(context)));
+
+    const iconSides = selectInput(String(display.iconSides), DICE_FIELD_DISPLAY_ICON_SIDES.map((sides) => ({
+      value: String(sides),
+      label: `d${sides}`,
+    })));
+    iconSides.setAttribute('aria-label', translateForgeText('Die icon', contextLanguage(context)));
+    const iconControl = labeledControl(translateForgeText('Die icon', contextLanguage(context)), iconSides);
+
+    const customText = inputText(display.text, translateForgeText('e.g. Damage, Attack', contextLanguage(context)));
+    customText.maxLength = 40;
+    customText.setAttribute('aria-label', translateForgeText('Custom word', contextLanguage(context)));
+    const textControl = labeledControl(translateForgeText('Display text', contextLanguage(context)), customText);
+
+    const preview = el('span', 'statblock-forge__dice-display-preview');
+    const previewWrap = el('div', 'statblock-forge__dice-display-preview-row');
+    previewWrap.append(el('small', 'statblock-forge__detail', translateForgeText('Preview', contextLanguage(context))), preview);
+    const displayHint = el('small', 'statblock-forge__detail', translateForgeText(
+      'The original formula remains unchanged and clickable; only its visible label is replaced.',
+      contextLanguage(context),
+    ));
+
+    const updateDisplayControls = (): void => {
+      const mode = displayMode.value === 'icon' || displayMode.value === 'text' ? displayMode.value : 'formula';
+      iconControl.hidden = mode !== 'icon';
+      textControl.hidden = mode !== 'text';
+      preview.replaceChildren();
+      if (mode === 'icon') {
+        const sides = Number(iconSides.value);
+        const icon = el('img', 'statblock-forge__dice-display-icon') as HTMLImageElement;
+        icon.src = ATLAS_DICE_ICON_DATA_URLS[sides] ?? ATLAS_DICE_ICON_DATA_URLS[6];
+        icon.alt = `d${sides}`;
+        icon.draggable = false;
+        preview.append(icon);
+      } else {
+        preview.textContent = mode === 'text'
+          ? (customText.value.trim() || formula.value.trim() || '—')
+          : (formula.value.trim() || '2d6');
+      }
+    };
+
+    formula.addEventListener('input', updateDisplayControls);
+    displayMode.addEventListener('change', () => {
+      const mode = displayMode.value === 'icon' || displayMode.value === 'text' ? displayMode.value : 'formula';
+      setDiceFieldDisplayMode(field, mode);
+      updateDisplayControls();
+      context.renderPreviewOnly();
+    });
+    iconSides.addEventListener('change', () => {
+      setDiceFieldDisplayIconSides(field, Number(iconSides.value));
+      updateDisplayControls();
+      context.renderPreviewOnly();
+    });
+    customText.addEventListener('input', () => {
+      setDiceFieldDisplayText(field, customText.value);
+      updateDisplayControls();
+      context.renderPreviewOnly();
+    });
+    updateDisplayControls();
+    const displaySettings = el('div', 'statblock-forge__dice-display-settings');
+    displaySettings.append(
+      labeledControl(translateForgeText('Dice display', contextLanguage(context)), displayMode),
+      iconControl,
+      textControl,
+      previewWrap,
+      displayHint,
+    );
+    panel.append(displaySettings);
   }
   return panel;
 }

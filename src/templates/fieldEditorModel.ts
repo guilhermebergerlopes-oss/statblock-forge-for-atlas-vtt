@@ -661,7 +661,10 @@ export function changeTemplateFieldType(template: ForgeTemplate, key: string, ne
   // Number/Rating formulas, so a source Field may legitimately change type
   // while remaining useful through a boolean or nested numeric property.
   field.type = nextType;
-  if (previousType === 'dice' && nextType !== 'dice') delete field.diceFormula;
+  if (previousType === 'dice' && nextType !== 'dice') {
+    delete field.diceFormula;
+    clearDiceFieldDisplaySettings(field);
+  }
   if (nextType === 'entries' && !isRecord(field.entry)) field.entry = { nameKey: 'name', textKey: 'desc', extras: [] };
   if (nextType === 'choice' && !Array.isArray(field.options)) field.options = ['Option 1', 'Option 2'];
   if (nextType === 'counters' && !Array.isArray(field.counterRows)) field.counterRows = [];

@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import { forgeRestDiceSetById, forgeRestDefaultDiceSet, parseForgeRestDiceSet, type ForgeRestDiceSet } from '../statblocks/restDiceRoller.ts';
+import { forgeRestDiceSetById, forgeRestDefaultDiceSet, listForgeAtlasDiceSetJsonFiles, parseForgeRestDiceSet, type ForgeRestDiceSet } from '../statblocks/restDiceRoller.ts';
 import { parseRollGroups } from '../statblocks/atlasDiceEngine/diceSetNotation.ts';
 import { loadAtlasSystemPresetRules } from './atlasSystemPresetRules.ts';
 
@@ -85,13 +85,12 @@ const BUILT_IN_PRESET_DICE_SET: Readonly<Record<string, string>> = {
 };
 
 async function customDiceSetsOf(app: App): Promise<ForgeRestDiceSet[]> {
-  const vault = (app as unknown as { vault?: VaultLike }).vault;
-  const files = vault?.getFiles?.() ?? [];
   const result: ForgeRestDiceSet[] = [];
-  for (const file of files) {
-    if (!file.path.startsWith('atlas-vtt/dice-sets/') || !file.path.toLowerCase().endsWith('.json') || !vault?.cachedRead) continue;
+  for (const path of await listForgeAtlasDiceSetJsonFiles(app)) {
     try {
-      const parsed = parseForgeRestDiceSet(JSON.parse(await vault.cachedRead(file)) as unknown);
+      const text = await app.vault.adapter.read(path);
+      if (text.length > 64 * 1024) continue;
+      const parsed = parseForgeRestDiceSet(JSON.parse(text) as unknown);
       if (parsed) result.push(parsed);
     } catch { /* invalid or unreadable library records are ignored like Atlas */ }
   }

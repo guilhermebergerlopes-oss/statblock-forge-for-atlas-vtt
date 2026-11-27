@@ -7,14 +7,33 @@ import { ForgeDiceRollResultModal } from '../views/ForgeDiceRollResultModal.ts';
 import { SaveAtlasDicePresetModal } from '../views/SaveAtlasDicePresetModal.ts';
 import { forgeStatblockDefaultRollFormula, forgeStatblockRollMenuSides, getForgeStatblockRollHistory, hasForgeStatblockRollHistory, repeatForgeStatblockRollFromHistory, rollForgeStatblockWithAtlasDiceTool, type ForgeAtlasRollContext } from '../statblocks/atlasRestDiceTool.ts';
 import {
-  formulaWithNextRollModifiers, isNextRollModifierQueued, pendingNextRollModifiers, restoreNextRollModifiers,
+  formulaWithNextRollModifiers, formulaWithNextRollModifiersForTemplateHost, isNextRollModifierQueued, pendingNextRollModifiers, restoreNextRollModifiers,
   takeNextRollModifiers, toggleNextRollModifier,
 } from '../statblocks/nextRollModifiers.ts';
 import { rollPieces } from '../statblocks/atlasDiceEngine/textRolls.ts';
+import { combineWrittenAdvantage, withWrittenAdvantage, writtenAdvantage } from '../statblocks/atlasDiceEngine/writtenAdvantage.ts';
 import { FORGE_STATBLOCK_DICE_LINK_CLASS } from './statblockDiceLinkElement.ts';
+import { forgeFieldKeyForRollLink, GENERIC_FORGE_ROLL_LINK_FIELD_KEY } from './forgeRollLinkFieldKey.ts';
+import { dispatchDiceRollTogetherForgeRoll } from '../integration/diceRollTogetherRollBridge.ts';
+export { forgeFieldKeyForRollLink } from './forgeRollLinkFieldKey.ts';
 
 const LINK_CLASS = FORGE_STATBLOCK_DICE_LINK_CLASS;
 const SKIPPED_TAGS = new Set(['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA', 'BUTTON', 'SELECT', 'OPTION', 'A']);
+
+async function requestDiceRollTogetherFieldRoll(
+  app: App, characterPath: string, fieldKey: string, formula: string, fieldLabel?: string, forceLinkFormula = false, prependTemplateDefaultDice = false,
+  requestedAdvantage?: 'advantage' | 'disadvantage',
+): Promise<boolean> {
+  const plugins = (app.plugins as unknown as { plugins?: Record<string, unknown> }).plugins;
+  return dispatchDiceRollTogetherForgeRoll(plugins, {
+    characterPath, fieldKey, formula,
+    ...(fieldLabel ? { fieldLabel } : {}),
+    ...(forceLinkFormula ? { forceLinkFormula: true } : {}),
+    ...(prependTemplateDefaultDice ? { prependTemplateDefaultDice: true } : {}),
+    ...(requestedAdvantage ? { requestedAdvantage } : {}),
+  });
+}
+
 const LABEL_SELECTOR = [
   '.statblock-forge__preview-stat-label',
   '.statblock-forge__preview-block-heading',
@@ -58,6 +77,8 @@ export interface ForgeStatblockDiceLinkOptions {
   statblockPath: string;
   statblockName: string;
   language: 'en' | 'pt-BR';
+  /** True for Template Editor samples; these never trigger a live session roll. */
+  templatePreview?: boolean;
   /** Exact originating map/token when the statblock is rendered by Atlas. */
   atlasRollContext?: ForgeAtlasRollContext;
 }
@@ -98,6 +119,8 @@ export function linkForgeStatblockDice(root: HTMLElement): void {
       link.className = LINK_CLASS;
       link.textContent = piece.text;
       link.dataset.formula = piece.formula;
+      const fieldKey = forgeFieldKeyForRollLink(link);
+      if (fieldKey) link.dataset.forgeDiceFieldKey = fieldKey;
       link.setAttribute('role', 'button');
       link.setAttribute('tabindex', '0');
       link.setAttribute('aria-label', `Rolar ${piece.formula}`);
@@ -286,6 +309,8 @@ export function attachForgeStatblockDiceRolling(
     ? 'Clique para rolar. Mantenha N pressionado e clique para adicionar ou remover esta fórmula da próxima rolagem.'
     : 'Click to roll. Hold N and click to add or remove this formula from the next roll.';
   root.querySelectorAll<HTMLElement>(`.${LINK_CLASS}`).forEach((link) => {
+    const fieldKey = forgeFieldKeyForRollLink(link, options.template);
+    if (fieldKey) link.dataset.forgeDiceFieldKey = fieldKey;
     link.title = rollLinkHint;
     const formula = link.dataset.formula ?? link.textContent ?? '';
     link.setAttribute('aria-label', options.language === 'pt-BR'
@@ -322,6 +347,62 @@ export function attachForgeStatblockDiceRolling(
     const formula = link.dataset.formula;
     if (!formula) return;
     const queued = takeNextRollModifiers(options.app, statblockKey);
+    const forgeFieldKey = forgeFieldKeyForRollLink(link, options.template);
+    const isLiveCharacterSheet = !options.templatePreview && !options.statblockPath.startsWith('template-preview:');
+    if (queued.length === 0 && isLiveCharacterSheet) {
+      // Set Dice bonuses (for example +5) are ordinary roll links, not Dice
+      // Fields. Route them as a Template-bound generic link if the renderer did
+      // not preserve a unique Field key; the host still verifies the selected
+      // Template fingerprint and validates the formula before rolling.
+      const rollFieldKey = forgeFieldKey || GENERIC_FORGE_ROLL_LINK_FIELD_KEY;
+      const fieldLabel = abilityNameFor(link) || (forgeFieldKey
+        ? options.template.fields.find((field) => field.key === forgeFieldKey)?.label
+        : undefined) || (options.language === 'pt-BR' ? 'Rolagem da ficha' : 'Statblock roll');
+      try {
+        if (await requestDiceRollTogetherFieldRoll(options.app, options.statblockPath, rollFieldKey, formula, fieldLabel, false, false, side ?? undefined)) return;
+      } catch (error) {
+        restoreNextRollModifiers(options.app, statblockKey, queued);
+        new Notice(options.language === 'pt-BR'
+          ? `Não foi possível enviar a rolagem ao Dice Roll Together: ${error instanceof Error ? error.message : String(error)}`
+          : `Could not send the roll to Dice Roll Together: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+    }
+    if (queued.length > 0 && isLiveCharacterSheet) {
+      const composition = formulaWithNextRollModifiersForTemplateHost(formula, queued);
+      // Once a roll has been composed, it is no longer the original Field's
+      // formula. Send it as a generic link bound to the character's Template;
+      // the GM host validates the complete expression and applies its own
+      // trusted Set Dice. Keeping a nested/child Field key here can cause the
+      // GM contract to reject a valid Metric/Table/Entries roll link.
+      const forgeRollFieldKey = GENERIC_FORGE_ROLL_LINK_FIELD_KEY;
+      const fieldLabel = abilityNameFor(link) || (forgeFieldKey
+        ? options.template.fields.find((field) => field.key === forgeFieldKey)?.label
+        : undefined) || (options.language === 'pt-BR' ? 'Rolagem da ficha' : 'Statblock roll');
+      const parsedWritten = writtenAdvantage(composition.formula);
+      const combinedSide = side ? combineWrittenAdvantage(parsedWritten.side, side) : parsedWritten.side;
+      const sharedFormula = withWrittenAdvantage(parsedWritten.formula, combinedSide);
+      if (sharedFormula.length > 500) {
+        restoreNextRollModifiers(options.app, statblockKey, queued);
+        new Notice(options.language === 'pt-BR'
+          ? 'A combinação da próxima rolagem ultrapassa o limite aceito pela sessão. Os modificadores continuam na fila.'
+          : 'The combined next roll exceeds the session limit. The modifiers remain queued.');
+        return;
+      }
+      try {
+        if (await requestDiceRollTogetherFieldRoll(
+          options.app, options.statblockPath, forgeRollFieldKey, sharedFormula, fieldLabel,
+          true, composition.prependTemplateDefaultDice,
+        )) return;
+      } catch (error) {
+        restoreNextRollModifiers(options.app, statblockKey, queued);
+        new Notice(options.language === 'pt-BR'
+          ? `Não foi possível enviar a rolagem combinada ao GM: ${error instanceof Error ? error.message : String(error)}`
+          : `Could not send the combined roll to the GM: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+    }
+
     try {
       const [set, collectionSet] = await Promise.all([getExplicitSet(), getCollectionSet()]);
       const defaultRoll = queued.length > 0
@@ -335,6 +416,7 @@ export function attachForgeStatblockDiceRolling(
           : 'Could not resolve the default dice needed to combine these formulas. The modifiers remain queued for the next roll.');
         return;
       }
+
       const attempt = rollForgeStatblockWithAtlasDiceTool(options.app, formulaToRoll, {
         statblockPath: options.statblockPath,
         ...(options.atlasRollContext?.viewId ? { viewId: options.atlasRollContext.viewId } : {}),

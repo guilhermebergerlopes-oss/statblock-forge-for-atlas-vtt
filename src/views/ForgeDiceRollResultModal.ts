@@ -10,7 +10,12 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string,
 
 /** Forge-owned result presentation for rolls made without an Atlas map open. */
 export class ForgeDiceRollResultModal extends Modal {
-  constructor(app: App, private readonly result: ForgeOffMapDiceRollResult, private readonly language: 'en' | 'pt-BR') {
+  constructor(
+    app: App,
+    private readonly result: ForgeOffMapDiceRollResult,
+    private readonly language: 'en' | 'pt-BR',
+    private readonly footerMessage?: string,
+  ) {
     super(app);
   }
 
@@ -83,7 +88,10 @@ export class ForgeDiceRollResultModal extends Modal {
     }
 
     const footer = node('div', 'statblock-forge__dice-roll-footer');
-    footer.append(node('small', '', label('Rolled locally by Statblock Forge · not added to Atlas map history', 'Rolagem local do Statblock Forge · não adicionada ao histórico do mapa Atlas')));
+    footer.append(node('small', '', this.footerMessage ?? label(
+      'Rolled locally by Statblock Forge · not added to Atlas map history',
+      'Rolagem local do Statblock Forge · não adicionada ao histórico do mapa Atlas',
+    )));
     const close = node('button', 'mod-cta', label('Close', 'Fechar'));
     close.type = 'button';
     close.addEventListener('click', () => this.close());

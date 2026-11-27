@@ -198,6 +198,29 @@ export function groupPreviewGroups(raw: unknown, creatureName = 'Creature'): Gro
  * Scores formulas. It deliberately has no `eval`, property access outside
  * declared sample references, assignments, or arbitrary function calls.
  */
+/**
+ * Resolve the numeric values that Forge actually displays for Number/Rating Fields.
+ * Formula-backed Fields are calculated from their formulas (including formula dependencies),
+ * never from the stored editable input. Fields without formulas display their stored value.
+ * This is the shared read path for integrations that must use visible statblock values.
+ */
+export function resolveDisplayedNumericFieldValues(
+  fields: readonly ForgeField[],
+  sample: Record<string, unknown>,
+  tableReferences: TableCellReferenceIndex = {},
+  tableSourceValues: Record<string, unknown> = sample,
+): Record<string, number | null> {
+  const result: Record<string, number | null> = {};
+  for (const field of fields) {
+    if (!isFormulaCapableNumericField(field)) continue;
+    result[field.key] = calculateNumericFieldValue(field, sample, (formula, formulaSample, formulaSlotValue, currentFieldKey) =>
+      evaluatePreviewFormula(
+        formula, formulaSample, formulaSlotValue, fields, tableReferences, tableSourceValues, currentFieldKey,
+      ));
+  }
+  return result;
+}
+
 export function evaluatePreviewFormula(
   source: string,
   sample: Record<string, unknown>,

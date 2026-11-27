@@ -1,10 +1,12 @@
 # Third-party notices
 
-## Atlas VTT dice formula engine
+## Atlas dice tray artwork
 
-The isolated formula parser and roller in `src/statblocks/atlasDiceEngine/` are adapted from Atlas VTT Beta's dice engine. The statblock text-roll scanner in `src/statblocks/atlasDiceEngine/textRolls.ts` is adapted from Atlas VTT Beta's `src/app/tools/textRolls.ts` to preserve its notation recognition rules. The source Atlas VTT project is distributed under the GNU Affero General Public License, version 3 (AGPL-3.0). These adapted portions remain under that license. The Forge uses the parser for its own validated formulas, reproduces Atlas 0.17.0's formula-completion, advantage/disadvantage and critical-result behavior for scene-independent statblock rolls, and routes rolls owned by an open map through that map's native Dice Tool. Scene-independent results are displayed by Forge and are not written to an Atlas map's history. Forge does not import Atlas UI components or statblock models.
+The six die images in `assets/dice-icons/` and embedded in `src/render/atlasDiceIconAssets.ts` are the same pencil-sketch WebP artwork used by Atlas VTT's dice tray. They are copied from the Atlas VTT source repository without modification.
 
+Atlas VTT's `THIRD_PARTY_NOTICES.md` identifies the underlying game-icons.net originals as follows:
 
-## Atlas VTT recovery formula behavior
+- `d4`, `d10` and `d12` by Skoll: [d4](https://game-icons.net/1x1/skoll/d4.html), [d10](https://game-icons.net/1x1/skoll/d10.html), [d12](https://game-icons.net/1x1/skoll/d12.html).
+- `dice-six-faces-six`, `dice-eight-faces-eight` and `dice-twenty-faces-twenty` by Delapouite: [d6](https://game-icons.net/1x1/delapouite/dice-six-faces-six.html), [d8](https://game-icons.net/1x1/delapouite/dice-eight-faces-eight.html), [d20](https://game-icons.net/1x1/delapouite/dice-twenty-faces-twenty.html).
 
-`src/statblocks/restFormulaModel.ts` adapts the reference substitution, bounded recovery formula validation, exact deterministic calculation, and multi-unit Spend aggregation from Atlas VTT Beta's `recoveryFormula.ts` and `spendFormula.ts`. It uses the Atlas-adapted dice parser already present in `src/statblocks/atlasDiceEngine/`. These adapted portions remain under AGPL-3.0. Forge supplies its own statblock field lookup and persists results through Forge-owned data APIs.
+The original icons are licensed under [Creative Commons Attribution 3.0 Unported (CC BY 3.0)](https://creativecommons.org/licenses/by/3.0/). Atlas VTT redrew them as pencil sketches; this extension reuses those Atlas redraws. The upstream asset attribution is documented in the [Atlas VTT source repository](https://github.com/atlas-vtt/atlas-vtt/blob/main/THIRD_PARTY_NOTICES.md).

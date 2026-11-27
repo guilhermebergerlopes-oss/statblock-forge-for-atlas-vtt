@@ -9626,3 +9626,32 @@ body.statblock-forge__entry-dragging * { cursor: grabbing !important; user-selec
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Custom Dice Field labels use the same pencil-sketch WebP artwork as Atlas' dice tray. */
+.statblock-forge__dice-display-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+.statblock-forge__dice-display-icon {
+  display: inline-block;
+  width: 1.35em;
+  height: 1.35em;
+  max-width: 2.1rem;
+  max-height: 2.1rem;
+  object-fit: contain;
+  vertical-align: middle;
+  mix-blend-mode: multiply;
+}
+.theme-dark .statblock-forge__dice-display-icon {
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: screen;
+}
+.statblock-forge__dice-display-label { display: inline-block; line-height: 1.1; }
+.statblock-forge__dice-display-settings { display: grid; gap: 0.4rem; margin-top: 0.55rem; }
+.statblock-forge__dice-display-settings [hidden] { display: none !important; }
+.statblock-forge__dice-display-preview-row { display: flex; align-items: center; gap: 0.65rem; min-height: 2rem; color: var(--text-muted); }
+.statblock-forge__dice-display-preview { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; min-height: 1.75rem; padding: 0.1rem 0.35rem; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); color: var(--text-normal); font-size: var(--font-ui-small); }
+.statblock-forge__dice-display-preview .statblock-forge__dice-display-icon { width: 1.5rem; height: 1.5rem; }

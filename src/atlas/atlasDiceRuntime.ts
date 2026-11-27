@@ -244,6 +244,73 @@ export function resolveAtlasDiceRollTarget(
   return { status: 'ambiguous' };
 }
 
+interface PresentedSceneIdentity {
+  readonly tabIds: readonly string[];
+  readonly mapPaths: readonly string[];
+}
+
+/** Reads Atlas' public, read-only presentedScene descriptor without importing Atlas internals. */
+function presentedSceneIdentity(app: App): PresentedSceneIdentity | null {
+  const plugins = readMember(readMember(app, 'plugins'), 'plugins');
+  const atlas = readMember(plugins, 'atlas-vtt');
+  const source = readMember(atlas, 'presentedScene');
+  if (!isObject(source)) return null;
+  // Atlas exposes presentedScene as a source/store with get(), not as the
+  // descriptor itself. Read the current descriptor so hidden/background map
+  // tabs can still be targeted while they remain presented to the LPV.
+  const getter = readMember(source, 'get');
+  let presented: unknown = source;
+  if (typeof getter === 'function') {
+    try { presented = (getter as (this: unknown) => unknown).call(source); }
+    catch { return null; }
+  }
+  if (!isObject(presented)) return null;
+
+  const tabIds: string[] = [];
+  const mapPaths: string[] = [];
+  for (const [key, raw] of Object.entries(presented)) {
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const value = raw.trim();
+    const loweredKey = key.toLowerCase();
+    if (loweredKey.includes('tab') || loweredKey.includes('view') || loweredKey === 'id') tabIds.push(value);
+    if ((loweredKey.includes('path') || loweredKey.includes('file') || loweredKey.includes('map'))
+      && /\.atlasmap(?:$|[?#])/i.test(value)) mapPaths.push(value);
+    // Atlas has described the presented scene as its tab id plus its map file.
+    // This suffix check also survives a property rename such as filePath -> mapFile.
+    if (/\.atlasmap(?:$|[?#])/i.test(value) && !mapPaths.includes(value)) mapPaths.push(value);
+  }
+  return tabIds.length || mapPaths.length ? { tabIds: [...new Set(tabIds)], mapPaths: [...new Set(mapPaths)] } : null;
+}
+
+/**
+ * Selects the map Atlas is actually showing in its Local Player View. This is
+ * deliberately different from the active GM tab: the GM can switch maps while
+ * the player window keeps the last presented scene. Hidden workspace tabs are
+ * valid here because Atlas keeps their event bus alive while that scene is held.
+ */
+export function resolveAtlasDiceRollTargetForPlayerView(app: App): AtlasDiceRollTargetResolution {
+  const identity = presentedSceneIdentity(app);
+  if (!identity) return resolveAtlasDiceRollTarget(app);
+
+  const contexts = getAtlasDiceRuntimeContexts(app);
+  const byTab = identity.tabIds.flatMap((id) => contexts.filter((context) =>
+    context.viewId === id || readMember(context.view, 'tabId') === id || readMember(context.view, 'id') === id));
+  const uniqueByTab = [...new Map(byTab.map((context) => [context.viewId ?? String(context.leaf), context])).values()];
+  if (uniqueByTab.length === 1) {
+    const context = uniqueByTab[0]!;
+    if (identity.mapPaths.length && context.mapPath && !identity.mapPaths.includes(context.mapPath)) {
+      return { status: 'origin-unavailable' };
+    }
+    return { status: 'ready', context };
+  }
+
+  const byPath = identity.mapPaths.flatMap((path) => contexts.filter((context) => context.mapPath === path));
+  const uniqueByPath = [...new Map(byPath.map((context) => [context.viewId ?? String(context.leaf), context])).values()];
+  if (uniqueByPath.length === 1) return { status: 'ready', context: uniqueByPath[0]! };
+  if (uniqueByPath.length > 1 || uniqueByTab.length > 1) return { status: 'ambiguous' };
+  return { status: 'origin-unavailable' };
+}
+
 /**
  * Creates the transient Atlas DiceRollOrigin event payload only while the
  * originating token still exists in the selected map. Atlas does not persist

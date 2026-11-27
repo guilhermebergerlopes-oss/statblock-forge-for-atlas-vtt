@@ -2,12 +2,14 @@ import type { App } from 'obsidian';
 import type { ForgeRestDiceSet } from './restDiceRoller.ts';
 import { forgeStatblockAdvantageSides, type ForgeAdvantageSide } from './statblockDiceMenuModel.ts';
 import { rollForgeOffMapDiceFormula, type ForgeOffMapDiceRollResult, type ForgeOffMapRollSource } from './atlasOffMapDiceRoller.ts';
+import { enableAtlasLocalPlayerDiceRolls } from '../atlas/atlasLocalPlayerViewSettings.ts';
 import { combineWrittenAdvantage, writtenAdvantage } from './atlasDiceEngine/writtenAdvantage.ts';
 import {
   atlasDiceRollOriginForToken,
   getAtlasDiceHistorySnapshots,
   getAtlasDiceRuntimeContexts,
   resolveAtlasDiceRollTarget,
+  resolveAtlasDiceRollTargetForPlayerView,
   type AtlasDiceRollResultLike,
   type AtlasDiceRuntimeContext,
   type AtlasDiceTokenRollContextLike,
@@ -361,6 +363,40 @@ export function repeatForgeStatblockRollFromHistory(app: App, id: string): Atlas
   }
 
   return localRepeat(app, entry, recipe);
+}
+
+
+/**
+ * Rolls one GM-authoritative Dice Field through the Atlas DiceTool for the scene currently presented to players.
+ * The returned result is the exact object emitted by Atlas' dice-rolled event,
+ * stored in its per-map roll history, shown in the normal result display and
+ * persisted by Atlas' map history listener. No second roll is performed.
+ * Returns null when no Atlas map runtime is available.
+ */
+export async function rollForgeDiceFieldThroughAtlas(
+  app: App,
+  formula: string,
+  set: ForgeRestDiceSet | undefined,
+  source: { characterName: string; fieldLabel: string },
+): Promise<AtlasDiceRollResultLike | null> {
+  const target = resolveAtlasDiceRollTargetForPlayerView(app);
+  // DiceTool and the LPV dice event bus are owned by an Atlas map view. If no
+  // unique presented map is currently open, return null so Dice Roll Together
+  // can still execute and publish the roll with the GM's trusted Set Dice.
+  // A presented map may be hidden behind another GM tab; the resolver above
+  // still finds it by Atlas' presentedScene descriptor.
+  if (target.status !== 'ready') return null;
+  const playerViewReady = await enableAtlasLocalPlayerDiceRolls(app);
+  if (!playerViewReady) return null;
+  const result = target.context.diceTool.rollDice(formula, {
+    type: 'statblock',
+    tokenName: source.characterName.slice(0, 80),
+    abilityName: source.fieldLabel.slice(0, 80),
+  }, undefined, set ? { set: diceSetForAtlas(set), setAppearance: true } : undefined);
+  if (!result || !Number.isFinite(result.total)) {
+    throw new Error('Atlas refused this formula. Check whether its dice syntax is supported by the active Atlas version.');
+  }
+  return result;
 }
 
 /** Rolls on the map that owns the statblock, or through Forge's local engine when no map is open. */
