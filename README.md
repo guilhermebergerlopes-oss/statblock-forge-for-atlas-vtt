@@ -1,7 +1,7 @@
 Statblock Forge for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online.
 Support: https://github.com/guilhermebergerlopes-oss/statblock-forge-for-atlas-vtt/issues
 
-# Statblock Forge for Atlas VTT 0.6.0
+# Statblock Forge for Atlas VTT 0.6.1
 
 Create reusable tabletop RPG Templates and character, creature, or NPC statblocks.
 

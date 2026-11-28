@@ -39617,6 +39617,48 @@ var ForgeDiceRollTogetherApi = class {
     const tableReferences = tableCellReferenceIndex(template.layout?.blocks ?? []);
     return resolveDisplayedNumericFieldValues(fields, data, tableReferences, data);
   }
+  /**
+   * Collects the values the player's local character currently exposes for a Dice
+   * Field. This is deliberately partial: a missing/optional/unresolved value is
+   * omitted so the GM can verify it from the authoritative sheet instead of the
+   * entire character approval being rejected on the player computer.
+   */
+  async collectDiceFieldReferenceCandidates(characterId, fieldKey) {
+    const context = await this.loadContext(characterId);
+    if (!context) throw new Error("The selected Forge statblock is no longer available.");
+    const field = context.template.fields.find((candidate) => candidate.key === fieldKey && candidate.type === "dice");
+    if (!field) return null;
+    const originalFormula = diceFieldFormula(field);
+    if (!originalFormula.trim()) return null;
+    const references = [...new Set(diceFieldFormulaReferences(originalFormula, context.template.fields))];
+    if (references.length > 80) throw new Error(`Dice Field ${fieldKey} uses more than 80 references; simplify its formula before submitting it.`);
+    const tableReferences = tableCellReferenceIndex(context.template.layout.blocks);
+    const referenceValues = {};
+    for (const reference of references) {
+      const value = evaluatePreviewFormula(
+        `{${reference}}`,
+        context.data,
+        void 0,
+        context.template.fields,
+        tableReferences,
+        context.data
+      );
+      if (typeof value === "number" && Number.isSafeInteger(value) && Math.abs(value) <= 1e9) {
+        referenceValues[reference] = value;
+      }
+    }
+    const templateContract = await this.buildTemplateRollContract(context.template, context.templateFile.basename, { requireDiceSet: false });
+    return {
+      characterId,
+      fieldKey,
+      label: field.label || field.key,
+      originalFormula,
+      references,
+      referenceValues,
+      templateId: templateContract.templateId,
+      templateFingerprint: templateContract.fingerprint
+    };
+  }
   async prepareDiceFieldRoll(characterId, fieldKey) {
     const context = await this.loadContext(characterId);
     if (!context) throw new Error("The selected Forge statblock is no longer available.");

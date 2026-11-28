@@ -100,6 +100,18 @@ export interface DiceTogetherTemplateDiceFieldV3 {
   references: string[];
 }
 
+/** Player-local candidate values for GM review; unresolved references are omitted, never coerced to zero. */
+export interface DiceTogetherFieldReferenceCandidatesV3 {
+  characterId: string;
+  fieldKey: string;
+  label: string;
+  originalFormula: string;
+  references: string[];
+  referenceValues: Record<string, number>;
+  templateId: string;
+  templateFingerprint: string;
+}
+
 export interface DiceTogetherTemplateDiceSetV3 {
   id: string;
   name: string;
@@ -199,6 +211,8 @@ export interface DiceTogetherForgeApiV3 extends Omit<DiceTogetherForgeApiV1, 'ap
     characterId: string; fieldKey: string; label: string; originalFormula: string; resolvedFormula: string; references: string[];
     referenceValues: Record<string, number>; templateId: string; templateFingerprint: string;
   } | null>;
+  /** Returns all resolvable reference candidates without requiring every optional character value to exist locally. */
+  collectDiceFieldReferenceCandidates(characterId: string, fieldKey: string): Promise<DiceTogetherFieldReferenceCandidatesV3 | null>;
   /** Optional: rolls via Atlas DiceTool so Atlas shows and logs the exact same GM result. */
   rollOnAtlas?(request: DiceTogetherAtlasRollRequest): Promise<DiceTogetherAtlasRollResult | null> | DiceTogetherAtlasRollResult | null;
   /** Optional: presents the host-authoritative result in the originating player's Forge window. */
@@ -672,6 +686,43 @@ export class ForgeDiceRollTogetherApi implements DiceTogetherForgeApiV3 {
     const template = current.template as unknown as ForgeTemplate;
     const tableReferences = tableCellReferenceIndex((template.layout?.blocks ?? []) as ForgeTemplate['layout']['blocks']);
     return resolveDisplayedNumericFieldValues(fields, data, tableReferences, data);
+  }
+
+  /**
+   * Collects the values the player's local character currently exposes for a Dice
+   * Field. This is deliberately partial: a missing/optional/unresolved value is
+   * omitted so the GM can verify it from the authoritative sheet instead of the
+   * entire character approval being rejected on the player computer.
+   */
+  async collectDiceFieldReferenceCandidates(characterId: string, fieldKey: string): Promise<DiceTogetherFieldReferenceCandidatesV3 | null> {
+    const context = await this.loadContext(characterId);
+    if (!context) throw new Error('The selected Forge statblock is no longer available.');
+    const field = context.template.fields.find((candidate) => candidate.key === fieldKey && candidate.type === 'dice');
+    if (!field) return null;
+    const originalFormula = diceFieldFormula(field);
+    if (!originalFormula.trim()) return null;
+    const references = [...new Set(diceFieldFormulaReferences(originalFormula, context.template.fields))];
+    if (references.length > 80) throw new Error(`Dice Field ${fieldKey} uses more than 80 references; simplify its formula before submitting it.`);
+    const tableReferences = tableCellReferenceIndex(context.template.layout.blocks);
+    const referenceValues: Record<string, number> = {};
+    for (const reference of references) {
+      const value = evaluatePreviewFormula(`{${reference}}`, context.data, undefined,
+        context.template.fields, tableReferences, context.data);
+      if (typeof value === 'number' && Number.isSafeInteger(value) && Math.abs(value) <= 1_000_000_000) {
+        referenceValues[reference] = value;
+      }
+    }
+    const templateContract = await this.buildTemplateRollContract(context.template, context.templateFile.basename, { requireDiceSet: false });
+    return {
+      characterId,
+      fieldKey,
+      label: field.label || field.key,
+      originalFormula,
+      references,
+      referenceValues,
+      templateId: templateContract.templateId,
+      templateFingerprint: templateContract.fingerprint,
+    };
   }
 
   async prepareDiceFieldRoll(characterId: string, fieldKey: string): Promise<{
